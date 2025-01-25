@@ -1,4 +1,4 @@
-(ns example.schema)
+(ns examples.chat.schema)
 
 (def schema
   (merge ;; Using merge we can define each logical entity separately

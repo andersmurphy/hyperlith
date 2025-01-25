@@ -4,16 +4,9 @@
             [hyperlith.impl.json :refer [wrap-parse-json-body]]
             [hyperlith.impl.datastar :as ds]
             [hiccup2.core :as h]
-            [org.httpkit.server :as hk]
-            [datalevin.core :as d]
-            [datalevin.lmdb :as l])
-  (:import (datalevin.db DB)
-           (datalevin.storage Store)))
+            [org.httpkit.server :as hk]))
 
 (def ^:private connections_ (atom {}))
-
-(defn- refresh-all! []
-  (run! (fn [f] (f)) (vals @connections_)))
 
 (defn- send! [ch event close-after-send?]
   (hk/send! ch {:status  200
@@ -23,24 +16,10 @@
                 :body    event}
     close-after-send?))
 
-;; DB
-(def q d/q)
-(def transact! d/transact!)
-(def update-schema d/update-schema)
-
 (defn new-uid
   "Allows us to change id implementation if need be."
   []
   (str (random-uuid)))
-
-(defn backup-copy
-  "Make a backup copy of the database. `dest-dir` is the destination
-  data directory path. Will compact while copying if `compact?` is true."
-  [conn dest-dir compact?]
-  (let [lmdb (.-lmdb ^Store (.-store ^DB conn))]
-    (println "Copying...")
-    (l/copy lmdb dest-dir compact?)
-    (println "Copied database.")))
 
 ;; HTML
 (defmacro html-str [hiccup]
@@ -80,22 +59,20 @@
        :on-close
        (fn on-close [ch _] (swap! connections_ dissoc ch))})))
 
+(defn refresh-all! []
+  (run! (fn [f] (f)) (vals @connections_)))
+
 ;; APP
-(defn start-app [{:keys [routes not-found-handler port schema
-                         csrf-secret]}]
-  (let [db          (d/get-conn "db" schema
-                      {:validate-data?    true
-                       :closed-schema?    true
-                       :auto-entity-time? true})
+(defn start-app [{:keys [routes not-found-handler port
+                         db-start db-stop csrf-secret]}]
+  (let [db          (db-start)
         stop-server (-> (router db routes not-found-handler)
                       (wrap-session csrf-secret)
                       wrap-parse-json-body
                       (hk/run-server {:port (or port 8080)}))]
-    (d/listen! db :refresh-on-change
-      (fn [_] (refresh-all!)))
     {:db-conn db
      :stop    (fn stop []
-                (d/close db)
+                (db-stop db)
                 (stop-server))}))
 
 ;; Compress SSE stream
