@@ -70,7 +70,7 @@
                       (wrap-session csrf-secret)
                       wrap-parse-json-body
                       (hk/run-server {:port (or port 8080)}))]
-    {:db-conn db
+    {:db db
      :stop    (fn stop []
                 (db-stop db)
                 (stop-server))}))

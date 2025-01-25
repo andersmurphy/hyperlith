@@ -3,7 +3,7 @@
   (:require [hyperlith.core :as h]
             [clojure.string :as str]
             [datalevin.core :as d]
-            [examples.chat-datalevin.schema :refer [schema]]))
+            [examples.chat.schema :refer [schema]]))
 
 (defn get-messages [db]
   (d/q '[:find ?id ?content ?created-at
@@ -62,5 +62,5 @@
   (let [stop (server :stop)] (stop))
 
   ;; query outside of handler
-  (get-messages (:db-conn server))
+  (get-messages (:db server))
   ,)

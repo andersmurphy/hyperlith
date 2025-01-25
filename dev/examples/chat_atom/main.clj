@@ -45,5 +45,5 @@
   (let [stop (server :stop)] (stop))
 
   ;; query outside of handler
-  (get-messages (:db-conn server))
+  (get-messages (:db server))
   ,)
