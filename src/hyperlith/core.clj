@@ -26,13 +26,12 @@
   `(-> (h/html ~hiccup) str))
 
 ;; ROUTING
-(defn router [db routes not-found-handler]
-  (let [routes            (merge ds/default-routes routes)
-        default-handler   (fn [_] {:status 303 :headers {"Location" "/"}})
-        not-found-handler (or not-found-handler default-handler)]
-    (fn [req]
-      ((routes [(:request-method req) (:uri req)] not-found-handler)
-       (assoc req :db db)))))
+(defn router
+  ([routes] (router routes (fn [_] {:status 303 :headers {"Location" "/"}})))
+  ([routes not-found-handler]
+   (let [routes (merge ds/default-routes routes)]
+     (fn [req]
+       ((routes [(:request-method req) (:uri req)] not-found-handler) req)))))
 
 ;; HANDLERS
 (defn shim-handler [opts]
@@ -63,17 +62,18 @@
   (run! (fn [f] (f)) (vals @connections_)))
 
 ;; APP
-(defn start-app [{:keys [routes not-found-handler port
-                         db-start db-stop csrf-secret]}]
+(defn start-app [{:keys [router port db-start db-stop csrf-secret]}]
   (let [db          (db-start)
-        stop-server (-> (router db routes not-found-handler)
+        wrap-db     (fn [handler] (fn [req] (handler (assoc req :db db))))
+        stop-server (-> router
+                      wrap-db
                       (wrap-session csrf-secret)
                       wrap-parse-json-body
                       (hk/run-server {:port (or port 8080)}))]
-    {:db db
-     :stop    (fn stop []
-                (db-stop db)
-                (stop-server))}))
+    {:db   db
+     :stop (fn stop []
+             (db-stop db)
+             (stop-server))}))
 
 ;; Compress SSE stream
 ;; reactive using signals

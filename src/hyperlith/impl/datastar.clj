@@ -31,7 +31,7 @@
 
 (def ^:private doctype-html5 "<!DOCTYPE html>")
 
-(defn build-shim-page-resp [{:keys [path]}]
+(defn build-shim-page-resp [{:keys [path css]}]
   {:status  200
    :headers (assoc default-headers "Content-Encoding" "gzip")
    :body
@@ -41,6 +41,8 @@
             [:meta {:charset "UTF-8"}]
             [:link {:rel  "icon" :type "image/png"
                     :href (icon :path)}]
+            ;; Styles
+            (when css [:style#css css])
             ;; Scripts
             [:script {:defer true :type "module"
                       :src   (datastar :path)}]

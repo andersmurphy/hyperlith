@@ -20,10 +20,11 @@
   (when-not (str/blank? message)
     (swap! db update :messages conj [(h/new-uid) message])))
 
-(def routes
-  {[:get "/"]         (h/shim-handler   {:path "/"})
-   [:post "/updates"] (h/render-handler #'render-home)
-   [:post "/send"]    (h/action-handler #'action-send-message)})
+(def router
+  (h/router
+    {[:get "/"]         (h/shim-handler   {:path "/"})
+     [:post "/updates"] (h/render-handler #'render-home)
+     [:post "/send"]    (h/action-handler #'action-send-message)}))
 
 (defn db-start []
   (let [db_ (atom {:messages []})]
@@ -32,7 +33,7 @@
 
 (defn -main [& _]
   (h/start-app
-    {:routes      routes
+    {:router      #'router
      :db-start    db-start
      :db-stop     (fn [_db] nil)
      :csrf-secret "fb1704df2b3484223cb5d2a79bf06a508311d8d0f03c68e724d555b6b605966d0ebb8dc54615f8d080e5fa062bd3b5bce5b6ba7ded23333bbd55deea3149b9d5"}))

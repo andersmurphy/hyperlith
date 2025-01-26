@@ -16,11 +16,12 @@
    :default-src     [none]
    :media-src       [self "https: data:"]
    :script-src      [self unsafe-eval]
-   :script-src-elem [self unsafe-inline]
    :img-src         [self "https: data:"]
    :font-src        [self]
    :connect-src     [self]
    :style-src       [self]
+   ;; We only use this because I'm currently using intline style-src-elem
+   :style-src-elem  [self unsafe-inline]
    :frame-ancestors [none]})
 
 (defn csp-data->str [csp-data]
