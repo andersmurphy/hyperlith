@@ -33,10 +33,11 @@
 
 (defn -main [& _]
   (h/start-app
-    {:router      #'router
-     :db-start    db-start
-     :db-stop     (fn [_db] nil)
-     :csrf-secret "fb1704df2b3484223cb5d2a79bf06a508311d8d0f03c68e724d555b6b605966d0ebb8dc54615f8d080e5fa062bd3b5bce5b6ba7ded23333bbd55deea3149b9d5"}))
+    {:router         #'router
+     :max-refresh-ms 100
+     :db-start       db-start
+     :db-stop        (fn [_db] nil)
+     :csrf-secret    "fb1704df2b3484223cb5d2a79bf06a508311d8d0f03c68e724d555b6b605966d0ebb8dc54615f8d080e5fa062bd3b5bce5b6ba7ded23333bbd55deea3149b9d5"}))
 
 (comment
   (def server (-main))
@@ -48,3 +49,5 @@
   ;; query outside of handler
   (get-messages (:db server))
   ,)
+
+;; CAS

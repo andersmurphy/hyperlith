@@ -1,6 +1,6 @@
 {:paths   ["src" "resources"]
- :deps    {org.clojure/clojure   {:mvn/version "1.12.0"}
-           org.clojure/data.json {:mvn/version "2.5.1"}
+ :deps    {org.clojure/clojure    {:mvn/version "1.12.0"}
+           org.clojure/data.json  {:mvn/version "2.5.1"}
            ;; http
            http-kit/http-kit
            {:git/url "https://github.com/http-kit/http-kit"
@@ -8,7 +8,8 @@
            ;; templating
            hiccup/hiccup
            {:git/url "https://github.com/weavejester/hiccup"
-            :git/sha "24d55d1c7c1fc3c249395d261eb723c381843bc0"}}
+            :git/sha "24d55d1c7c1fc3c249395d261eb723c381843bc0"}
+           org.clojure/core.async {:mvn/version "1.7.701"}}
  :aliases {:dev {:extra-paths ["dev"]
                  ;; db for example
                  :extra-deps {datalevin/datalevin {:mvn/version "0.9.17"}}
