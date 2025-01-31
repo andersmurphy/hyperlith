@@ -16,7 +16,7 @@
     @db))
 
 (defn render-home [{:keys [db] :as _req}]
-  (h/html-str
+  (h/html
     [:main#morph
      [:div
       (for [[id content] (get-messages db)]

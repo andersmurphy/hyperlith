@@ -41,8 +41,8 @@
   (str (random-uuid)))
 
 ;; HTML
-(defmacro html-str [hiccup]
-  `(-> (h/html ~hiccup) str))
+(defmacro html [hiccup]
+  `(h/html ~hiccup))
 
 ;; ROUTING
 (defn router
@@ -81,7 +81,7 @@
                        new-view-hash (hash new-view)]
                    ;; only send an event if the view has changed
                    (when (not= last-view-hash new-view-hash)
-                     (send! ch (ds/merge-fragments new-view) false))
+                     (send! ch (ds/merge-fragments (str new-view)) false))
                    (recur new-view-hash))))))
          :on-close (fn on-close [_ _] (a/close! <ch))}))))
 
