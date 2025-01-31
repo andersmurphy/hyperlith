@@ -7,20 +7,24 @@
             [org.httpkit.server :as hk]
             [clojure.core.async :as a]))
 
-(defmacro thread-while-some
+(defmacro thread [& body]
+  `(Thread/startVirtualThread
+     (fn [] ~@body)))
+
+(defmacro while-some
   {:clj-kondo/lint-as 'clojure.core/let}
   [bindings & body]
-  `(Thread/startVirtualThread
-     #(loop []
-        (when-some ~bindings
-          ~@body
-          (recur)))))
+  `(loop []
+     (when-some ~bindings
+       ~@body
+       (recur))))
 
 (defn- throttled-mult [<in-ch msec]
   (let [<out-ch (a/chan (a/dropping-buffer 1))]
-    (thread-while-some [v (a/<!! <in-ch)]
-      (a/>!! <out-ch v)
-      (Thread/sleep ^long msec))
+    (thread
+      (while-some [v (a/<!! <in-ch)]
+        (a/>!! <out-ch v)
+        (Thread/sleep ^long msec)))
     (a/mult <out-ch)))
 
 (defn- send! [ch event close-after-send?]
@@ -61,15 +65,24 @@
 
 (defn render-handler [render-fn]
   (fn handler [req]
-    (let [<ch (a/tap (:refresh-mult req) (a/chan (a/dropping-buffer 1)))]
+    (let [<ch (a/tap (:refresh-mult req) (a/chan (a/dropping-buffer 1)))
+          ;; Ensures at least one render on connect
+          _   (a/>!! <ch :refresh-event)] 
       (hk/as-channel req
         {:on-open
          (fn on-open [ch]
-           ;; Get latest render on connect/reconnect
-           (send! ch (ds/merge-fragments (render-fn req)) false)
-           ;; Subscribe to subsequent refreshes
-           (thread-while-some [_ (a/<!! <ch)]
-             (send! ch (ds/merge-fragments (render-fn req)) false)))
+           (thread
+             ;; Note: it could be possible to perform diffing here
+             ;; to optimise network use. However, this will lead to more
+             ;; server CPU and memory usage.
+             (loop [last-view-hash nil]
+               (when-some [_ (a/<!! <ch)]
+                 (let [new-view      (render-fn req)
+                       new-view-hash (hash new-view)]
+                   ;; only send an event if the view has changed
+                   (when (not= last-view-hash new-view-hash)
+                     (send! ch (ds/merge-fragments new-view) false))
+                   (recur new-view-hash))))))
          :on-close (fn on-close [_ _] (a/close! <ch))}))))
 
 (defonce ^:private refresh-ch_ (atom nil))
