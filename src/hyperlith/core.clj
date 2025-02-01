@@ -19,11 +19,19 @@
        ~@body
        (recur))))
 
+(defonce ^:private tick_ (atom (bigint 0)))
+(def ^:private  do-not-refresh-shared-queries
+  "By being smaller than any tick, this tick will never trigger
+  a refresh of shared queries."
+  (bigint -1))
+
 (defn- throttled-mult [<in-ch msec]
-  (let [<out-ch (a/chan (a/dropping-buffer 1))]
+  (let [;; No buffer on the out-ch as the in-ch should be buffered
+        <out-ch (a/chan)]
     (thread
-      (while-some [v (a/<!! <in-ch)]
-        (a/>!! <out-ch v)
+      (while-some [_ (a/<!! <in-ch)]
+        ;; Each mult event is a sequentially increasing value
+        (a/>!! <out-ch (swap! tick_ inc))
         (Thread/sleep ^long msec)))
     (a/mult <out-ch)))
 
@@ -65,9 +73,13 @@
 
 (defn render-handler [render-fn]
   (fn handler [req]
-    (let [<ch (a/tap (:refresh-mult req) (a/chan (a/dropping-buffer 1)))
+    (let [;; Dropping buffer is used here as we don't want a slow handler
+          ;; blocking other handlers. Mult distributes each event to all
+          ;; taps in parallel and synchronously, i.e. each tap must
+          ;; accept before the next item is distributed.
+          <ch (a/tap (:refresh-mult req) (a/chan (a/dropping-buffer 1)))
           ;; Ensures at least one render on connect
-          _   (a/>!! <ch :refresh-event)] 
+          _   (a/>!! <ch do-not-refresh-shared-queries)] 
       (hk/as-channel req
         {:on-open
          (fn on-open [ch]
@@ -88,7 +100,7 @@
 (defonce ^:private refresh-ch_ (atom nil))
 
 (defn refresh-all! []
-  (a/>!! @refresh-ch_ :refresh-event))
+  (a/>!! @refresh-ch_ :refresh))
 
 ;; APP
 (defn start-app [{:keys [router port db-start db-stop csrf-secret
@@ -114,3 +126,4 @@
 
 ;; Compress SSE stream
 ;; solve CSS
+  
