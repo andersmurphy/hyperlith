@@ -1,7 +1,7 @@
 (ns hyperlith.impl.datastar
   (:require [hyperlith.impl.headers :refer [default-headers]]
             [hyperlith.impl.session :refer [csrf-cookie-js]]
-            [hyperlith.impl.gzip :refer [gzip]]            
+            [hyperlith.impl.gzip :refer [gzip]]
             [clojure.string :as str]
             [clojure.java.io :as io]
             [hiccup2.core :as h])
@@ -60,8 +60,8 @@
 
 (defn merge-fragments [fragments]
   (str "event: datastar-merge-fragments\ndata: fragments "
-              (str/replace fragments "\n" "\ndata: fragments ")
-              "\n\n\n"))
+    (str/replace fragments "\n" "\ndata: fragments ")
+    "\n\n\n"))
 
 (def default-routes
   {[:get (datastar :path)]   (fn [_] datastar)
