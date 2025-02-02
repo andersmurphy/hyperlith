@@ -10,14 +10,16 @@
 (def ^:private datastar-source-map
   {:status  200
    :headers (assoc default-headers
+              "Cache-Control"    "max-age=31536000, immutable"
               "Content-Type"     "text/javascript"
               "Content-Encoding" "gzip")
    :body    (-> "datastar.js.map" io/resource slurp gzip)})
 
 (def ^:private datastar
-  {:path    "/datastar-v1.0.0-beta.1.js"
+  {:path    "/datastar-v1.0.0-beta.3.js"
    :status  200
    :headers (assoc default-headers
+              "Cache-Control"    "max-age=31536000, immutable"
               "Content-Type"     "text/javascript"
               "Content-Encoding" "gzip")
    :body    (-> "datastar.js" io/resource slurp gzip)})
