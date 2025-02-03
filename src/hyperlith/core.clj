@@ -2,6 +2,7 @@
   (:require [hyperlith.impl.session :refer [wrap-session]]
             [hyperlith.impl.headers :refer [default-headers]]
             [hyperlith.impl.json :refer [wrap-parse-json-body]]
+            [hyperlith.impl.gzip :as gz]
             [hyperlith.impl.datastar :as ds]
             [hiccup2.core :as h]
             [org.httpkit.server :as hk]
@@ -35,13 +36,14 @@
         (Thread/sleep ^long msec)))
     (a/mult <out-ch)))
 
-(defn- send! [ch event close-after-send?]
+(defn- send! [ch event]
   (hk/send! ch {:status  200
                 :headers (assoc default-headers
                            "Content-Type"  "text/event-stream"
-                           "Cache-Control" "no-store")
+                           "Cache-Control" "no-store"
+                           "Content-Encoding" "gzip")
                 :body    event}
-    close-after-send?))
+    false))
 
 (defn new-uid
   "Allows us to change id implementation if need be."
@@ -77,9 +79,9 @@
           ;; blocking other handlers. Mult distributes each event to all
           ;; taps in parallel and synchronously, i.e. each tap must
           ;; accept before the next item is distributed.
-          <ch (a/tap (:refresh-mult req) (a/chan (a/dropping-buffer 1)))
+          <ch  (a/tap (:refresh-mult req) (a/chan (a/dropping-buffer 1)))
           ;; Ensures at least one render on connect
-          _   (a/>!! <ch do-not-refresh-shared-queries)] 
+          _    (a/>!! <ch do-not-refresh-shared-queries)]
       (hk/as-channel req
         {:on-open
          (fn on-open [ch]
@@ -87,14 +89,18 @@
              ;; Note: it could be possible to perform diffing here
              ;; to optimise network use. However, this will lead to more
              ;; server CPU and memory usage.
-             (loop [last-view-hash nil]
-               (when-some [_ (a/<!! <ch)]
-                 (let [new-view      (render-fn req)
-                       new-view-hash (hash new-view)]
-                   ;; only send an event if the view has changed
-                   (when (not= last-view-hash new-view-hash)
-                     (send! ch (ds/merge-fragments (str new-view)) false))
-                   (recur new-view-hash))))))
+             (with-open [out  (gz/byte-array-out-stream)
+                         gzip (gz/gzip-out-stream out)]
+               (loop [last-view-hash nil]
+                 (when-some [_ (a/<!! <ch)]
+                   (let [new-view      (render-fn req)
+                         new-view-hash (hash new-view)]
+                     ;; only send an event if the view has changed
+                     (when (not= last-view-hash new-view-hash)
+                       (->> new-view str ds/merge-fragments
+                         (gz/gzip-chunk out gzip)
+                         (send! ch)))
+                     (recur new-view-hash)))))))
          :on-close (fn on-close [_ _] (a/close! <ch))}))))
 
 (defonce ^:private refresh-ch_ (atom nil))
@@ -124,6 +130,8 @@
              (db-stop db)
              (a/close! <refresh-ch))}))
 
-;; Compress SSE stream
+;; handle pushing CSS down
+;; handle pushing JS down
 ;; solve CSS
-  
+;; check animations
+

@@ -1,7 +1,7 @@
 (ns hyperlith.impl.datastar
   (:require [hyperlith.impl.headers :refer [default-headers]]
             [hyperlith.impl.session :refer [csrf-cookie-js]]
-            [hyperlith.impl.gzip :refer [gzip]]
+            [hyperlith.impl.gzip :as gz]
             [clojure.string :as str]
             [clojure.java.io :as io]
             [hiccup2.core :as h])
@@ -13,7 +13,7 @@
               "Cache-Control"    "max-age=31536000, immutable"
               "Content-Type"     "text/javascript"
               "Content-Encoding" "gzip")
-   :body    (-> "datastar.js.map" io/resource slurp gzip)})
+   :body    (-> "datastar.js.map" io/resource slurp gz/gzip)})
 
 (def ^:private datastar
   {:path    "/datastar-v1.0.0-beta.3.js"
@@ -22,7 +22,7 @@
               "Cache-Control"    "max-age=31536000, immutable"
               "Content-Type"     "text/javascript"
               "Content-Encoding" "gzip")
-   :body    (-> "datastar.js" io/resource slurp gzip)})
+   :body    (-> "datastar.js" io/resource slurp gz/gzip)})
 
 (def ^:private icon
   {:path    "/icon.png"
@@ -58,7 +58,7 @@
             [:noscript "Your browser does not support JavaScript!"]
             [:main {:id "morph"}]]])
      (str doctype-html5)
-     gzip)})
+     gz/gzip)})
 
 (defn merge-fragments [fragments]
   (str "event: datastar-merge-fragments\ndata: fragments "
