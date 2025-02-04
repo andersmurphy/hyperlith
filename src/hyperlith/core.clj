@@ -79,9 +79,11 @@
           ;; blocking other handlers. Mult distributes each event to all
           ;; taps in parallel and synchronously, i.e. each tap must
           ;; accept before the next item is distributed.
-          <ch  (a/tap (:refresh-mult req) (a/chan (a/dropping-buffer 1)))
+          <ch     (a/tap (:refresh-mult req) (a/chan (a/dropping-buffer 1)))
           ;; Ensures at least one render on connect
-          _    (a/>!! <ch do-not-refresh-shared-queries)]
+          _       (a/>!! <ch do-not-refresh-shared-queries)
+          ;; poison pill for work cancelling
+          <cancel (a/chan)]
       (hk/as-channel req
         {:on-open
          (fn on-open [ch]
@@ -94,16 +96,19 @@
              (with-open [out  (gz/byte-array-out-stream)
                          gzip (gz/gzip-out-stream out)]
                (loop [last-view-hash nil]
-                 (when-some [_ (a/<!! <ch)]
-                   (let [new-view      (render-fn req)
-                         new-view-hash (hash new-view)]
-                     ;; only send an event if the view has changed
-                     (when (not= last-view-hash new-view-hash)
-                       (->> new-view str ds/merge-fragments
-                         (gz/gzip-chunk out gzip)
-                         (send! ch)))
-                     (recur new-view-hash)))))))
-         :on-close (fn on-close [_ _] (a/close! <ch))}))))
+                 (a/alt!!
+                   [<cancel] (do (a/close! <ch) (a/close! <cancel))
+                   [<ch]     (let [new-view      (render-fn req)
+                                     new-view-hash (hash new-view)]
+                                 ;; only send an event if the view has changed
+                                 (when (not= last-view-hash new-view-hash)
+                                   (->> new-view str ds/merge-fragments
+                                     (gz/gzip-chunk out gzip)
+                                     (send! ch)))
+                                 (recur new-view-hash))
+                   ;; we want work cancelling to have higher priority
+                   :priority true)))))
+         :on-close (fn on-close [_ _] (a/>!! <cancel :cancel))}))))
 
 (defonce ^:private refresh-ch_ (atom nil))
 
@@ -132,7 +137,6 @@
              (db-stop db)
              (a/close! <refresh-ch))}))
 
-;; handle cancelling 
 ;; handle pushing CSS down
 ;; handle pushing JS down
 ;; solve CSS
