@@ -86,9 +86,11 @@
         {:on-open
          (fn on-open [ch]
            (thread
-             ;; Note: it could be possible to perform diffing here
-             ;; to optimise network use. However, this will lead to more
-             ;; server CPU and memory usage.
+             ;; Note: it is possible to perform diffing here. However, because
+             ;; we are gziping the stream for the duration of the connection
+             ;; and html compresses well we get insane compression. To the
+             ;; point were it's more network efficient and more performant
+             ;; than diffing.
              (with-open [out  (gz/byte-array-out-stream)
                          gzip (gz/gzip-out-stream out)]
                (loop [last-view-hash nil]
@@ -130,6 +132,7 @@
              (db-stop db)
              (a/close! <refresh-ch))}))
 
+;; handle cancelling 
 ;; handle pushing CSS down
 ;; handle pushing JS down
 ;; solve CSS

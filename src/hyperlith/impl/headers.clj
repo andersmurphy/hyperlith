@@ -20,8 +20,7 @@
    :font-src        [self]
    :connect-src     [self]
    :style-src       [self]
-   ;; We only use this because I'm currently using intline style-src-elem
-   :style-src-elem  [self unsafe-inline]
+   :style-src-elem  [self]
    :frame-ancestors [none]})
 
 (defn csp-data->str [csp-data]
