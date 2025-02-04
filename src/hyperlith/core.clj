@@ -1,6 +1,7 @@
 (ns hyperlith.core
   (:require [hyperlith.impl.session :refer [wrap-session]]
             [hyperlith.impl.headers :refer [default-headers]]
+            [hyperlith.impl.assets :as assets]
             [hyperlith.impl.json :refer [wrap-parse-json-body]]
             [hyperlith.impl.gzip :as gz]
             [hyperlith.impl.datastar :as ds]
@@ -110,6 +111,8 @@
                    :priority true)))))
          :on-close (fn on-close [_ _] (a/>!! <cancel :cancel))}))))
 
+(def static-asset assets/static-asset)
+
 (defonce ^:private refresh-ch_ (atom nil))
 
 (defn refresh-all! []
@@ -137,8 +140,8 @@
              (db-stop db)
              (a/close! <refresh-ch))}))
 
-;; handle pushing CSS down
 ;; handle pushing JS down
+;; handle pushing CSS down
 ;; solve CSS
 ;; check animations
 

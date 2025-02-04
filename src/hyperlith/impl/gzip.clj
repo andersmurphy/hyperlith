@@ -2,10 +2,10 @@
   (:import (java.io ByteArrayOutputStream)
            (java.util.zip GZIPOutputStream)))
 
-(defn byte-array-out-stream []
+(defn byte-array-out-stream ^ByteArrayOutputStream []
   (ByteArrayOutputStream/new))
 
-(defn gzip-out-stream [out-stream]
+(defn gzip-out-stream ^GZIPOutputStream [^ByteArrayOutputStream out-stream]
   (GZIPOutputStream/new out-stream true))
 
 (defn gzip
@@ -17,7 +17,7 @@
       (.finish))
     (.toByteArray out)))
 
-(defn gzip-chunk [out gzip chunk]
+(defn gzip-chunk [^ByteArrayOutputStream out ^GZIPOutputStream gzip chunk]
   (doto gzip
     (.write  (String/.getBytes chunk))
     (.flush))
