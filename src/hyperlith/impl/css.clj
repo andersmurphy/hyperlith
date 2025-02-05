@@ -23,3 +23,6 @@
     {:body         (->> (map format-rule css-rules) (reduce str ""))
      :content-type "text/css"
      :gzip?        true}))
+
+(defn -- [css-var-name]
+  (str "var(--" (to-str css-var-name) ")"))

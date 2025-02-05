@@ -1,11 +1,12 @@
 (ns hyperlith.core
-  (:require [hyperlith.impl.session :refer [wrap-session]]
+  (:require [hyperlith.impl.session :refer [wrap-session csrf-cookie-js]]
             [hyperlith.impl.headers :refer [default-headers]]
             [hyperlith.impl.assets :as assets]
             [hyperlith.impl.css :as css]
             [hyperlith.impl.json :refer [wrap-parse-json-body]]
             [hyperlith.impl.gzip :as gz]
             [hyperlith.impl.datastar :as ds]
+            [hyperlith.impl.icon :as ic]
             [hiccup2.core :as h]
             [org.httpkit.server :as hk]
             [clojure.core.async :as a]))
@@ -46,6 +47,31 @@
                            "Content-Encoding" "gzip")
                 :body    event}
     false))
+(defn- build-shim-page-resp [{:keys [path]}]
+  {:status  200
+   :headers (assoc default-headers "Content-Encoding" "gzip")
+   :body
+   (->> (h/html
+          [:html  {:lang "en"}
+           [:head
+            [:meta {:charset "UTF-8"}]
+            [:link {:rel "icon" :type "image/png" :href (ic/icon :path)}]
+            ;; Styles
+            [:link#css]
+            ;; Scripts
+            [:script#js {:defer true :type "module"
+                         :src   (ds/datastar :path)}]
+            ;; Enables responsiveness on mobile devices
+            [:meta {:name    "viewport"
+                    :content "width=device-width, initial-scale=1.0"}]]
+           [:body
+            [:div {:data-signals-csrf csrf-cookie-js}]
+            [:div {:data-on-load
+                   (str "@post('" (if (= path "/") "" path) "/updates')")}]
+            [:noscript "Your browser does not support JavaScript!"]
+            [:main {:id "morph"}]]])
+     (str "<!DOCTYPE html>")
+     gz/gzip)})
 
 (defn new-uid
   "Allows us to change id implementation if need be."
@@ -60,13 +86,13 @@
 (defn router
   ([routes] (router routes (fn [_] {:status 303 :headers {"Location" "/"}})))
   ([routes not-found-handler]
-   (let [routes (merge ds/default-routes routes)]
+   (let [routes (merge ds/routes ic/routes routes)]
      (fn [req]
        ((routes [(:request-method req) (:uri req)] not-found-handler) req)))))
 
 ;; HANDLERS
 (defn shim-handler [opts]
-  (let [resp (ds/build-shim-page-resp opts)]
+  (let [resp (build-shim-page-resp opts)]
     (fn handler [_req] resp)))
 
 (defn action-handler [thunk]
@@ -112,10 +138,14 @@
                    :priority true)))))
          :on-close (fn on-close [_ _] (a/>!! <cancel :cancel))}))))
 
+;; ASSETS
 (def static-asset assets/static-asset)
 
 (def static-css css/static-css)
 
+(def -- css/--)
+
+;; REFRESH
 (defonce ^:private refresh-ch_ (atom nil))
 
 (defn refresh-all! []
