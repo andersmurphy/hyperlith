@@ -18,21 +18,26 @@
        :overflow-y      :scroll
        :scrollbar-width :none
        :display         :flex
-       :flex-direction  :column-reverse}]]))
+       :gap             :3px
+       :flex-direction  :column-reverse}]
+
+     [:.chat
+      {:display        :flex
+       :flex-direction :column}]]))
 
 (defn get-messages [db]
-  (@db :messages))
+  (reverse (@db :messages)))
 
 (defn render-home [{:keys [db] :as _req}]
   (h/html
     [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
     [:main#morph.main
-     [:button
-      {:data-on-click "@post('/send'); $message = ''"} "send"]
-     [:input {:type "text" :data-bind "message"}]
-     [:div
-      (for [[id content] (get-messages db)]
-        [:p {:id id} content])]]))
+     [:div.chat
+      [:input {:type "text" :data-bind "message"}]
+      [:button
+       {:data-on-click "@post('/send'); $message = ''"} "send"]]
+     (for [[id content] (get-messages db)]
+       [:p {:id id} content])]))
 
 (defn action-send-message [{:keys [_sid db] {:keys [message]} :body}]
   (when-not (str/blank? message)
