@@ -2,6 +2,7 @@
   (:require [hyperlith.impl.session :refer [wrap-session]]
             [hyperlith.impl.headers :refer [default-headers]]
             [hyperlith.impl.assets :as assets]
+            [hyperlith.impl.css :as css]
             [hyperlith.impl.json :refer [wrap-parse-json-body]]
             [hyperlith.impl.gzip :as gz]
             [hyperlith.impl.datastar :as ds]
@@ -52,8 +53,8 @@
   (str (random-uuid)))
 
 ;; HTML
-(defmacro html [hiccup]
-  `(h/html ~hiccup))
+(defmacro html [& hiccups]
+  `(str ~@(map (fn [hiccup] `(h/html ~hiccup)) hiccups)))
 
 ;; ROUTING
 (defn router
@@ -103,7 +104,7 @@
                                      new-view-hash (hash new-view)]
                                  ;; only send an event if the view has changed
                                  (when (not= last-view-hash new-view-hash)
-                                   (->> new-view str ds/merge-fragments
+                                   (->> new-view ds/merge-fragments
                                      (gz/gzip-chunk out gzip)
                                      (send! ch)))
                                  (recur new-view-hash))
@@ -113,10 +114,13 @@
 
 (def static-asset assets/static-asset)
 
+(def static-css css/static-css)
+
 (defonce ^:private refresh-ch_ (atom nil))
 
 (defn refresh-all! []
-  (a/>!! @refresh-ch_ :refresh))
+  (when-let [<refresh-ch @refresh-ch_]
+    (a/>!! <refresh-ch :refresh)))
 
 ;; APP
 (defn start-app [{:keys [router port db-start db-stop csrf-secret
@@ -140,8 +144,6 @@
              (db-stop db)
              (a/close! <refresh-ch))}))
 
-;; handle pushing JS down
-;; handle pushing CSS down
 ;; solve CSS
 ;; check animations
 
