@@ -76,5 +76,3 @@
   ;; query outside of handler
   (get-messages (:db server))
   ,)
-
-
