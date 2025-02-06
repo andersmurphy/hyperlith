@@ -25,7 +25,7 @@ But, wait! Won't that mean every change will cause all users to re-render? Yes, 
 
 - The more events that are happening the more likely most users will have to re-render.
 
-This means you actually end up doing more work with a homogeneous event system under heavy load than with this simple homogeneous event system that's throttled (especially it there's any sort of common/shared view between users).
+This means you actually end up doing more work with a non homogeneous event system under heavy load than with this simple homogeneous event system that's throttled (especially it there's any sort of common/shared view between users).
 
 #### Why no diffing?
 
