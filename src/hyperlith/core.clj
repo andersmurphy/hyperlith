@@ -9,7 +9,8 @@
             [hyperlith.impl.icon :as ic]
             [hiccup2.core :as h]
             [org.httpkit.server :as hk]
-            [clojure.core.async :as a]))
+            [clojure.core.async :as a]
+            [hyperlith.impl.crypto :as crypto]))
 
 (defmacro thread [& body]
   `(Thread/startVirtualThread
@@ -47,6 +48,7 @@
                            "Content-Encoding" "gzip")
                 :body    event}
     false))
+
 (defn- build-shim-page-resp [{:keys [path]}]
   {:status  200
    :headers (assoc default-headers "Content-Encoding" "gzip")
@@ -78,6 +80,8 @@
   []
   (str (random-uuid)))
 
+(def digest crypto/digest)
+
 ;; HTML
 (defmacro html [& hiccups]
   `(str ~@(map (fn [hiccup] `(h/html ~hiccup)) hiccups)))
@@ -101,7 +105,9 @@
     {:status  204
      :headers default-headers}))
 
-(defn render-handler [render-fn]
+
+(defn render-handler [render-fn & {:keys                               [on-close
+                                                              on-open] :as _opts}]
   (fn handler [req]
     (let [;; Dropping buffer is used here as we don't want a slow handler
           ;; blocking other handlers. Mult distributes each event to all
@@ -114,7 +120,7 @@
           <cancel (a/chan)]
       (hk/as-channel req
         {:on-open
-         (fn on-open [ch]
+         (fn hk-on-open [ch]
            (thread
              ;; Note: it is possible to perform diffing here. However, because
              ;; we are gziping the stream for the duration of the connection
@@ -127,16 +133,19 @@
                  (a/alt!!
                    [<cancel] (do (a/close! <ch) (a/close! <cancel))
                    [<ch]     (let [new-view      (render-fn req)
-                                     new-view-hash (hash new-view)]
-                                 ;; only send an event if the view has changed
-                                 (when (not= last-view-hash new-view-hash)
-                                   (->> new-view ds/merge-fragments
-                                     (gz/gzip-chunk out gzip)
-                                     (send! ch)))
-                                 (recur new-view-hash))
+                                   new-view-hash (hash new-view)]
+                               ;; only send an event if the view has changed
+                               (when (not= last-view-hash new-view-hash)
+                                 (->> new-view ds/merge-fragments
+                                   (gz/gzip-chunk out gzip)
+                                   (send! ch)))
+                               (recur new-view-hash))
                    ;; we want work cancelling to have higher priority
-                   :priority true)))))
-         :on-close (fn on-close [_ _] (a/>!! <cancel :cancel))}))))
+                   :priority true))))
+           (when on-open (on-open req)))
+         :on-close (fn hk-on-close [_ _]
+                     (a/>!! <cancel :cancel)
+                     (when on-close (on-close req)))}))))
 
 ;; ASSETS
 (def static-asset assets/static-asset)

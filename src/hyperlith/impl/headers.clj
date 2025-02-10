@@ -19,7 +19,7 @@
    :img-src         [self "https: data:"]
    :font-src        [self]
    :connect-src     [self]
-   :style-src       [self]
+   :style-src       [self unsafe-inline]
    :style-src-elem  [self]
    :frame-ancestors [none]})
 
