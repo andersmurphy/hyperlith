@@ -80,6 +80,5 @@
 
 ;; TODO make initial css plugable
 ;; TODO make css not flicker
-;; TODO query and form support? using ring codec
 ;; TODO move to chassis?
 
