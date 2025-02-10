@@ -174,6 +174,3 @@
              (db-stop db)
              (a/close! <refresh-ch))}))
 
-;; solve CSS
-;; check animations
-
