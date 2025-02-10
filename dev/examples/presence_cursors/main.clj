@@ -14,7 +14,7 @@
        :height   :100dvh
        :width    "100%"}]]))
 
-;; Todo animate between positions
+;; TODO: animate between positions
 
 (defn render-home [{:keys [db] :as _req}]
   (h/html

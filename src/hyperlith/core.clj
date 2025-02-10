@@ -4,6 +4,7 @@
             [hyperlith.impl.assets :as assets]
             [hyperlith.impl.css :as css]
             [hyperlith.impl.json :refer [wrap-parse-json-body]]
+            [hyperlith.impl.params :refer [wrap-query-params]]
             [hyperlith.impl.gzip :as gz]
             [hyperlith.impl.datastar :as ds]
             [hyperlith.impl.icon :as ic]
@@ -106,8 +107,7 @@
      :headers default-headers}))
 
 
-(defn render-handler [render-fn & {:keys                               [on-close
-                                                              on-open] :as _opts}]
+(defn render-handler [render-fn & {:keys [on-close on-open] :as _opts}]
   (fn handler [req]
     (let [;; Dropping buffer is used here as we don't want a slow handler
           ;; blocking other handlers. Mult distributes each event to all
@@ -174,6 +174,7 @@
                                          :refresh-mult refresh-mult))))
         stop-server  (-> router
                        wrap-state
+                       wrap-query-params
                        (wrap-session csrf-secret)
                        wrap-parse-json-body
                        (hk/run-server {:port (or port 8080)}))]
