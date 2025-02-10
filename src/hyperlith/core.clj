@@ -50,7 +50,7 @@
                 :body    event}
     false))
 
-(defn- build-shim-page-resp [{:keys [path]}]
+(defn- build-shim-page-resp [head-html]
   {:status  200
    :headers (assoc default-headers "Content-Encoding" "gzip")
    :body
@@ -58,9 +58,7 @@
           [:html  {:lang "en"}
            [:head
             [:meta {:charset "UTF-8"}]
-            [:link {:rel "icon" :type "image/png" :href (ic/icon :path)}]
-            ;; Styles
-            [:link#css]
+            (when head-html (h/raw head-html))
             ;; Scripts
             [:script#js {:defer true :type "module"
                          :src   (ds/datastar :path)}]
@@ -70,7 +68,7 @@
            [:body
             [:div {:data-signals-csrf csrf-cookie-js}]
             [:div {:data-on-load
-                   (str "@post('" (if (= path "/") "" path) "/updates')")}]
+                   "@post(window.location.pathname.replace(/\\/$/,'') + '/updates')"}]
             [:noscript "Your browser does not support JavaScript!"]
             [:main {:id "morph"}]]])
      (str "<!DOCTYPE html>")
@@ -89,15 +87,15 @@
 
 ;; ROUTING
 (defn router
-  ([routes] (router routes (fn [_] {:status 303 :headers {"Location" "/"}})))
+  ([routes] (router routes (fn [_] {:status 404})))
   ([routes not-found-handler]
    (let [routes (merge ds/routes ic/routes routes)]
      (fn [req]
        ((routes [(:request-method req) (:uri req)] not-found-handler) req)))))
 
 ;; HANDLERS
-(defn shim-handler [opts]
-  (let [resp (build-shim-page-resp opts)]
+(defn shim-handler [head-hiccup]
+  (let [resp (build-shim-page-resp head-hiccup)]
     (fn handler [_req] resp)))
 
 (defn action-handler [thunk]

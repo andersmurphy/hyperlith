@@ -56,10 +56,14 @@
         :message/user    [:user/sid sid]
         :message/content message}])))
 
+(def default-shim-handler
+  (h/shim-handler
+    (h/html [:link#css])))
+
 (def router
   (h/router
     {[:get (css :path)] (css :handler)
-     [:get "/"]         (h/shim-handler   {:path "/"})
+     [:get "/"]         default-shim-handler
      [:post "/updates"] (h/render-handler #'render-home)
      [:post "/send"]    (h/action-handler #'action-send-message)}))
 

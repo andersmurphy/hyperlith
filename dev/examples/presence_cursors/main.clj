@@ -36,14 +36,18 @@
   (when (and x y)
     (swap! db assoc sid [x y])))
 
+(def default-shim-handler
+  (h/shim-handler
+    (h/html [:link#css])))
+
 (def router
   (h/router
-    {[:get (css :path)] (css :handler)
-     [:get "/"]         (h/shim-handler   {:path "/"})
-     [:post "/updates"] (h/render-handler #'render-home
+    {[:get (css :path)]  (css :handler)
+     [:get "/"]          default-shim-handler
+     [:post "/updates"]  (h/render-handler #'render-home
                           :on-close
                           (fn [{:keys [sid db]}] (swap! db dissoc sid)))
-     [:post "/position"]    (h/action-handler action-user-cursor-position)}))
+     [:post "/position"] (h/action-handler action-user-cursor-position)}))
 
 (defn db-start []
   (let [db_ (atom {})]
