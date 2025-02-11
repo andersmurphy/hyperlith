@@ -12,23 +12,19 @@
         csrf-keyspec (crypto/secret-key->hmac-md5-keyspec csrf-secret)
         sid->csrf    (fn sid->csrf [sid] (crypto/hmac-md5 csrf-keyspec sid))]
     (fn [req]
-      (let [request-method (:request-method req)
-            body           (:body req)
-            sid            (get-sid req)]
+      (let [body (:body req)
+            sid  (get-sid req)
+            csrf (sid->csrf sid)]
         (cond
-          ;; If get and user has sid handle request
-          (and sid (= request-method :get))
-          (handler (assoc req :sid sid))
-
-          ;; if post and user has sid and csrf handle request
-          (and (= request-method :post) sid (= (:csrf body) (sid->csrf sid)))
-          (handler (assoc req :sid sid))
+          ;; If user has sid and csrf handle request
+          (and sid (= (:csrf body) (sid->csrf sid)))
+          (handler (assoc req :sid sid :csrf csrf))
 
           ;; :get request and user does not have session we create one
           ;; and a csrf cookie
           (= (:request-method req) :get)
           (let [new-sid (crypto/random-unguessable-uid)]
-            (-> (handler (assoc req :sid new-sid))
+            (-> (handler (assoc req :sid new-sid :csrf csrf))
               (assoc-in [:headers "Set-Cookie"]
                 ;; This cookie won't be set on local host on chrome/safari as
                 ;; it's using secure needs to be true and local host
