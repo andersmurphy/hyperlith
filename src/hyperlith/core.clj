@@ -7,11 +7,12 @@
             [hyperlith.impl.params :refer [wrap-query-params]]
             [hyperlith.impl.gzip :as gz]
             [hyperlith.impl.datastar :as ds]
-            [hyperlith.impl.icon :as ic]
+            [hyperlith.impl.crypto :as crypto]
             [hiccup2.core :as h]
             [org.httpkit.server :as hk]
             [clojure.core.async :as a]
-            [hyperlith.impl.crypto :as crypto]))
+            [clojure.java.io :as io])
+  (:import (java.io InputStream)))
 
 (defmacro thread [& body]
   `(Thread/startVirtualThread
@@ -24,6 +25,24 @@
      (when-some ~bindings
        ~@body
        (recur))))
+
+(def new-uid
+  "Allows us to change id implementation if need be."
+  crypto/random-unguessable-uid)
+
+(def digest
+  "Digest function based on Clojure's hash."
+  crypto/digest)
+
+(defmacro resource
+  "Fails at compile time if resource doesn't exists."
+  [path]
+  (let [res (io/resource path)]
+    (assert res (str path " not found."))
+    `(io/resource ~path)))
+
+(defn resource->bytes [resource]
+  (-> resource io/input-stream InputStream/.readAllBytes))
 
 (defonce ^:private tick_ (atom (bigint 0)))
 (def ^:private  do-not-refresh-shared-queries
@@ -74,13 +93,6 @@
      (str "<!DOCTYPE html>")
      gz/gzip)})
 
-(defn new-uid
-  "Allows us to change id implementation if need be."
-  []
-  (str (random-uuid)))
-
-(def digest crypto/digest)
-
 ;; HTML
 (defmacro html [& hiccups]
   `(str ~@(map (fn [hiccup] `(h/html ~hiccup)) hiccups)))
@@ -89,7 +101,7 @@
 (defn router
   ([routes] (router routes (fn [_] {:status 404})))
   ([routes not-found-handler]
-   (let [routes (merge ds/routes ic/routes routes)]
+   (let [routes (merge ds/routes routes)]
      (fn [req]
        ((routes [(:request-method req) (:uri req)] not-found-handler) req)))))
 
@@ -103,7 +115,6 @@
     (thunk req)
     {:status  204
      :headers default-headers}))
-
 
 (defn render-handler [render-fn & {:keys [on-close on-open] :as _opts}]
   (fn handler [req]
@@ -181,4 +192,3 @@
              (stop-server)
              (db-stop db)
              (a/close! <refresh-ch))}))
-

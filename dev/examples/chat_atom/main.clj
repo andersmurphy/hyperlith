@@ -82,8 +82,5 @@
   (get-messages (:db server))
   ,)
 
-
-;; TODO make initial css plugable
-;; TODO make css not flicker
 ;; TODO move to chassis?
 
