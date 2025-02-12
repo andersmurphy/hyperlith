@@ -13,17 +13,17 @@
         sid->csrf    (fn sid->csrf [sid] (crypto/hmac-md5 csrf-keyspec sid))]
     (fn [req]
       (let [body (:body req)
-            sid  (get-sid req)
-            csrf (sid->csrf sid)]
+            sid  (get-sid req)]
         (cond
           ;; If user has sid and csrf handle request
           (and sid (= (:csrf body) (sid->csrf sid)))
-          (handler (assoc req :sid sid :csrf csrf))
+          (handler (assoc req :sid sid :csrf (:csrf body)))
 
           ;; :get request and user does not have session we create one
           ;; and a csrf cookie
           (= (:request-method req) :get)
-          (let [new-sid (crypto/random-unguessable-uid)]
+          (let [new-sid (crypto/random-unguessable-uid)
+                csrf    (sid->csrf new-sid)]
             (-> (handler (assoc req :sid new-sid :csrf csrf))
               (assoc-in [:headers "Set-Cookie"]
                 ;; This cookie won't be set on local host on chrome/safari as
@@ -35,7 +35,7 @@
                    "__Host-sid=" new-sid
                    "; Path=/; Secure; HttpOnly; SameSite=Lax")
                  (str ;; Set csrf cookie
-                   "__Host-csrf=" (sid->csrf new-sid)
+                   "__Host-csrf=" csrf
                    "; Path=/; Secure; SameSite=Lax")])))
 
           ;; not a :get request and user does not have session we 403
