@@ -20,9 +20,9 @@
           (handler (assoc req :sid sid :csrf (:csrf body)))
 
           ;; :get request and user does not have session we create one
-          ;; and a csrf cookie
+          ;; if they do not have a csrf cookie we give them one
           (= (:request-method req) :get)
-          (let [new-sid (crypto/random-unguessable-uid)
+          (let [new-sid (or sid (crypto/random-unguessable-uid))
                 csrf    (sid->csrf new-sid)]
             (-> (handler (assoc req :sid new-sid :csrf csrf))
               (assoc-in [:headers "Set-Cookie"]
