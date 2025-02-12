@@ -138,14 +138,15 @@
              ;; than diffing.
              (with-open [out  (gz/byte-array-out-stream)
                          gzip (gz/gzip-out-stream out)]
-               (loop [last-view-hash nil]
+               (loop [last-view-hash (get-in req [:headers "last-event-id"])]
                  (a/alt!!
                    [<cancel] (do (a/close! <ch) (a/close! <cancel))
                    [<ch]     (let [new-view      (render-fn req)
-                                   new-view-hash (hash new-view)]
+                                   new-view-hash (crypto/digest new-view)]
                                ;; only send an event if the view has changed
                                (when (not= last-view-hash new-view-hash)
-                                 (->> new-view ds/merge-fragments
+                                 (->> (ds/merge-fragments
+                                        new-view-hash new-view)
                                    (gz/gzip-chunk out gzip)
                                    (send! ch)))
                                (recur new-view-hash))

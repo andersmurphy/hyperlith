@@ -18,9 +18,10 @@
      :content-type "text/javascript"
      :gzip?        true}))
 
-(defn merge-fragments [fragments]
-  (str "event: datastar-merge-fragments\ndata: fragments "
-    (str/replace fragments "\n" "\ndata: fragments ")
+(defn merge-fragments [event-id fragments]
+  (str "event: datastar-merge-fragments"
+    "\nid: " event-id
+    "\ndata: fragments " (str/replace fragments "\n" "\ndata: fragments ")
     "\n\n\n"))
 
 (def routes
