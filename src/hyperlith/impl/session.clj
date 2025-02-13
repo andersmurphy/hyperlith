@@ -39,6 +39,8 @@
                    "; Path=/; Secure; SameSite=Lax")])))
 
           ;; not a :get request and user does not have session we 403
+          ;; Note: If the updates SSE connection is a not a :get then this 
+          ;; will close the connection until the user reloads the page.
           :else
           {:status 403})))))
 
