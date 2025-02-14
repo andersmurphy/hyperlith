@@ -8,11 +8,23 @@
             [hyperlith.impl.gzip :as gz]
             [hyperlith.impl.datastar :as ds]
             [hyperlith.impl.crypto :as crypto]
-            [hiccup2.core :as h]
+            [dev.onionpancakes.chassis.core :as h]
+            [dev.onionpancakes.chassis.compiler :as cc]
             [org.httpkit.server :as hk]
             [clojure.core.async :as a]
             [clojure.java.io :as io])
   (:import (java.io InputStream)))
+
+;; Warn on ambiguous attributes
+(cc/set-warn-on-ambig-attrs!)
+
+(def ^:private html->str h/html)
+
+(defmacro html
+  "Compiles html."
+  [& hiccups]
+  (let [node (vec hiccups)]
+    `(cc/compile ~node)))
 
 (defmacro thread [& body]
   `(Thread/startVirtualThread
@@ -73,8 +85,9 @@
   {:status  200
    :headers (assoc default-headers "Content-Encoding" "gzip")
    :body
-   (->> (h/html
-          [:html  {:lang "en"}
+   (->> (html
+          [h/doctype-html5
+           [:html  {:lang "en"}
            [:head
             [:meta {:charset "UTF-8"}]
             (when head-html (h/raw head-html))
@@ -89,13 +102,9 @@
             [:div {:data-on-load
                    "@post(window.location.pathname.replace(/\\/$/,'') + '/updates' + window.location.search)"}]
             [:noscript "Your browser does not support JavaScript!"]
-            [:main {:id "morph"}]]])
-     (str "<!DOCTYPE html>")
+            [:main {:id "morph"}]]]])
+     html->str
      gz/gzip)})
-
-;; HTML
-(defmacro html [& hiccups]
-  `(str ~@(map (fn [hiccup] `(h/html ~hiccup)) hiccups)))
 
 ;; ROUTING
 (defn router
@@ -146,7 +155,7 @@
                                ;; only send an event if the view has changed
                                (when (not= last-view-hash new-view-hash)
                                  (->> (ds/merge-fragments
-                                        new-view-hash new-view)
+                                        new-view-hash (html->str new-view))
                                    (gz/gzip-chunk out gzip)
                                    (send! ch)))
                                (recur new-view-hash))

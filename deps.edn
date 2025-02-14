@@ -1,17 +1,15 @@
 {:paths   ["src" "resources"]
- :deps    {org.clojure/clojure    {:mvn/version "1.12.0"}
-           org.clojure/data.json  {:mvn/version "2.5.1"}
-           org.clojure/core.async {:mvn/version "1.7.701"}
+ :deps    {org.clojure/clojure       {:mvn/version "1.12.0"}
+           org.clojure/data.json     {:mvn/version "2.5.1"}
+           org.clojure/core.async    {:mvn/version "1.7.701"}
            ;; http
            http-kit/http-kit
            {:git/url "https://github.com/http-kit/http-kit"
             :git/sha "76b869fc34536ad0c43afa9a98d971a0fc32c644"}
            ;; query params parsing and other utilities
-           ring/ring-codec        {:mvn/version "1.2.0"}
+           ring/ring-codec           {:mvn/version "1.2.0"}
            ;; templating
-           hiccup/hiccup
-           {:git/url "https://github.com/weavejester/hiccup"
-            :git/sha "24d55d1c7c1fc3c249395d261eb723c381843bc0"}}
+           dev.onionpancakes/chassis {:mvn/version "1.0.365"}}
  :aliases {:dev {:extra-paths ["dev"]
                  ;; db for example
                  :extra-deps  {datalevin/datalevin {:mvn/version "0.9.17"}}
