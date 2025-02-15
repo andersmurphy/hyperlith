@@ -43,11 +43,11 @@ Signals should only be used for ephemeral client side state. Things like: the cu
 
 #### Signals in fragments should be declared __ifmissing
 
-Because signals are only being used to represent ephemeral client state that means they can only be initialised by fragments and they can only be changed via expressions on the client or from the server via `merge-signals` in an action.
+Because signals are only being used to represent ephemeral client state that means they can only be initialised by fragments and they can only be changed via expressions on the client or from the server via `merge-signals` in an action. Signals in fragments should be declared `__ifmissing` unless they are view only signals (signals that are not used for ephemeral client side state).
 
-#### Actions cannot update the view themselves directly
+#### Actions should not update the view themselves directly
 
-Actions can't view via merge fragments. This is because the changes they make would get overwritten on the next `render-fn` that pushes a new view down the `/updates` SSE connection. However, they can still be used to update signals as those won't be changed by fragment merges. This allows you to do things like validation on the server.
+Actions should not update the view via merge fragments. This is because the changes they make would get overwritten on the next `render-fn` that pushes a new view down the `/updates` SSE connection. However, they can still be used to update signals as those won't be changed by fragment merges. This allows you to do things like validation on the server.
 
 #### Stateless
 
