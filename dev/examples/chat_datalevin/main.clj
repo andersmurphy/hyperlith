@@ -44,7 +44,7 @@
      [:div.chat
       [:input {:type "text" :data-bind "message"}]
       [:button
-       {:data-on-click "@post('/send'); $message = ''"} "send"]]
+       {:data-on-click "@post('/send')"} "send"]]
       (for [[id content] (get-messages db)]
         [:p {:id id} content])]))
 
@@ -54,7 +54,8 @@
       [{:user/sid sid}
        {:message/id      (h/new-uid)
         :message/user    [:user/sid sid]
-        :message/content message}])))
+        :message/content message}])
+    (h/signals {:message ""})))
 
 (def default-shim-handler
   (h/shim-handler

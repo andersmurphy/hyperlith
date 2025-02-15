@@ -35,13 +35,14 @@
      [:div.chat
       [:input {:type "text" :data-bind "message"}]
       [:button
-       {:data-on-click "@post('/send'); $message = ''"} "send"]]
+       {:data-on-click "@post('/send')"} "send"]]
      (for [[id content] (get-messages db)]
        [:p {:id id} content])]))
 
 (defn action-send-message [{:keys [_sid db] {:keys [message]} :body}]
   (when-not (str/blank? message)
-    (swap! db update :messages conj [(h/new-uid) message])))
+    (swap! db update :messages conj [(h/new-uid) message])
+    (h/signals {:message ""})))
 
 ;; Allows for shim handler to be reused across shim routes
 (def default-shim-handler
@@ -72,6 +73,7 @@
 (h/refresh-all!)
 
 (comment
+  
   (def server (-main))
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
@@ -81,5 +83,3 @@
   ;; query outside of handler
   (get-messages (:db server))
   ,)
-
-;; TODO move to chassis?

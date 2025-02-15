@@ -37,9 +37,25 @@ This approach avoids the additional challenges of view and session maintenance (
 
 My suspicion is websocket approaches in this space like Phoenix Liveview haven't stumbled across this because you don't get compression out of the box with websockets, and idiomorph is a relatively new invention. Intuitively you would think the diffing approach would be more performant so you wouldn't even consider this approach.
 
+#### Signals are only for ephemeral client side state
+
+Signals should only be used for ephemeral client side state. Things like: the current value of a text input, whether a popover is visible, current csrf token, input validation errors. Signals can be controlled on the client via expressions, or from the backend via `merge-signals`.
+
+#### Signals in fragments should be declared __ifmissing
+
+Because signals are only being used to represent ephemeral client state that means they can only be initialised by fragments and they can only be changed via expressions on the client or from the server via `merge-signals` in an action.
+
+#### Actions cannot update the view themselves directly
+
+Actions can't view via merge fragments. This is because the changes they make would get overwritten on the next `render-fn` that pushes a new view down the `/updates` SSE connection. However, they can still be used to update signals as those won't be changed by fragment merges. This allows you to do things like validation on the server.
+
+#### Stateless
+
+The only way for actions to affect the view returned by the `render-fn` running in a connection is via the database. The ensures CQRS. This means there is no connection state that needs to be persisted or maintained (so missed events and shutdowns/deploys will not lead to lost state). Even when you are running in a single process there is no way for an action (command) to communicate with/affect a view render (query) without going through the database.
+
 #### CQRS
 
-- Actions modify the database and return a 204.
+- Actions modify the database and return a 204 or a 200 if they `merge-signals`.
 - Render functions re-render when the database changes and send an update down the `/updates` SSE connection.
 
 ## Other Radical choices

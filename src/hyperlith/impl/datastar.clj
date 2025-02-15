@@ -1,5 +1,6 @@
 (ns hyperlith.impl.datastar
   (:require [hyperlith.impl.assets :refer [static-asset]]
+            [hyperlith.impl.json :as j]
             [clojure.string :as str]
             [clojure.java.io :as io]))
 
@@ -22,6 +23,12 @@
   (str "event: datastar-merge-fragments"
     "\nid: " event-id
     "\ndata: fragments " (str/replace fragments "\n" "\ndata: fragments ")
+    "\n\n\n"))
+
+(defn merge-signals [signals]
+  (str "event: datastar-merge-signals"
+    "\ndata: onlyIfMissing false"
+    "\ndata: signals " (j/edn->json signals)
     "\n\n\n"))
 
 (def routes

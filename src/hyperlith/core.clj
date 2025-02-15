@@ -119,11 +119,20 @@
   (let [resp (build-shim-page-resp head-hiccup)]
     (fn handler [_req] resp)))
 
+(defn signals [signals]
+  {::signals signals})
+
 (defn action-handler [thunk]
   (fn handler [req]
-    (thunk req)
-    {:status  204
-     :headers default-headers}))
+    (if-let [signals (::signals (thunk req))]
+      {:status  200
+       :headers (assoc default-headers
+                  "Content-Type"  "text/event-stream"
+                  "Cache-Control" "no-store"
+                  "Content-Encoding" "gzip")
+       :body    (gz/gzip (ds/merge-signals signals))}
+      {:status  204
+       :headers default-headers})))
 
 (defn render-handler [render-fn & {:keys [on-close on-open] :as _opts}]
   (fn handler [req]
