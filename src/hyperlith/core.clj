@@ -56,19 +56,33 @@
 (defn resource->bytes [resource]
   (-> resource io/input-stream InputStream/.readAllBytes))
 
-(defonce ^:private tick_ (atom (bigint 0)))
-(def ^:private  do-not-refresh-shared-queries
-  "By being smaller than any tick, this tick will never trigger
-  a refresh of shared queries."
-  (bigint -1))
+(defonce ^:private cache_ (atom {}))
+
+(defn- assoc-if-missing [m k v]
+  (if-not (m k) (assoc m k v) m))
+
+(defn cache [f]
+  ;; Note: cache has no upper bound and is only cleared when a refresh
+  ;; event is fire.
+  (fn [& args]
+    (let [k         [f args]
+          ;; By delaying the value we make it lazy
+          ;; then it gets evaluated on first read.
+          ;; This prevents stampedes.
+          new-value (delay (apply f args))]
+      @((swap! cache_ assoc-if-missing k new-value) k))))
+
+(defn- invalidate-cache! []
+  (reset! cache_ {}))
 
 (defn- throttled-mult [<in-ch msec]
   (let [;; No buffer on the out-ch as the in-ch should be buffered
         <out-ch (a/chan)]
     (thread
       (while-some [_ (a/<!! <in-ch)]
-        ;; Each mult event is a sequentially increasing value
-        (a/>!! <out-ch (swap! tick_ inc))
+        ;; cache is only invalidate at most every X msec otherwise on db change
+        (invalidate-cache!) 
+        (a/>!! <out-ch :refresh)
         (Thread/sleep ^long msec)))
     (a/mult <out-ch)))
 
@@ -142,7 +156,7 @@
           ;; accept before the next item is distributed.
           <ch     (a/tap (:refresh-mult req) (a/chan (a/dropping-buffer 1)))
           ;; Ensures at least one render on connect
-          _       (a/>!! <ch do-not-refresh-shared-queries)
+          _       (a/>!! <ch :refresh-event)
           ;; poison pill for work cancelling
           <cancel (a/chan)]
       (hk/as-channel req
@@ -187,7 +201,7 @@
 
 (defn refresh-all! []
   (when-let [<refresh-ch @refresh-ch_]
-    (a/>!! <refresh-ch :refresh)))
+    (a/>!! <refresh-ch :refresh-event)))
 
 ;; APP
 (defn start-app [{:keys [router port db-start db-stop csrf-secret

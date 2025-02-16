@@ -28,6 +28,12 @@
 (defn get-messages [db]
   (reverse (@db :messages)))
 
+(def messages
+  (h/cache
+    (fn [db]
+      (for [[id content] (get-messages db)]
+        [:p {:id id} content]))))
+
 (defn render-home [{:keys [db] :as _req}]
   (h/html
     [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
@@ -36,8 +42,7 @@
       [:input {:type "text" :data-bind "message"}]
       [:button
        {:data-on-click "@post('/send')"} "send"]]
-     (for [[id content] (get-messages db)]
-       [:p {:id id} content])]))
+     (messages db)]))
 
 (defn action-send-message [{:keys [_sid db] {:keys [message]} :body}]
   (when-not (str/blank? message)
