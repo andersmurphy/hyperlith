@@ -80,7 +80,8 @@
         <out-ch (a/chan)]
     (thread
       (while-some [_ (a/<!! <in-ch)]
-        ;; cache is only invalidate at most every X msec otherwise on db change
+        ;; cache is only invalidate at most every X msec and only if
+        ;; db has change
         (invalidate-cache!) 
         (a/>!! <out-ch :refresh)
         (Thread/sleep ^long msec)))
