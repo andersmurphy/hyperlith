@@ -1,0 +1,20 @@
+# Caddy file for testing with https locally
+#
+# You can install Caddy with:
+#
+# $ brew install caddy
+#
+# You can start caddy with in the project root directory:
+#
+# $ Caddy run
+#
+# Then start your project at the server at repl on port 8080
+#
+localhost:3030 {
+  reverse_proxy localhost:8080 {
+    # If localhost:8080 is not responding retry every second for
+    # 30 seconds. This stops deployments from breaking SSE connections.
+    lb_try_duration 30s
+    lb_try_interval 1s
+  }
+}
