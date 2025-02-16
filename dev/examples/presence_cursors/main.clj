@@ -14,7 +14,16 @@
        :height   :100dvh
        :width    "100%"}]]))
 
-;; TODO: animate between positions
+(def cursors
+  (h/cache
+    (fn [db]
+      (for [[id [x y]] @db]
+        [:div
+         {:id    (h/digest id)
+          :style {:position :absolute
+                  :left     (str x "px")
+                  :top      (str y "px")}}
+         [:p "🚀"]]))))
 
 (defn render-home [{:keys [db] :as _req}]
   (h/html
@@ -24,13 +33,7 @@
      [:div.cursor-area
       {:data-on-mousemove__debounce.100ms
        "$x = evt.clientX; $y = evt.clientY; @post('/position')"}
-      (for [[id [x y]] @db]
-        [:div
-         {:id    (h/digest id)
-          :style {:position  :absolute
-                  :left      (str x "px")
-                  :top       (str y "px")}}
-         [:p "🚀"]])]]))
+      (cursors db)]]))
 
 (defn action-user-cursor-position [{:keys [sid db] {:keys [x y]} :body}]
   (when (and x y)
@@ -75,4 +78,6 @@
   @(server :db)
   
   ,)
+
+;; TODO: test transition animations
 
