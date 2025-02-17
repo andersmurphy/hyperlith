@@ -58,6 +58,14 @@ The only way for actions to affect the view returned by the `render-fn` running 
 - Actions modify the database and return a 204 or a 200 if they `merge-signals`.
 - Render functions re-render when the database changes and send an update down the `/updates` SSE connection.
 
+#### Work sharing (caching)
+
+Work sharing is the term I'm using for sharing renders between connected users. This can be useful when a lot of connected users share the same view. For example a leader board, game board, presence indicator etc. It ensures the work (eg: query and html generation) for that view is only done once regardless of the number of connected users. 
+
+There's a lot of ways you can do this. I've settled on a simple cache that gets invalidate when a `:refresh-event` is fired. This means the cache is invalidated at most every X msec (determined by `:max-refresh-ms`) and only if the db state has changed.
+
+Future work could invalidate parts of the cache based on what has changed in the db. To add something to the cache wrap the function in the `cache` higher order function.
+
 ## Other Radical choices
 
 #### No CORS
