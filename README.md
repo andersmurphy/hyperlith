@@ -64,7 +64,7 @@ Work sharing is the term I'm using for sharing renders between connected users. 
 
 There's a lot of ways you can do this. I've settled on a simple cache that gets invalidate when a `:refresh-event` is fired. This means the cache is invalidated at most every X msec (determined by `:max-refresh-ms`) and only if the db state has changed.
 
-Future work could invalidate parts of the cache based on what has changed in the db. To add something to the cache wrap the function in the `cache` higher order function.
+To add something to the cache wrap the function in the `cache` higher order function.
 
 ## Other Radical choices
 
