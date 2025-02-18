@@ -11,7 +11,7 @@
             [hyperlith.impl.router]
             [hyperlith.impl.cache]
             [hyperlith.impl.assets]
-            [potemkin :refer [import-vars]]
+            [hyperlith.impl.namespaces :refer [import-vars]]
             [clojure.core.async :as a]
             [org.httpkit.server :as hk]))
 

@@ -78,6 +78,3 @@
   @(server :db)
   
   ,)
-
-;; TODO: test transition animations
-
