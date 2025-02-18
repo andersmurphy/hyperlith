@@ -15,3 +15,5 @@
                gzip? (assoc-in [:headers "Content-Encoding"] "gzip"))]
     {:handler (fn [_] resp)
      :path    (str "/" (crypto/digest body))}))
+
+

@@ -22,6 +22,10 @@
     (.nextBytes secure-random buffer)
     (bytes->base64 buffer)))
 
+(def new-uid
+  "Allows uid implementation to be changed if need be."
+  random-unguessable-uid)
+
 (defn secret-key->hmac-md5-keyspec [secret-key]
   (SecretKeySpec/new (String/.getBytes secret-key) "HmacMD5"))
 
