@@ -1,8 +1,9 @@
 (ns hyperlith.core
-  (:require [hyperlith.impl.session :refer [wrap-session]]
+  (:require [hyperlith.impl.namespaces :refer [import-vars]]
+            [hyperlith.impl.session :refer [wrap-session]]
             [hyperlith.impl.json :refer [wrap-parse-json-body]]
             [hyperlith.impl.params :refer [wrap-query-params]]
-            [hyperlith.impl.datastar :as ds]            
+            [hyperlith.impl.datastar :as ds]
             [hyperlith.impl.crypto]
             [hyperlith.impl.util]
             [hyperlith.impl.css]
@@ -11,7 +12,7 @@
             [hyperlith.impl.router]
             [hyperlith.impl.cache]
             [hyperlith.impl.assets]
-            [hyperlith.impl.namespaces :refer [import-vars]]
+            [hyperlith.impl.trace]
             [clojure.core.async :as a]
             [org.httpkit.server :as hk]))
 
@@ -38,18 +39,23 @@
    shim-handler
    signals
    action-handler
-   render-handler]  
+   render-handler]
   ;; HTTP
   [hyperlith.impl.http
    get!
-   post!]  
+   post!]
   ;; CSS
   [hyperlith.impl.css
    static-css
    --]
   ;; ASSETS
   [hyperlith.impl.assets
-   static-asset])
+   static-asset]
+  ;; TRACE
+  [hyperlith.impl.trace
+   traces
+   trace>
+   reset-traces!])
 
 (defonce ^:private refresh-ch_ (atom nil))
 

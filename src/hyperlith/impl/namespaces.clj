@@ -75,9 +75,9 @@
         (link-vars ~vr (var ~n))
         ~vr))))
 
-(defmacro import-vars
+(defmacro import-vars  
+  "Imports a list of vars from other namespaces."  
   {:clj-kondo/lint-as 'potemkin/import-vars}
-  "Imports a list of vars from other namespaces."
   [& syms]
   (let [unravel (fn unravel [x]
                   (if (sequential? x)
