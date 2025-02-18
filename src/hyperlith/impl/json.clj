@@ -5,6 +5,9 @@
 (defn- json-stream->edn [json]
   (-> json io/reader (json/read {:key-fn keyword})))
 
+(defn json->edn [json]
+  (json/read-str json {:key-fn keyword}))
+
 (defn edn->json [edn]
   (json/write-str edn))
 

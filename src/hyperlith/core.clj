@@ -8,6 +8,7 @@
             [hyperlith.impl.gzip :as gz]
             [hyperlith.impl.datastar :as ds]
             [hyperlith.impl.crypto :as crypto]
+            [hyperlith.impl.http :as http]
             [dev.onionpancakes.chassis.core :as h]
             [dev.onionpancakes.chassis.compiler :as cc]
             [org.httpkit.server :as hk]
@@ -226,3 +227,8 @@
              (stop-server)
              (db-stop db)
              (a/close! <refresh-ch))}))
+
+
+;; HTTP
+(def get! http/get!)
+(def post! http/post!)
