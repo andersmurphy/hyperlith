@@ -1,14 +1,14 @@
 (ns hyperlith.impl.css
   (:require [hyperlith.impl.assets :refer [static-asset]]))
 
-(defn- to-str [s]
+(defn to-str [s]
   (cond (keyword? s) (name s)
         (vector? s)  (->> (map to-str s)
                        (interpose " ")
                        (apply str))
         :else        (str s)))
 
-(defn- format-rule [[k v]]
+(defn format-rule [[k v]]
   (str
     (to-str k)
     "{"

@@ -10,19 +10,18 @@
             [hyperlith.impl.html :as h]
             [org.httpkit.server :as hk]
             [clojure.string :as str]
-            [clojure.java.io :as io]
             [clojure.core.async :as a]))
 
 (def datastar-source-map
   (static-asset
-    {:body         (-> "datastar.js.map" io/resource slurp)
+    {:body         (util/load-resource "datastar.js.map")
      :content-type "text/javascript"
      :gzip?        true}))
 
 (def datastar
   (static-asset
     {:body
-     (-> "datastar.js" io/resource slurp
+     (-> (util/load-resource "datastar.js") slurp
        ;; Make sure we point to the right source map
        (str/replace "datastar.js.map" (:path datastar-source-map)))
      :content-type "text/javascript"
@@ -52,7 +51,7 @@
         (Thread/sleep ^long msec)))
     (a/mult <out-ch)))
 
-(defn- send! [ch event]
+(defn send! [ch event]
   (hk/send! ch {:status  200
                 :headers (assoc default-headers
                            "Content-Type"  "text/event-stream"
@@ -61,7 +60,7 @@
                 :body    event}
     false))
 
-(defn- build-shim-page-resp [head-html]
+(defn build-shim-page-resp [head-html]
   {:status  200
    :headers (assoc default-headers "Content-Encoding" "gzip")
    :body

@@ -9,11 +9,11 @@
   (GZIPOutputStream/new out-stream true))
 
 (defn gzip
-  [string]
+  [data]
   (with-open [out  (byte-array-out-stream)
               gzip (gzip-out-stream out)]
     (doto gzip
-      (.write  (String/.getBytes string))
+      (.write  (if (string? data) (String/.getBytes data) data))
       (.finish))
     (.toByteArray out)))
 

@@ -1,9 +1,7 @@
-(ns hyperlith.impl.cache)
+(ns hyperlith.impl.cache
+  (:require [hyperlith.impl.util :as util]))
 
 (defonce ^:private cache_ (atom {}))
-
-(defn- assoc-if-missing [m k v]
-  (if-not (m k) (assoc m k v) m))
 
 (defn cache [f]
   ;; Note: cache has no upper bound and is only cleared when a refresh
@@ -14,7 +12,7 @@
           ;; then it gets evaluated on first read.
           ;; This prevents stampedes.
           new-value (delay (apply f args))]
-      @((swap! cache_ assoc-if-missing k new-value) k))))
+      @((swap! cache_ util/assoc-if-missing k new-value) k))))
 
 (defn invalidate-cache! []
   (reset! cache_ {}))

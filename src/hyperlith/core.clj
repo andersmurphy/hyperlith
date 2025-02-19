@@ -19,8 +19,7 @@
 (import-vars
   ;; UTIL
   [hyperlith.impl.util
-   resource
-   resource->bytes]
+   load-resource]
   ;; HTML
   [hyperlith.impl.html
    html]

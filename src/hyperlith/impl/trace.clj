@@ -1,6 +1,6 @@
 (ns hyperlith.impl.trace)
 
-(def ^:private traces_ (atom []))
+(def traces_ (atom []))
 
 (defn traces [] @traces_)
 
@@ -8,7 +8,7 @@
   (reset! traces_ []))
 
 #_:clj-kondo/ignore
-(def ^:private trace-tap
+(def trace-tap
   (do (remove-tap trace-tap) ;; Remove old tap
       (let [f (partial swap! traces_ conj)]
         (add-tap f)

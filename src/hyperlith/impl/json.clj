@@ -2,16 +2,20 @@
   (:require [clojure.data.json :as json]
             [clojure.java.io :as io]))
 
-(defn- json-stream->edn [json]
+(defn json-stream->edn [json]
   (-> json io/reader (json/read {:key-fn keyword})))
 
 (defn json->edn [json]
   (json/read-str json {:key-fn keyword}))
 
+(defn try-json->edn [json]
+  (try (json->edn json)
+       (catch Throwable _)))
+
 (defn edn->json [edn]
   (json/write-str edn))
 
-(defn- parse-json-body? [req]
+(defn parse-json-body? [req]
   (and (= (:request-method req) :post)
     (= (:content-type req) "application/json")
     (:body req)))

@@ -14,12 +14,15 @@
        ~@body
        (recur))))
 
-(defmacro resource
+(defn assoc-if-missing [m k v]
+  (if-not (m k) (assoc m k v) m))
+
+(defn resource->bytes [resource]
+  (-> resource io/input-stream InputStream/.readAllBytes))
+
+(defmacro load-resource
   "Fails at compile time if resource doesn't exists."
   [path]
   (let [res (io/resource path)]
     (assert res (str path " not found."))
-    `(io/resource ~path)))
-
-(defn resource->bytes [resource]
-  (-> resource io/input-stream InputStream/.readAllBytes))
+    `(resource->bytes (io/resource ~path))))
