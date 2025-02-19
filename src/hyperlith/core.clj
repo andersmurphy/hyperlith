@@ -39,7 +39,8 @@
    shim-handler
    signals
    action-handler
-   render-handler]
+   render-handler
+   debug-signals-el]
   ;; HTTP
   [hyperlith.impl.http
    get!

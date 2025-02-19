@@ -149,3 +149,5 @@
          :on-close (fn hk-on-close [_ _]
                      (a/>!! <cancel :cancel)
                      (when on-close (on-close req)))}))))
+
+(def debug-signals-el [:pre {:data-text "ctx.signals.JSON()"}])
