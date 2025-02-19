@@ -20,7 +20,8 @@
 
 (defn static-css [css-rules]
   (static-asset
-    {:body         (->> (map format-rule css-rules) (reduce str ""))
+    {:body         (if (string? css-rules) css-rules
+                       (->> (map format-rule css-rules) (reduce str "")))
      :content-type "text/css"
      :gzip?        true}))
 

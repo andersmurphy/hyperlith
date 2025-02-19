@@ -28,6 +28,7 @@
        :flex-direction :column}]]))
 
 (defn get-messages [db]
+  #_:clj-kondo/ignore
   (d/q '[:find ?id ?content ?created-at
          :where
          [?m :message/id ?id]
@@ -87,6 +88,7 @@
 (defn -main [& _]
   (h/start-app
     {:router      #'router
+     :max-refresh-ms 100
      :db-start    db-start
      :db-stop     d/close
      :csrf-secret "fb1704df2b3484223cb5d2a79bf06a508311d8d0f03c68e724d555b6b605966d0ebb8dc54615f8d080e5fa062bd3b5bce5b6ba7ded23333bbd55deea3149b9d5"}))
