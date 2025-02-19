@@ -65,7 +65,10 @@
 
 (def default-shim-handler
   (h/shim-handler
-    (h/html [:link#css])))
+    (h/html
+      [:link#css]
+      [:title nil "Chat"]
+      [:meta {:content "Chat app" :name "description"}])))
 
 (def router
   (h/router

@@ -4,9 +4,9 @@
             [hyperlith.impl.json :as j]
             [hyperlith.impl.headers :refer [default-headers]]
             [hyperlith.impl.util :as util]
-            [hyperlith.impl.cache :as cache]            
-            [hyperlith.impl.gzip :as gz]            
-            [hyperlith.impl.crypto :as crypto]                        
+            [hyperlith.impl.cache :as cache]
+            [hyperlith.impl.gzip :as gz]
+            [hyperlith.impl.crypto :as crypto]
             [hyperlith.impl.html :as h]
             [org.httpkit.server :as hk]
             [clojure.string :as str]
@@ -46,7 +46,7 @@
       (util/while-some [_ (a/<!! <in-ch)]
         ;; cache is only invalidate at most every X msec and only if
         ;; db has change
-        (cache/invalidate-cache!) 
+        (cache/invalidate-cache!)
         (a/>!! <out-ch :refresh)
         (Thread/sleep ^long msec)))
     (a/mult <out-ch)))
@@ -60,28 +60,28 @@
                 :body    event}
     false))
 
-(defn build-shim-page-resp [head-html]
+(defn build-shim-page-resp [head-hiccup]
   {:status  200
    :headers (assoc default-headers "Content-Encoding" "gzip")
    :body
    (->> (h/html
           [h/doctype-html5
            [:html  {:lang "en"}
-           [:head
-            [:meta {:charset "UTF-8"}]
-            (when head-html (h/raw head-html))
-            ;; Scripts
-            [:script#js {:defer true :type "module"
-                         :src   (datastar :path)}]
-            ;; Enables responsiveness on mobile devices
-            [:meta {:name    "viewport"
-                    :content "width=device-width, initial-scale=1.0"}]]
-           [:body
-            [:div {:data-signals-csrf csrf-cookie-js}]
-            [:div {:data-on-load
-                   "@post(window.location.pathname.replace(/\\/$/,'') + '/updates' + window.location.search)"}]
-            [:noscript "Your browser does not support JavaScript!"]
-            [:main {:id "morph"}]]]])
+            [:head
+             [:meta {:charset "UTF-8"}]
+             (when head-hiccup head-hiccup)
+             ;; Scripts
+             [:script#js {:defer true :type "module"
+                          :src   (datastar :path)}]
+             ;; Enables responsiveness on mobile devices
+             [:meta {:name    "viewport"
+                     :content "width=device-width, initial-scale=1.0"}]]
+            [:body
+             [:div {:data-signals-csrf csrf-cookie-js}]
+             [:div {:data-on-load
+                    "@post(window.location.pathname.replace(/\\/$/,'') + '/updates' + window.location.search)"}]
+             [:noscript "Your browser does not support JavaScript!"]
+             [:main {:id "morph"}]]]])
      h/html->str
      gz/gzip)})
 
