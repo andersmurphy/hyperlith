@@ -47,7 +47,7 @@ Because signals are only being used to represent ephemeral client state that mea
 
 #### Actions should not update the view themselves directly
 
-Actions should not update the view via merge fragments. This is because the changes they make would get overwritten on the next `render-fn` that pushes a new view down the `/updates` SSE connection. However, they can still be used to update signals as those won't be changed by fragment merges. This allows you to do things like validation on the server.
+Actions should not update the view via merge fragments. This is because the changes they make would get overwritten on the next `render-fn` that pushes a new view down the updates SSE connection. However, they can still be used to update signals as those won't be changed by fragment merges. This allows you to do things like validation on the server.
 
 #### Stateless
 
@@ -56,7 +56,7 @@ The only way for actions to affect the view returned by the `render-fn` running 
 #### CQRS
 
 - Actions modify the database and return a 204 or a 200 if they `merge-signals`.
-- Render functions re-render when the database changes and send an update down the `/updates` SSE connection.
+- Render functions re-render when the database changes and send an update down the updates SSE connection.
 
 #### Work sharing (caching)
 
@@ -82,7 +82,7 @@ Double submit cookie pattern is used for CSRF.
 
 #### Rendering an initial shim
 
-Rather than returning the whole page on initial render and having two render paths, one for initial render and one for subsequent rendering a shell is rendered and then populated when the page connects to the '/updates' endpoint for that page. This has a few advantages:
+Rather than returning the whole page on initial render and having two render paths, one for initial render and one for subsequent rendering a shell is rendered and then populated when the page connects to the updates endpoint for that page. This has a few advantages:
 
 - The page will only render dynamic content if the user has javascript and first party cookies enabled.
 

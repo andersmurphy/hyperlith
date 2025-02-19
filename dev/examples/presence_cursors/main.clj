@@ -46,10 +46,10 @@
 (def router
   (h/router
     {[:get (css :path)]  (css :handler)
-     [:get "/"]          default-shim-handler
-     [:post "/updates"]  (h/render-handler #'render-home
-                          :on-close
-                          (fn [{:keys [sid db]}] (swap! db dissoc sid)))
+     [:get  "/"]         default-shim-handler
+     [:post "/"]         (h/render-handler #'render-home
+                           :on-close
+                           (fn [{:keys [sid db]}] (swap! db dissoc sid)))
      [:post "/position"] (h/action-handler action-user-cursor-position)}))
 
 (defn db-start []

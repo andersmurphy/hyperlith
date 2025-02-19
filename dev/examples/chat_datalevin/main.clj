@@ -73,8 +73,8 @@
 (def router
   (h/router
     {[:get (css :path)] (css :handler)
-     [:get "/"]         default-shim-handler
-     [:post "/updates"] (h/render-handler #'render-home)
+     [:get  "/"]        default-shim-handler
+     [:post "/"]        (h/render-handler #'render-home)
      [:post "/send"]    (h/action-handler #'action-send-message)}))
 
 (defn db-start []

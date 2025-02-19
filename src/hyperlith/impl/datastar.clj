@@ -79,7 +79,7 @@
             [:body
              [:div {:data-signals-csrf csrf-cookie-js}]
              [:div {:data-on-load
-                    "@post(window.location.pathname.replace(/\\/$/,'') + '/updates' + window.location.search)"}]
+                    "@post(window.location.pathname + window.location.search)"}]
              [:noscript "Your browser does not support JavaScript!"]
              [:main {:id "morph"}]]]])
      h/html->str
