@@ -43,7 +43,8 @@
 
 (def default-shim-handler
   (h/shim-handler
-    (h/html [:link#css])))
+    (h/html
+      [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}])))
 
 (def router
   (h/router

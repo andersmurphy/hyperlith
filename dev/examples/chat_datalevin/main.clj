@@ -66,7 +66,7 @@
 (def default-shim-handler
   (h/shim-handler
     (h/html
-      [:link#css]
+      [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
       [:title nil "Chat"]
       [:meta {:content "Chat app" :name "description"}])))
 
