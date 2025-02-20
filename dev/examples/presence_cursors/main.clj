@@ -10,9 +10,9 @@
        :padding    0}]
 
      [:.cursor-area
-      {:position :adsolute
-       :height   :100dvh
-       :width    "100%"}]
+      {:user-select :none
+       :height      :100dvh
+       :width       "100%"}]
 
      [:.cursor
       {:position   :absolute
