@@ -17,6 +17,9 @@
 (defn assoc-if-missing [m k v]
   (if-not (m k) (assoc m k v) m))
 
+(defn assoc-in-if-missing [m ks v]
+  (if-not (get-in m ks) (assoc-in m ks v) m))
+
 (defn resource->bytes [resource]
   (-> resource io/input-stream InputStream/.readAllBytes))
 

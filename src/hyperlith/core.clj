@@ -19,7 +19,9 @@
 (import-vars
   ;; UTIL
   [hyperlith.impl.util
-   load-resource]
+   load-resource
+   assoc-if-missing
+   assoc-in-if-missing]
   ;; HTML
   [hyperlith.impl.html
    html]

@@ -91,15 +91,3 @@
               :y (rand-nth (range 1 400 20))}}))
   
   ,)
-
-
-;; TODO: finish port
-;; TODO: deploy port (copy DB)
-;; TODO: grid layout
-;; TODO: drag and drop
-;; dislay grid
-;; display: grid
-;; place-items: center
-;; or
-;; place-self: center on a grid item
-
