@@ -30,6 +30,9 @@
 (defn merge-fragments [event-id fragments]
   (str "event: datastar-merge-fragments"
     "\nid: " event-id
+    ;; settleDuration is only needed when using view transition API
+    ;; regular CSS animation/transitions are not affected by it.
+    "\ndata: settleDuration 0" 
     "\ndata: fragments " (str/replace fragments "\n" "\ndata: fragments ")
     "\n\n\n"))
 

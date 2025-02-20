@@ -12,18 +12,20 @@
      [:.cursor-area
       {:position :adsolute
        :height   :100dvh
-       :width    "100%"}]]))
+       :width    "100%"}]
+
+     [:.cursor
+      {:position   :absolute
+       :transition "all 0.2s ease-in-out"}]]))
 
 (def cursors
   (h/cache
     (fn [db]
-      (for [[id [x y]] @db]
-        [:div
-         {:id    (h/digest id)
-          :style {:position :absolute
-                  :left     (str x "px")
-                  :top      (str y "px")}}
-         [:p "🚀"]]))))
+      (for [[sid [x y]] @db]
+        [:div.cursor
+         {:id    (h/digest sid)
+          :style {:left (str x "px") :top (str y "px")}}
+         "🚀"]))))
 
 (defn render-home [{:keys [db] :as _req}]
   (h/html
@@ -76,5 +78,28 @@
   (let [stop (server :stop)] (stop))
 
   @(server :db)
+
+  (reset! (server :db) {})
+
+  ;; Example backend driven cursor test
+  (doseq [_x (range 10000)]
+    (Thread/sleep 1)
+    (action-user-cursor-position
+      {:db   (server :db)
+       :sid  (rand-nth (range 1000))
+       :body {:x (rand-nth (range 1 400 20))
+              :y (rand-nth (range 1 400 20))}}))
   
   ,)
+
+
+;; TODO: finish port
+;; TODO: deploy port (copy DB)
+;; TODO: grid layout
+;; TODO: drag and drop
+;; dislay grid
+;; display: grid
+;; place-items: center
+;; or
+;; place-self: center on a grid item
+
