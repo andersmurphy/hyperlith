@@ -20,22 +20,27 @@
        :place-items :center}]
 
      [:.board
-      {:user-select   :none
-       :height        :400px
-       :width         :400px
-       :position      :relative}]
+      {:user-select           :none
+       :-webkit-touch-callout :none
+       :-webkit-user-select   :none
+       :height                :400px
+       :width                 :400px
+       :position              :relative}]
 
      [:.star
-      {:position   :absolute
-       :font-size  :20px
-       :transition "all 0.2s ease-in-out"}]
+      {:position    :absolute
+       :font-size   :20px
+       :transition  "all 0.2s ease-in-out"
+       }]
 
      [:.dropzone
       {:position  :absolute
        :font-size :40px}]
 
      [:.counter
-      {:font-size :20px}]]))
+      {:font-size :20px}]
+
+     [:a {:color       :#e9ecef}]]))
 
 (defn place-stars [db n]
   (doseq [_n (range n)]
@@ -59,7 +64,8 @@
   (h/html
     [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
     [:main#morph.main     
-     [:div [:p.counter "DRAG THE STARS TO THE SHIP"]]     
+     [:div [:p.counter "DRAG THE STARS TO THE SHIP"]]
+     [:p "(multiplayer coop)"]
      [:div.board (stars db)
       [:div.dropzone
        {:style            {:left :100px :top :100px}
@@ -67,7 +73,9 @@
         :data-on-drop
         "evt.preventDefault(); @post(`/dropzone?id=${evt.dataTransfer.getData('text/plain')}`)"}
        "🚀"]]
-     [:div [:p.counter (str "STARS COLLECTED: "  (@db :stars-collected))]]]))
+     [:div [:p.counter (str "STARS COLLECTED: "  (@db :stars-collected))]]
+     [:a {:href "https://data-star.dev/"}
+      "Built with ❤️ using Datastar"]]))
 
 (defn remove-star [db id]
   (-> (update db :stars dissoc id)
