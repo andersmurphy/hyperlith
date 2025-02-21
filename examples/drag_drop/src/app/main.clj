@@ -10,13 +10,19 @@
        :padding    0}]
 
      [:html
-      {:background :#212529}]
+      {:font-family "Arial, Helvetica, sans-serif"
+       :background  :#212529
+       :color       :#e9ecef}]
 
      [:.main
+      {:margin-top :20px
+       :display      :grid
+       :place-items :center}]
+
+     [:.board
       {:user-select   :none
        :height        :400px
        :width         :400px
-       :margin-inline :auto
        :position      :relative}]
 
      [:.star
@@ -25,8 +31,11 @@
        :transition "all 0.2s ease-in-out"}]
 
      [:.dropzone
-      {:position   :absolute
-       :font-size  :40px}]]))
+      {:position  :absolute
+       :font-size :40px}]
+
+     [:.counter
+      {:font-size :20px}]]))
 
 (defn place-stars [db n]
   (doseq [_n (range n)]
@@ -49,22 +58,27 @@
 (defn render-home [{:keys [db] :as _req}]
   (h/html
     [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
-    [:main#morph.main {:data-signals-x__ifmissing 0
-                       :data-signals-y__ifmissing 0}
-     (stars db)
-     [:div.dropzone
-      {:style            {:left :100px :top :100px}
-       :data-on-dragover "evt.preventDefault()"
-       :data-on-drop
-       "evt.preventDefault(); @post(`/dropzone?id=${evt.dataTransfer.getData('text/plain')}`)"}
-      "🚀"]]))
+    [:main#morph.main     
+     [:div [:p.counter "DRAG THE STARS TO THE SHIP"]]     
+     [:div.board (stars db)
+      [:div.dropzone
+       {:style            {:left :100px :top :100px}
+        :data-on-dragover "evt.preventDefault()"
+        :data-on-drop
+        "evt.preventDefault(); @post(`/dropzone?id=${evt.dataTransfer.getData('text/plain')}`)"}
+       "🚀"]]
+     [:div [:p.counter (str "STARS COLLECTED: "  (@db :stars-collected))]]]))
+
+(defn remove-star [db id]
+  (-> (update db :stars dissoc id)
+    (update :stars-collected inc)))
 
 (defn action-user-dropzone [{:keys        [db]
                              {:strs [id]} :query-params}]
   (when id
     (swap! db assoc-in [:stars id] {:x 110 :y 110})
     (Thread/sleep 250)
-    (swap! db update :stars dissoc id)))
+    (swap! db remove-star id)))
 
 (def default-shim-handler
   (h/shim-handler
