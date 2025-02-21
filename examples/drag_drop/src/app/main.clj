@@ -14,13 +14,14 @@
 
      [:.main
       {:user-select   :none
-       :height        :100dvh
-       :width         "min(100% - 2rem , 40rem)"
+       :height        :400px
+       :width         :400px
        :margin-inline :auto
        :position      :relative}]
 
      [:.star
       {:position   :absolute
+       :font-size  :20px
        :transition "all 0.2s ease-in-out"}]
 
      [:.dropzone
@@ -30,8 +31,8 @@
 (defn place-stars [db n]
   (doseq [_n (range n)]
     (swap! db h/assoc-in-if-missing [:stars (h/new-uid)]
-      {:x (rand-int 400)
-       :y (rand-int 400)})))
+      {:x (rand-nth (range 0 400 20))
+       :y (rand-nth (range 0 400 20))})))
 
 (def stars
   (h/cache
@@ -82,7 +83,12 @@
 
 (defn db-start []
   (let [db_ (atom {})]
-    (add-watch db_ :refresh-on-change (fn [& _] (h/refresh-all!)))
+    (place-stars db_ 20)
+    (add-watch db_ :refresh-on-change
+      (fn [_ ref _old-state new-state]
+        (when (empty? (:stars new-state))
+          (place-stars ref 20))
+        (h/refresh-all!)))
     db_))
 
 (defn -main [& _]
