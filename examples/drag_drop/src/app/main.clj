@@ -81,14 +81,15 @@
                             (swap! db update :cursors dissoc sid)))
      [:post "/dropzone"] (h/action-handler #'action-user-dropzone)}))
 
+(defn db-watcher-fn [_ ref _old-state new-state]
+  (when (empty? (:stars new-state))
+    (place-stars ref 20))
+  (h/refresh-all!))
+
 (defn db-start []
   (let [db_ (atom {})]
     (place-stars db_ 20)
-    (add-watch db_ :refresh-on-change
-      (fn [_ ref _old-state new-state]
-        (when (empty? (:stars new-state))
-          (place-stars ref 20))
-        (h/refresh-all!)))
+    (add-watch db_ :refresh-on-change #'db-watcher-fn)
     db_))
 
 (defn -main [& _]

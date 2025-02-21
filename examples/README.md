@@ -9,13 +9,13 @@ Add an A record @ which points to the IPV4 address of the VPS. For IPV6 add a AA
 Move the setup script to the server:
 
 ```bash
-scp server-setup.sh root@XXX.XXX.XXX.XXX:
+scp server-setup.sh root@example.andersmurphy.com:
 ```
 
 ssh into server as root:
 
 ```bash
-ssh root@XXX.XXX.XXX.XXX
+ssh root@example.andersmurphy.com
 ```
 
 run bash script:
@@ -25,14 +25,6 @@ bash server-setup.sh
 ```
 
 follow instructions.
-
-## After deploying first jar
-
-Optional: the first time you move the jar onto the server you will need to reboot to trigger/test systemd is working correctly.
-
-```
-ssh root@XXX.XXX.XXX.XXX "reboot"
-```
 
 ## Caddy service
 
