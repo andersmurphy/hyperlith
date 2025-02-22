@@ -1,7 +1,9 @@
-(ns examples.chat-atom.main
+(ns app.main
   (:gen-class)
   (:require [hyperlith.core :as h]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [datalevin.core :as d]
+            [app.schema :refer [schema]]))
 
 (def css
   (h/static-css
@@ -26,7 +28,15 @@
        :flex-direction :column}]]))
 
 (defn get-messages [db]
-  (reverse (@db :messages)))
+  #_:clj-kondo/ignore
+  (d/q '[:find ?id ?content ?created-at
+         :where
+         [?m :message/id ?id]
+         [?m :message/content ?content]
+         [?m :db/created-at ?created-at]
+         :order-by [?created-at :desc]
+         :limit 100]
+    @db))
 
 (def messages
   (h/cache
@@ -42,14 +52,17 @@
       [:input {:type "text" :data-bind "message"}]
       [:button
        {:data-on-click "@post('/send')"} "send"]]
-     (messages db)]))
+      (messages db)]))
 
-(defn action-send-message [{:keys [_sid db] {:keys [message]} :body}]
+(defn action-send-message [{:keys [sid db] {:keys [message]} :body}]
   (when-not (str/blank? message)
-    (swap! db update :messages conj [(h/new-uid) message])
+    (d/transact! db
+      [{:user/sid sid}
+       {:message/id      (h/new-uid)
+        :message/user    [:user/sid sid]
+        :message/content message}])
     (h/signals {:message ""})))
 
-;; Allows for shim handler to be reused across shim routes
 (def default-shim-handler
   (h/shim-handler
     (h/html
@@ -65,26 +78,27 @@
      [:post "/send"]    (h/action-handler #'action-send-message)}))
 
 (defn db-start []
-  (let [db_ (atom {:messages []})]
-    (add-watch db_ :refresh-on-change
+  (let [db (d/get-conn "db" schema
+             {:validate-data?    true
+              :closed-schema?    true
+              :auto-entity-time? true})]
+    (d/listen! db :refresh-on-change
       ;; This is where you can filter out db transactions you want
-      ;; to ignore (changes that don't affect any views)
-      (fn [& _] (h/refresh-all!)))
-    db_))
+      ;; to ignore (changes that don't affect any views) 
+      (fn [_] (h/refresh-all!)))
+    db))
 
 (defn -main [& _]
   (h/start-app
-    {:router         #'router
+    {:router      #'router
      :max-refresh-ms 100
-     :db-start       db-start
-     :db-stop        (fn [_db] nil)
-     :csrf-secret    "fb1704df2b3484223cb5d2a79bf06a508311d8d0f03c68e724d555b6b605966d0ebb8dc54615f8d080e5fa062bd3b5bce5b6ba7ded23333bbd55deea3149b9d5"}))
+     :db-start    db-start
+     :db-stop     d/close
+     :csrf-secret "fb1704df2b3484223cb5d2a79bf06a508311d8d0f03c68e724d555b6b605966d0ebb8dc54615f8d080e5fa062bd3b5bce5b6ba7ded23333bbd55deea3149b9d5"}))
 
-;; Refresh app when you re-eval file
 (h/refresh-all!)
 
 (comment
-  
   (def server (-main))
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 

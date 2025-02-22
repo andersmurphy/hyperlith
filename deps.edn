@@ -9,15 +9,4 @@
            ;; query params parsing and other utilities
            ring/ring-codec           {:mvn/version "1.2.0"}
            ;; templating
-           dev.onionpancakes/chassis {:mvn/version "1.0.365"}}
- :aliases {:dev {:extra-paths ["dev"]
-                 ;; db for example
-                 :extra-deps  {datalevin/datalevin {:mvn/version "0.9.17"}}
-                 :jvm-opts
-                 ["-Duser.timezone=UTC"
-                  "-XX:+UseZGC"
-                  ;; ZGenerational will be the default in future
-                  ;; so this won't need to be specified
-                  "-XX:+ZGenerational"
-                  "--add-opens=java.base/java.nio=ALL-UNNAMED"
-                  "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"]}}}
+           dev.onionpancakes/chassis {:mvn/version "1.0.365"}}}

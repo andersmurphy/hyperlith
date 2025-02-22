@@ -1,4 +1,4 @@
-(ns examples.chat-datalevin.schema)
+(ns app.schema)
 
 (def schema
   (merge ;; Using merge we can define each logical entity separately

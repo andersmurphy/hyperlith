@@ -1,0 +1,15 @@
+{:paths   ["src" "resources"]
+ :deps    {org.clojure/clojure {:mvn/version "1.12.0"}
+           hyperlith/hyperlith {:local/root "../../../hyperlith"}
+           datalevin/datalevin {:mvn/version "0.9.17"}}
+ :aliases {:dev   {:jvm-opts
+                   ["-Duser.timezone=UTC"
+                    "-XX:+UseZGC"
+                    ;; ZGenerational will be the default in future
+                    ;; so this won't need to be specified
+                    "-XX:+ZGenerational"
+                    "--add-opens=java.base/java.nio=ALL-UNNAMED"
+                    "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"]}
+           :build {:deps       {io.github.clojure/tools.build
+                                {:git/tag "v0.10.5" :git/sha "2a21b7a"}}
+                   :ns-default build}}}

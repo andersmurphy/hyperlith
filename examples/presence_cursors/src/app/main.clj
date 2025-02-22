@@ -1,4 +1,4 @@
-(ns examples.presence-cursors.main
+(ns app.main
   (:gen-class)
   (:require [hyperlith.core :as h]))
 
