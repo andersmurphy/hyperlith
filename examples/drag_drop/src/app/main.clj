@@ -11,6 +11,7 @@
 
      [:html
       {:font-family "Arial, Helvetica, sans-serif"
+       :overflow    :hidden
        :background  :#212529
        :color       :#e9ecef}]
 
@@ -23,13 +24,14 @@
       {:user-select           :none
        :-webkit-touch-callout :none
        :-webkit-user-select   :none
-       :height                :400px
-       :width                 :400px
+       :width                 :100%
+       :max-width :500px
+       :aspect-ratio          "1 / 1"
        :position              :relative}]
 
      [:.star
       {:position    :absolute
-       :font-size   :20px
+       :font-size   :16px
        :transition  "all 0.2s ease-in-out"}]
 
      [:.dropzone
@@ -37,15 +39,16 @@
        :font-size :40px}]
 
      [:.counter
-      {:font-size :20px}]
+      {:font-size :16px}]
 
      [:a {:color       :#e9ecef}]]))
 
 (defn place-stars [db n]
   (doseq [_n (range n)]
-    (swap! db h/assoc-in-if-missing [:stars (h/new-uid)]
-      {:x (rand-nth (range 0 400 20))
-       :y (rand-nth (range 0 400 20))})))
+    (let [x (rand-nth (range 0 100 5))
+          y (rand-nth (range 0 100 5))]
+      (swap! db h/assoc-in-if-missing [:stars (str "s" x y)]
+        {:x x :y y}))))
 
 (def stars
   (h/cache
@@ -53,21 +56,23 @@
       (for [[star-id {:keys [x y]}] (:stars @db)]
         [:div.star
          {:id                star-id
-          :style             {:left (str x "px") :top (str y "px")}
+          :style             {:left (str x "%") :top (str y "%")}
           :draggable         "true"
           :data-on-dragstart
           "evt.dataTransfer.setData('text/plain', evt.target.id)"}
          "⭐"]))))
 
+(def rocket-postition {:left :50% :top :50%})
+
 (defn render-home [{:keys [db] :as _req}]
   (h/html
     [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
-    [:main#morph.main     
+    [:main#morph.main
      [:div [:p.counter "DRAG THE STARS TO THE SHIP"]]
      [:p "(multiplayer co-op)"]
      [:div.board nil (stars db)
       [:div.dropzone
-       {:style            {:left :100px :top :100px}
+       {:style            {:left :50% :top :50%}
         :data-on-dragover "evt.preventDefault()"
         :data-on-drop
         "evt.preventDefault(); @post(`/dropzone?id=${evt.dataTransfer.getData('text/plain')}`)"}
@@ -84,7 +89,7 @@
 (defn action-user-dropzone [{:keys        [db]
                              {:strs [id]} :query-params}]
   (when id
-    (swap! db assoc-in [:stars id] {:x 110 :y 110})
+    (swap! db assoc-in [:stars id] {:x 52 :y 52})
     (Thread/sleep 250)
     (swap! db remove-star id)))
   
