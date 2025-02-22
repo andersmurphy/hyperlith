@@ -30,8 +30,7 @@
      [:.star
       {:position    :absolute
        :font-size   :20px
-       :transition  "all 0.2s ease-in-out"
-       }]
+       :transition  "all 0.2s ease-in-out"}]
 
      [:.dropzone
       {:position  :absolute
@@ -65,7 +64,7 @@
     [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
     [:main#morph.main     
      [:div [:p.counter "DRAG THE STARS TO THE SHIP"]]
-     [:p "(multiplayer coop)"]
+     [:p "(multiplayer co-op)"]
      [:div.board (stars db)
       [:div.dropzone
        {:style            {:left :100px :top :100px}
@@ -91,6 +90,8 @@
 (def default-shim-handler
   (h/shim-handler
     (h/html
+      ;; Setting the colour here prevents flash on remote stylesheet update
+      [:style "html {background: #212529}"]
       [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}])))
 
 (def router
@@ -140,3 +141,7 @@
 
   ,)
 
+;; TODO: move away from absolute to grid layout
+;; TODO: more compression friendly uids?
+;; TODO: cursor presence?
+;; TODO: better mobile support
