@@ -142,7 +142,6 @@
 
   ,)
 
-;; TODO: allow watcher function to leverage debounce
 ;; TODO: move away from absolute to grid layout
 ;; TODO: more compression friendly uids?
 ;; TODO: cursor presence?
