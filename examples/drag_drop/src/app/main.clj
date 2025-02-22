@@ -65,14 +65,15 @@
     [:main#morph.main     
      [:div [:p.counter "DRAG THE STARS TO THE SHIP"]]
      [:p "(multiplayer co-op)"]
-     [:div.board (stars db)
+     [:div.board nil (stars db)
       [:div.dropzone
        {:style            {:left :100px :top :100px}
         :data-on-dragover "evt.preventDefault()"
         :data-on-drop
         "evt.preventDefault(); @post(`/dropzone?id=${evt.dataTransfer.getData('text/plain')}`)"}
        "🚀"]]
-     [:div [:p.counter (str "STARS COLLECTED: "  (@db :stars-collected))]]
+     [:div [:p.counter nil
+            (str "STARS COLLECTED: "  (@db :stars-collected))]]
      [:a {:href "https://data-star.dev/"}
       "Built with ❤️ using Datastar"]]))
 
@@ -86,7 +87,7 @@
     (swap! db assoc-in [:stars id] {:x 110 :y 110})
     (Thread/sleep 250)
     (swap! db remove-star id)))
-
+  
 (def default-shim-handler
   (h/shim-handler
     (h/html
@@ -104,23 +105,21 @@
                             (swap! db update :cursors dissoc sid)))
      [:post "/dropzone"] (h/action-handler #'action-user-dropzone)}))
 
-(defn db-watcher-fn [_ ref _old-state new-state]
-  (when (empty? (:stars new-state))
-    (place-stars ref 20))
-  (h/refresh-all!))
-
 (defn db-start []
-  (let [db_ (atom {})]
+  (let [db_ (atom {:stars-collected 0})]
     (place-stars db_ 20)
-    (add-watch db_ :refresh-on-change
-      ;; Allows watcher function to be swapped at runtime
-      #'db-watcher-fn)
+    (add-watch db_ :refresh-on-change h/refresh-all!)
     db_))
+
+(defn on-refresh [_ ref _old-state new-state]
+  (when (empty? (:stars new-state))
+    (place-stars ref 20)))
 
 (defn -main [& _]
   (h/start-app
     {:router         #'router
      :max-refresh-ms 100
+     :on-refresh     #'on-refresh
      :db-start       db-start
      :db-stop        (fn [_db] nil)
      :csrf-secret    (h/env :csrf-secret)}))

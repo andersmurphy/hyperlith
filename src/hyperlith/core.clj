@@ -10,7 +10,7 @@
             [hyperlith.impl.http]
             [hyperlith.impl.html]
             [hyperlith.impl.router]
-            [hyperlith.impl.cache]
+            [hyperlith.impl.cache :as cache]
             [hyperlith.impl.assets]
             [hyperlith.impl.trace]
             [hyperlith.impl.env]
@@ -65,16 +65,29 @@
 
 (defonce ^:private refresh-ch_ (atom nil))
 
-(defn refresh-all! []
+(defn refresh-all! [& args]
   (when-let [<refresh-ch @refresh-ch_]
-    (a/>!! <refresh-ch :refresh-event)))
+    (a/>!! <refresh-ch (or args []))))
 
 (defn start-app [{:keys [router port db-start db-stop csrf-secret
-                         max-refresh-ms]}]
+                         max-refresh-ms on-refresh]}]
   (let [<refresh-ch  (a/chan (a/dropping-buffer 1))
         _            (reset! refresh-ch_ <refresh-ch)
         db           (db-start)
-        refresh-mult (ds/throttled-mult <refresh-ch (or max-refresh-ms 100))
+        refresh-mult (-> (ds/throttle <refresh-ch (or max-refresh-ms 100))
+                       (a/pipe
+                         (a/chan 1
+                           (map
+                             (fn [args]
+                               ;; cache is only invalidate at most
+                               ;; every X msec and only if db has change
+                               (cache/invalidate-cache!)
+                               ;; run on-refresh
+                               (when (and on-refresh (seq args))
+                                 (apply on-refresh args))
+                               ;; No point sending the args past here
+                               :refresh-event))))
+                       a/mult)
         wrap-state   (fn [handler] (fn [req]
                                      (handler
                                        (assoc req :db db
@@ -90,5 +103,3 @@
              (stop-server)
              (db-stop db)
              (a/close! <refresh-ch))}))
-
-

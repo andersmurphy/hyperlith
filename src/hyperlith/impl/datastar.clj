@@ -4,7 +4,6 @@
             [hyperlith.impl.json :as j]
             [hyperlith.impl.headers :refer [default-headers]]
             [hyperlith.impl.util :as util]
-            [hyperlith.impl.cache :as cache]
             [hyperlith.impl.gzip :as gz]
             [hyperlith.impl.crypto :as crypto]
             [hyperlith.impl.html :as h]
@@ -42,17 +41,14 @@
     "\ndata: signals " (j/edn->json signals)
     "\n\n\n"))
 
-(defn throttled-mult [<in-ch msec]
+(defn throttle [<in-ch msec]
   (let [;; No buffer on the out-ch as the in-ch should be buffered
         <out-ch (a/chan)]
     (util/thread
-      (util/while-some [_ (a/<!! <in-ch)]
-        ;; cache is only invalidate at most every X msec and only if
-        ;; db has change
-        (cache/invalidate-cache!)
-        (a/>!! <out-ch :refresh)
+      (util/while-some [event (a/<!! <in-ch)]
+        (a/>!! <out-ch event)
         (Thread/sleep ^long msec)))
-    (a/mult <out-ch)))
+    <out-ch))
 
 (defn send! [ch event]
   (hk/send! ch {:status  200

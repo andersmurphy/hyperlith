@@ -66,10 +66,7 @@
 
 (defn db-start []
   (let [db_ (atom {:messages []})]
-    (add-watch db_ :refresh-on-change
-      ;; This is where you can filter out db transactions you want
-      ;; to ignore (changes that don't affect any views)
-      (fn [& _] (h/refresh-all!)))
+    (add-watch db_ :refresh-on-change h/refresh-all!)
     db_))
 
 (defn -main [& _]

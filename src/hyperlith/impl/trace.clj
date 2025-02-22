@@ -7,7 +7,6 @@
 (defn reset-traces! []
   (reset! traces_ []))
 
-#_:clj-kondo/ignore
 (def trace-tap
   (do (remove-tap trace-tap) ;; Remove old tap
       (let [f (partial swap! traces_ conj)]

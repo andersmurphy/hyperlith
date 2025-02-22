@@ -82,10 +82,7 @@
              {:validate-data?    true
               :closed-schema?    true
               :auto-entity-time? true})]
-    (d/listen! db :refresh-on-change
-      ;; This is where you can filter out db transactions you want
-      ;; to ignore (changes that don't affect any views) 
-      (fn [_] (h/refresh-all!)))
+    (d/listen! db :refresh-on-change h/refresh-all!)
     db))
 
 (defn -main [& _]
