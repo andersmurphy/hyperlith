@@ -13,10 +13,14 @@
             [hyperlith.impl.cache]
             [hyperlith.impl.assets]
             [hyperlith.impl.trace]
+            [hyperlith.impl.env]
             [clojure.core.async :as a]
             [org.httpkit.server :as hk]))
 
 (import-vars
+  ;; ENV
+  [hyperlith.impl.env
+   env]
   ;; UTIL
   [hyperlith.impl.util
    load-resource

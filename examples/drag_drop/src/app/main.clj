@@ -112,7 +112,9 @@
 (defn db-start []
   (let [db_ (atom {})]
     (place-stars db_ 20)
-    (add-watch db_ :refresh-on-change #'db-watcher-fn)
+    (add-watch db_ :refresh-on-change
+      ;; Allows watcher function to be swapped at runtime
+      #'db-watcher-fn)
     db_))
 
 (defn -main [& _]
@@ -121,7 +123,7 @@
      :max-refresh-ms 100
      :db-start       db-start
      :db-stop        (fn [_db] nil)
-     :csrf-secret    "fb1704df2b3484223cb5d2a79bf06a508311d8d0f03c68e724d555b6b605966d0ebb8dc54615f8d080e5fa062bd3b5bce5b6ba7ded23333bbd55deea3149b9d5"}))
+     :csrf-secret    (h/env :csrf-secret)}))
 
 ;; Refresh app when you re-eval file
 (h/refresh-all!)
@@ -141,6 +143,7 @@
 
   ,)
 
+;; TODO: allow watcher function to leverage debounce
 ;; TODO: move away from absolute to grid layout
 ;; TODO: more compression friendly uids?
 ;; TODO: cursor presence?
