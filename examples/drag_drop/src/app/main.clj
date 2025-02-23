@@ -25,18 +25,19 @@
        :-webkit-touch-callout :none
        :-webkit-user-select   :none
        :width                 :100%
-       :max-width :500px
+       :max-width             :500px
        :aspect-ratio          "1 / 1"
        :position              :relative}]
 
      [:.star
-      {:position    :absolute
-       :font-size   :30px
-       :transition  "all 0.2s ease-in-out"}]
+      {:position     :absolute
+       :touch-action :none
+       :font-size    :30px
+       :transition   "all 0.2s ease-in-out"}]
 
      [:.dropzone
       {:position  :absolute
-       :font-size :40px}]
+       :font-size :30px}]
 
      [:.counter
       {:font-size :16px}]
@@ -62,8 +63,6 @@
           "evt.dataTransfer.setData('text/plain', evt.target.id)"}
          "⭐"]))))
 
-(def rocket-postition {:left :50% :top :50%})
-
 (defn render-home [{:keys [db] :as _req}]
   (h/html
     [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
@@ -72,7 +71,7 @@
      [:p "(multiplayer co-op)"]
      [:div.board nil (stars db)
       [:div.dropzone
-       {:style            {:left :50% :top :50%}
+       {:style            {:left :55% :top :55%}
         :data-on-dragover "evt.preventDefault()"
         :data-on-drop
         "evt.preventDefault(); @post(`/dropzone?id=${evt.dataTransfer.getData('text/plain')}`)"}
@@ -89,7 +88,7 @@
 (defn action-user-dropzone [{:keys        [db]
                              {:strs [id]} :query-params}]
   (when id
-    (swap! db assoc-in [:stars id] {:x 52 :y 52})
+    (swap! db assoc-in [:stars id] {:x 55 :y 55})
     (Thread/sleep 250)
     (swap! db remove-star id)))
   

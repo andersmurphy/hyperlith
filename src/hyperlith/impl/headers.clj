@@ -20,7 +20,7 @@
    :font-src        [self]
    :connect-src     [self]
    :style-src       [self unsafe-inline]
-   :style-src-elem  [self]
+   :style-src-elem  [self unsafe-inline]
    :frame-ancestors [none]})
 
 (defn csp-data->str [csp-data]
