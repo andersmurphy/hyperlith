@@ -16,8 +16,8 @@
        :color       :#e9ecef}]
 
      [:.main
-      {:margin-top :20px
-       :display      :grid
+      {:margin-top  :20px
+       :display     :grid
        :place-items :center}]
 
      [:.board
@@ -31,7 +31,7 @@
 
      [:.star
       {:position    :absolute
-       :font-size   :16px
+       :font-size   :30px
        :transition  "all 0.2s ease-in-out"}]
 
      [:.dropzone
@@ -45,8 +45,8 @@
 
 (defn place-stars [db n]
   (doseq [_n (range n)]
-    (let [x (rand-nth (range 0 100 5))
-          y (rand-nth (range 0 100 5))]
+    (let [x (rand-nth (range 0 100 10))
+          y (rand-nth (range 0 100 10))]
       (swap! db h/assoc-in-if-missing [:stars (str "s" x y)]
         {:x x :y y}))))
 
@@ -112,13 +112,13 @@
 
 (defn db-start []
   (let [db_ (atom {:stars-collected 0})]
-    (place-stars db_ 20)
+    (place-stars db_ 15)
     (add-watch db_ :refresh-on-change h/refresh-all!)
     db_))
 
 (defn on-refresh [_ ref _old-state new-state]
   (when (empty? (:stars new-state))
-    (place-stars ref 20)))
+    (place-stars ref 15)))
 
 (defn -main [& _]
   (h/start-app
