@@ -18,7 +18,8 @@
      [:.main
       {:margin-top  :20px
        :display     :grid
-       :place-items :center}]
+       :place-items :center
+       :gap         :2px}]
 
      [:.board
       {:user-select           :none
@@ -42,7 +43,7 @@
      [:.counter
       {:font-size :16px}]
 
-     [:a {:color       :#e9ecef}]]))
+     [:a {:color :#e9ecef}]]))
 
 (defn place-stars [db n]
   (doseq [_n (range n)]
@@ -56,9 +57,9 @@
     (fn [db]
       (for [[star-id {:keys [x y]}] (:stars @db)]
         [:div.star
-         {:id                star-id
-          :style             {:left (str x "%") :top (str y "%")}
-          :draggable         "true"
+         {:id        star-id
+          :style     {:left (str x "%") :top (str y "%")}
+          :draggable "true"
           :data-on-dragstart
           "evt.dataTransfer.setData('text/plain', evt.target.id)"}
          "⭐"]))))
@@ -67,7 +68,7 @@
   (h/html
     [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
     [:main#morph.main
-     [:div [:p.counter "DRAG THE STARS TO THE SHIP"]]
+     [:p.counter "DRAG THE STARS TO THE SHIP"]
      [:p "(multiplayer co-op)"]
      [:div.board nil (stars db)
       [:div.dropzone
@@ -76,10 +77,12 @@
         :data-on-drop
         "evt.preventDefault(); @post(`/dropzone?id=${evt.dataTransfer.getData('text/plain')}`)"}
        "🚀"]]
-     [:div [:p.counter nil
-            (str "STARS COLLECTED: "  (@db :stars-collected))]]
+     [:p.counter nil
+      (str "STARS COLLECTED: "  (@db :stars-collected))]
      [:a {:href "https://data-star.dev/"}
-      "Built with ❤️ using Datastar"]]))
+      "Built with ❤️ using Datastar"]
+     [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/drag_drop/src/app/main.clj"}
+      "show me the code"]]))
 
 (defn remove-star [db id]
   (-> (update db :stars dissoc id)
@@ -91,7 +94,7 @@
     (swap! db assoc-in [:stars id] {:x 55 :y 55})
     (Thread/sleep 250)
     (swap! db remove-star id)))
-  
+
 (def default-shim-handler
   (h/shim-handler
     (h/html
@@ -104,9 +107,9 @@
     {[:get (css :path)]  (css :handler)
      [:get  "/"]         default-shim-handler
      [:post "/"]         (h/render-handler #'render-home
-                          :on-close
-                          (fn [{:keys [sid db]}]
-                            (swap! db update :cursors dissoc sid)))
+                           :on-close
+                           (fn [{:keys [sid db]}]
+                             (swap! db update :cursors dissoc sid)))
      [:post "/dropzone"] (h/action-handler #'action-user-dropzone)}))
 
 (defn db-start []
@@ -145,8 +148,3 @@
   (place-stars (server :db) 10)
 
   ,)
-
-;; TODO: move away from absolute to grid layout
-;; TODO: more compression friendly uids?
-;; TODO: cursor presence?
-;; TODO: better mobile support
