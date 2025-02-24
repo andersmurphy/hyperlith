@@ -3,7 +3,7 @@
 This is a small and very opinionated fullstack [Datastar](https://data-star.dev/) framework mostly
 for my personal use. However, I felt there were some ideas in here that were worth sharing.
 
-Hyperlith only uses a subset of Datastar's feartures. If you want a production ready full featured [Datastar Clojure SDK use the official SDK](https://github.com/starfederation/datastar/tree/main/sdk/clojure). 
+Hyperlith only uses a subset of Datastar's feartures. If you want a production ready full featured Datastar Clojure SDK use [the official SDK](https://github.com/starfederation/datastar/tree/main/sdk/clojure). 
 
 >⚠️ **WARNING:**  API can change at any time! Use at your own risk. 
 
