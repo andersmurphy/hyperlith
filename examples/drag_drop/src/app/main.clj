@@ -88,12 +88,20 @@
   (-> (update db :stars dissoc id)
     (update :stars-collected inc)))
 
-(defn action-user-dropzone [{:keys        [db]
-                             {:strs [id]} :query-params}]
+(defn move-star [db id]
+  (swap! db assoc-in [:stars id] {:x 55 :y 55})
+  (Thread/sleep 250)
+  (swap! db remove-star id))
+
+(defn action-user-move-star-to-dropzone
+  [{:keys [db] {:strs [id]} :query-params}]
   (when id
-    (swap! db assoc-in [:stars id] {:x 55 :y 55})
-    (Thread/sleep 250)
-    (swap! db remove-star id)))
+    (move-star db id)
+    ;; AI plays
+    (when (>= 0.40 (rand))
+      (Thread/sleep ^long (rand-int 2000))
+      (let [id (rand-nth (keys (:stars @db)))]
+        (move-star db id)))))
 
 (def default-shim-handler
   (h/shim-handler
@@ -110,7 +118,7 @@
                            :on-close
                            (fn [{:keys [sid db]}]
                              (swap! db update :cursors dissoc sid)))
-     [:post "/dropzone"] (h/action-handler #'action-user-dropzone)}))
+     [:post "/dropzone"] (h/action-handler #'action-user-move-star-to-dropzone)}))
 
 (defn db-start []
   (let [db_ (atom {:stars-collected 0})]
@@ -148,3 +156,17 @@
   (place-stars (server :db) 10)
 
   ,)
+
+(comment
+  (declare db)
+  
+  (map
+    (fn [[k _]]
+      (action-user-move-star-to-dropzone
+        {:db           db
+         :query-params {"id" k}}))
+    (:stars @db))
+
+  
+
+  )
