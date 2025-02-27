@@ -64,18 +64,18 @@
      [:post "/"]        (h/render-handler #'render-home)
      [:post "/send"]    (h/action-handler #'action-send-message)}))
 
-(defn db-start []
+(defn state-start []
   (let [db_ (atom {:messages []})]
     (add-watch db_ :refresh-on-change h/refresh-all!)
-    db_))
+    {:db db_}))
 
 (defn -main [& _]
   (h/start-app
     {:router         #'router
      :max-refresh-ms 100
-     :db-start       db-start
-     :db-stop        (fn [_db] nil)
-     :csrf-secret (h/env :csrf-secret)}))
+     :state-start    state-start
+     :state-stop     (fn [_state] nil)
+     :csrf-secret    (h/env :csrf-secret)}))
 
 ;; Refresh app when you re-eval file
 (h/refresh-all!)

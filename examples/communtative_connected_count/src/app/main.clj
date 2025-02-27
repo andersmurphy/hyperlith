@@ -24,13 +24,13 @@
       {:text-align :center
        :font-size :50px}]]))
 
-(defn render-home [{:keys [db] :as _req}]
+(defn render-home [{:keys [connected-counter] :as _req}]
   (h/html
     [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
     [:main#morph.main
      [:div
       [:p nil (str "connected users")]
-      [:p.counter nil @db]]]))
+      [:p.counter nil @connected-counter]]]))
 
 (def default-shim-handler
   (h/shim-handler
@@ -43,25 +43,25 @@
      [:get  "/"]        default-shim-handler
      [:post "/"]        (h/render-handler #'render-home
                           :on-open
-                          (fn [{:keys [db]}]
-                            (dosync (commute db inc)))
+                          (fn [{:keys [connected-counter]}]
+                            (dosync (commute connected-counter inc)))
                           :on-close
-                          (fn [{:keys [db]}]
-                            (dosync (commute db dec))))}))
+                          (fn [{:keys [connected-counter]}]
+                            (dosync (commute connected-counter dec))))}))
 
-(defn db-start []
+(defn state-start []
   ;; By using ref and commute to track user count allows for higher
   ;; level of concurrency.
-  (let [db_ (ref 0)]
-    (add-watch db_ :refresh-on-change h/refresh-all!)
-    db_))
+  (let [connected-counter_ (ref 0)]
+    (add-watch connected-counter_ :refresh-on-change h/refresh-all!)
+    {:connected-counter connected-counter_}))
 
 (defn -main [& _]
   (h/start-app
     {:router         #'router
      :max-refresh-ms 100
-     :db-start       db-start
-     :db-stop        (fn [_db] nil)
+     :state-start       state-start
+     :state-stop        (fn [_db] nil)
      :csrf-secret    (h/env :csrf-secret)}))
 
 ;; Refresh app when you re-eval file

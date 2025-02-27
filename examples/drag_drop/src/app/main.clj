@@ -120,11 +120,11 @@
                              (swap! db update :cursors dissoc sid)))
      [:post "/dropzone"] (h/action-handler #'action-user-move-star-to-dropzone)}))
 
-(defn db-start []
+(defn state-start []
   (let [db_ (atom {:stars-collected 0})]
     (place-stars db_ 15)
     (add-watch db_ :refresh-on-change h/refresh-all!)
-    db_))
+    {:db db_}))
 
 (defn on-refresh [_ ref _old-state new-state]
   (when (empty? (:stars new-state))
@@ -135,8 +135,8 @@
     {:router         #'router
      :max-refresh-ms 100
      :on-refresh     #'on-refresh
-     :db-start       db-start
-     :db-stop        (fn [_db] nil)
+     :state-start    state-start
+     :state-stop     (fn [_] nil)
      :csrf-secret    (h/env :csrf-secret)}))
 
 ;; Refresh app when you re-eval file

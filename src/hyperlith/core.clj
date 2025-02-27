@@ -3,9 +3,9 @@
             [hyperlith.impl.session :refer [wrap-session]]
             [hyperlith.impl.json :refer [wrap-parse-json-body]]
             [hyperlith.impl.params :refer [wrap-query-params]]
-            [hyperlith.impl.datastar :as ds]
+            [hyperlith.impl.datastar :as ds]            
+            [hyperlith.impl.util :as u]
             [hyperlith.impl.crypto]
-            [hyperlith.impl.util]
             [hyperlith.impl.css]
             [hyperlith.impl.http]
             [hyperlith.impl.html]
@@ -69,18 +69,18 @@
   (when-let [<refresh-ch @refresh-ch_]
     (a/>!! <refresh-ch (or args []))))
 
-(defn start-app [{:keys [router port db-start db-stop csrf-secret
+(defn start-app [{:keys [router port state-start state-stop csrf-secret
                          max-refresh-ms on-refresh]}]
   (let [<refresh-ch  (a/chan (a/dropping-buffer 1))
         _            (reset! refresh-ch_ <refresh-ch)
-        db           (db-start)
+        state        (state-start)
         refresh-mult (-> (ds/throttle <refresh-ch (or max-refresh-ms 100))
                        (a/pipe
                          (a/chan 1
                            (map
                              (fn [args]
                                ;; cache is only invalidate at most
-                               ;; every X msec and only if db has change
+                               ;; every X msec and only if state has change
                                (cache/invalidate-cache!)
                                ;; run on-refresh
                                (when (and on-refresh (seq args))
@@ -90,16 +90,16 @@
                        a/mult)
         wrap-state   (fn [handler] (fn [req]
                                      (handler
-                                       (assoc req :db db
-                                         :refresh-mult refresh-mult))))
+                                       (-> (u/merge req state)
+                                         (assoc :refresh-mult refresh-mult)))))
         stop-server  (-> router
                        wrap-state
                        wrap-query-params
                        (wrap-session csrf-secret)
                        wrap-parse-json-body
                        (hk/run-server {:port (or port 8080)}))]
-    {:db   db
-     :stop (fn stop []
-             (stop-server)
-             (db-stop db)
-             (a/close! <refresh-ch))}))
+    {:state state
+     :stop  (fn stop []
+              (stop-server)
+              (state-stop state)
+              (a/close! <refresh-ch))}))

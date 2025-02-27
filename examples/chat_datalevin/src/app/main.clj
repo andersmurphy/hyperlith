@@ -77,20 +77,20 @@
      [:post "/"]        (h/render-handler #'render-home)
      [:post "/send"]    (h/action-handler #'action-send-message)}))
 
-(defn db-start []
+(defn state-start []
   (let [db (d/get-conn "db" schema
              {:validate-data?    true
               :closed-schema?    true
               :auto-entity-time? true})]
     (d/listen! db :refresh-on-change h/refresh-all!)
-    db))
+    {:db db}))
 
 (defn -main [& _]
   (h/start-app
     {:router      #'router
      :max-refresh-ms 100
-     :db-start    db-start
-     :db-stop     d/close
+     :state-start    state-start
+     :state-stop     d/close
      :csrf-secret (h/env :csrf-secret)}))
 
 (h/refresh-all!)

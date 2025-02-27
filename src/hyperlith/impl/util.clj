@@ -1,6 +1,12 @@
 (ns hyperlith.impl.util
+  (:refer-clojure :exclude [merge])
   (:require [clojure.java.io :as io])
   (:import (java.io InputStream)))
+
+(defn merge
+  "Faster merge."
+  [m1 m2]
+  (persistent! (reduce-kv assoc! (transient (or m1 {})) m2)))
 
 (defmacro thread [& body]
   `(Thread/startVirtualThread
