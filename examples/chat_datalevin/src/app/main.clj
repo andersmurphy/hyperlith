@@ -87,11 +87,11 @@
 
 (defn -main [& _]
   (h/start-app
-    {:router      #'router
+    {:router         #'router
      :max-refresh-ms 100
      :state-start    state-start
-     :state-stop     d/close
-     :csrf-secret (h/env :csrf-secret)}))
+     :state-stop     (fn [{:keys [db]}] (d/close db))
+     :csrf-secret    (h/env :csrf-secret)}))
 
 (h/refresh-all!)
 
