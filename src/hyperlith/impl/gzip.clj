@@ -1,6 +1,8 @@
 (ns hyperlith.impl.gzip
-  (:import (java.io ByteArrayOutputStream)
-           (java.util.zip GZIPOutputStream)))
+  (:import
+   (java.io ByteArrayInputStream ByteArrayOutputStream EOFException
+     StringWriter BufferedWriter)
+   (java.util.zip GZIPInputStream GZIPOutputStream)))
 
 (defn byte-array-out-stream ^ByteArrayOutputStream []
   (ByteArrayOutputStream/new))
@@ -24,3 +26,17 @@
   (let [result (.toByteArray out)]
     (.reset out)
     result))
+
+(defn gunzip [data]
+  (with-open [in     (-> (if (string? data) (String/.getBytes data) data)
+                       ByteArrayInputStream/new
+                       GZIPInputStream/new)
+              s      (StringWriter/new)
+              w      (BufferedWriter/new s)]
+    (try (loop [data (.read in)]
+           (when-not (= data -1)
+             (.write w data)
+             (recur (.read in))))
+         (catch EOFException _))
+    (.flush w)
+    (str s)))
