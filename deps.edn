@@ -9,4 +9,5 @@
            ;; query params parsing and other utilities
            ring/ring-codec           {:mvn/version "1.2.0"}
            ;; templating
-           dev.onionpancakes/chassis {:mvn/version "1.0.365"}}}
+           dev.onionpancakes/chassis {:mvn/version "1.0.365"}}
+ :aliases {:dev {:extra-paths ["dev"]}}}
