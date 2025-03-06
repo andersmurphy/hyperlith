@@ -32,19 +32,20 @@
     (^boolean accept [_this ^java.util.Map _m]
      true)))
 
-(def parse-sse-xf
-  (comp ;; Probably a nicer way to write this
-    (remove str/blank?)
-    (map (fn [line] (update (str/split line #": " 2) 0 keyword)))
-    (partition-by #(-> % first (= :event)))
-    (partition-all 2)
-    (map (fn [[a b]]
-           (->> (into a b)
-             (reduce (fn [acc [k v]]
-                       (if (= :data k)
-                         (update acc :data conj v)
-                         (assoc acc k v)))
-               {:data []}))))))
+(defn split-events [s]
+  (str/split s #"\n\n\n"))
+
+(defn parse-sse-events [events]
+  (mapv
+    (fn [event]
+      (reduce (fn [acc line]
+                (let [[k v] (update (str/split line #": " 2) 0 keyword)]
+                  (if (= :data k)
+                    (update acc :data conj v)
+                    (assoc acc k v))))
+        {:data []}
+        (str/split-lines event)))
+    (str/split events #"\n\n\n")))
 
 (defn wrap-gzipped-sse-response [method]
   (fn [url request]
@@ -57,8 +58,7 @@
            ;; for the stream to complete which could be never.
            :as :none
            :filter  (byte-capture-filter capture)))
-      (->> @capture gzip/gunzip str/split-lines
-        (into [] parse-sse-xf)))))
+      (-> @capture gzip/gunzip parse-sse-events))))
 
 (def sse-get!
   (wrap-gzipped-sse-response #_:clj-kondo/ignore http/get))
@@ -68,7 +68,7 @@
 
 (comment
   ;; TODO: stream gunzip?
-  ;; TODO: return a channel or atom of SSE events 
+  ;; TODO: return a channel or atom of SSE events
 
   (sse-post!
     "http://localhost:8080/"
