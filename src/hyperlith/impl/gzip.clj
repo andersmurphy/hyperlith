@@ -15,7 +15,7 @@
   (with-open [out  (byte-array-out-stream)
               gzip (gzip-out-stream out)]
     (doto gzip
-      (.write  (if (string? data) (String/.getBytes data) data))
+      (.write  (if (string? data) (String/.getBytes data) ^byte/1 data))
       (.finish))
     (.toByteArray out)))
 
