@@ -32,9 +32,6 @@
     (^boolean accept [_this ^java.util.Map _m]
      true)))
 
-(defn split-events [s]
-  (str/split s #"\n\n\n"))
-
 (defn parse-sse-events [events]
   (mapv
     (fn [event]
