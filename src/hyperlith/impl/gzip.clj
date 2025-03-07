@@ -1,7 +1,6 @@
 (ns hyperlith.impl.gzip
   (:import
-   (java.io ByteArrayInputStream ByteArrayOutputStream EOFException
-     StringWriter BufferedWriter)
+   (java.io ByteArrayInputStream ByteArrayOutputStream EOFException)
    (java.util.zip GZIPInputStream GZIPOutputStream)))
 
 (defn byte-array-out-stream ^ByteArrayOutputStream []
@@ -28,15 +27,15 @@
     result))
 
 (defn gunzip [data]
-  (with-open [in     (-> (if (string? data) (String/.getBytes data) data)
-                       ByteArrayInputStream/new
-                       GZIPInputStream/new)
-              s      (StringWriter/new)
-              w      (BufferedWriter/new s)]
-    (try (loop [data (.read in)]
-           (when-not (= data -1)
-             (.write w data)
-             (recur (.read in))))
-         (catch EOFException _))
-    (.flush w)
-    (str s)))
+  (with-open [in  (-> (if (string? data) (String/.getBytes data) data)
+                    ByteArrayInputStream/new
+                    GZIPInputStream/new)
+              out (ByteArrayOutputStream/new 4096)]
+    (let [buf (byte-array 4096)]
+      (try ;; Allows gunzipping of incomplete streams
+        (loop [len (.read in buf)]
+          (when-not (= len -1)
+            (.write out buf 0 len)
+            (recur (.read in buf))))
+        (catch EOFException _)))
+    (str out)))
