@@ -1,6 +1,8 @@
 (ns hyperlith.impl.gzip
+  (:require
+   [clojure.java.io :as io])
   (:import
-   (java.io ByteArrayInputStream ByteArrayOutputStream EOFException)
+   (java.io ByteArrayOutputStream EOFException)
    (java.util.zip GZIPInputStream GZIPOutputStream)))
 
 (defn byte-array-out-stream ^ByteArrayOutputStream []
@@ -28,14 +30,10 @@
 
 (defn gunzip [data]
   (with-open [in  (-> (if (string? data) (String/.getBytes data) data)
-                    ByteArrayInputStream/new
+                    io/input-stream
                     GZIPInputStream/new)
               out (ByteArrayOutputStream/new 4096)]
-    (let [buf (byte-array 4096)]
-      (try ;; Allows gunzipping of incomplete streams
-        (loop [len (.read in buf)]
-          (when-not (= len -1)
-            (.write out buf 0 len)
-            (recur (.read in buf))))
-        (catch EOFException _)))
+    (try ;; Allows gunzipping of incomplete streams
+      (io/copy in out :buffer-size 4096)
+      (catch EOFException _))
     (str out)))
