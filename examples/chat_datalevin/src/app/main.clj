@@ -100,8 +100,8 @@
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
   ;; stop server
-  (let [stop (server :stop)] (stop))
+  ((server :stop))
 
   ;; query outside of handler
-  (get-messages (:db server))
+  (get-messages (-> server :state :db))
   ,)

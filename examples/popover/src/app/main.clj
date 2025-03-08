@@ -84,7 +84,6 @@
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
   ;; stop server
-  (let [stop (server :stop)] (stop))
-
+  ((server :stop))
 
   ,)
