@@ -144,23 +144,28 @@
   ;; stop server
   (let [stop (server :stop)] (stop))
 
-  @(server :db)
+  (:db (server :state))
 
-  (reset! (server :db) {})
+  (reset! (server :state) {})
 
-  (place-stars (server :db) 10)
+  (place-stars (:db (server :state)) 10)
 
   ,)
 
 (comment
+  (def db (:db (server :state)))
   (declare db)
-  
-  (map
-    (fn [[k _]]
-      (action-user-move-star-to-dropzone
-        {:db           db
-         :query-params {"id" k}}))
-    (:stars @db))
+
+
+  (def db (:db (server :state)))
+  (place-stars (:db (server :state)) 60)
+  (do (mapv
+        (fn [[k _]]
+          (action-user-move-star-to-dropzone
+            {:db           db
+             :query-params {"id" k}}))
+        (:stars @db))
+      nil)
 
   
 
