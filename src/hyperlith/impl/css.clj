@@ -24,7 +24,7 @@
                      (->> (map format-rule css-rules) (reduce str ""))
                      css-rules)
      :content-type "text/css"
-     :gzip?        true}))
+     :compress?    true}))
 
 (defn -- [css-var-name]
   (str "var(--" (to-str css-var-name) ")"))

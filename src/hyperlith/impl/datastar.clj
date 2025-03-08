@@ -4,7 +4,7 @@
             [hyperlith.impl.json :as j]
             [hyperlith.impl.headers :refer [default-headers]]
             [hyperlith.impl.util :as util]
-            [hyperlith.impl.gzip :as gz]
+            [hyperlith.impl.brotli :as br]
             [hyperlith.impl.crypto :as crypto]
             [hyperlith.impl.html :as h]
             [org.httpkit.server :as hk]
@@ -15,7 +15,7 @@
   (static-asset
     {:body         (util/load-resource "datastar.js.map")
      :content-type "text/javascript"
-     :gzip?        true}))
+     :compress?        true}))
 
 (def datastar
   (static-asset
@@ -24,7 +24,7 @@
        ;; Make sure we point to the right source map
        (str/replace "datastar.js.map" (:path datastar-source-map)))
      :content-type "text/javascript"
-     :gzip?        true}))
+     :compress?        true}))
 
 (defn merge-fragments [event-id fragments]
   (str "event: datastar-merge-fragments"
@@ -55,34 +55,34 @@
                 :headers (assoc default-headers
                            "Content-Type"  "text/event-stream"
                            "Cache-Control" "no-store"
-                           "Content-Encoding" "gzip")
+                           "Content-Encoding" "br")
                 :body    event}
     false))
 
 (defn build-shim-page-resp [head-hiccup]
   {:status  200
-   :headers (assoc default-headers "Content-Encoding" "gzip")
+   :headers (assoc default-headers "Content-Encoding" "br")
    :body
-   (->> (h/html
-          [h/doctype-html5
-           [:html  {:lang "en"}
-            [:head
-             [:meta {:charset "UTF-8"}]
-             (when head-hiccup head-hiccup)
-             ;; Scripts
-             [:script#js {:defer true :type "module"
-                          :src   (datastar :path)}]
-             ;; Enables responsiveness on mobile devices
-             [:meta {:name    "viewport"
-                     :content "width=device-width, initial-scale=1.0"}]]
-            [:body
-             [:div {:data-signals-csrf csrf-cookie-js}]
-             [:div {:data-on-load
-                    "@post(window.location.pathname + window.location.search)"}]
-             [:noscript "Your browser does not support JavaScript!"]
-             [:main {:id "morph"}]]]])
+   (-> (h/html
+         [h/doctype-html5
+          [:html  {:lang "en"}
+           [:head
+            [:meta {:charset "UTF-8"}]
+            (when head-hiccup head-hiccup)
+            ;; Scripts
+            [:script#js {:defer true :type "module"
+                         :src   (datastar :path)}]
+            ;; Enables responsiveness on mobile devices
+            [:meta {:name    "viewport"
+                    :content "width=device-width, initial-scale=1.0"}]]
+           [:body
+            [:div {:data-signals-csrf csrf-cookie-js}]
+            [:div {:data-on-load
+                   "@post(window.location.pathname + window.location.search)"}]
+            [:noscript "Your browser does not support JavaScript!"]
+            [:main {:id "morph"}]]]])
      h/html->str
-     gz/gzip)})
+     (br/compress :quality 11))})
 
 (def routes
   {[:get (datastar :path)]            (datastar :handler)
@@ -102,8 +102,8 @@
        :headers (assoc default-headers
                   "Content-Type"  "text/event-stream"
                   "Cache-Control" "no-store"
-                  "Content-Encoding" "gzip")
-       :body    (gz/gzip (merge-signals signals))}
+                  "Content-Encoding" "br")
+       :body    (br/compress (merge-signals signals))}
       {:status  204
        :headers default-headers})))
 
@@ -123,12 +123,16 @@
          (fn hk-on-open [ch]
            (util/thread
              ;; Note: it is possible to perform diffing here. However, because
-             ;; we are gziping the stream for the duration of the connection
-             ;; and html compresses well we get insane compression. To the
-             ;; point were it's more network efficient and more performant
-             ;; than diffing.
-             (with-open [out  (gz/byte-array-out-stream)
-                         gzip (gz/gzip-out-stream out)]
+             ;; we are compressing the stream for the duration of the
+             ;; connection and html compresses well we get insane compression.
+             ;; To the point were it's more network efficient and more
+             ;; performant than diffing.
+             (with-open [out  (br/byte-array-out-stream)
+                         br (br/compress-out-stream out
+                              ;; Window size can be tuned to trade bandwidth
+                              ;; for memory. 65KB is double of gzip's 32KB.
+                              ;; (br/window-size->kb 16) => 65KB
+                              :window-size 16)]
                (loop [last-view-hash (get-in req [:headers "last-event-id"])]
                  (a/alt!!
                    [<cancel] (do (a/close! <ch) (a/close! <cancel))
@@ -138,7 +142,7 @@
                                (when (not= last-view-hash new-view-hash)
                                  (->> (merge-fragments
                                         new-view-hash (h/html->str new-view))
-                                   (gz/gzip-chunk out gzip)
+                                   (br/compress-stream out br)
                                    (send! ch)))
                                (recur new-view-hash))
                    ;; we want work cancelling to have higher priority

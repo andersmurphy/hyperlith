@@ -166,7 +166,4 @@
              :query-params {"id" k}}))
         (:stars @db))
       nil)
-
-  
-
   )

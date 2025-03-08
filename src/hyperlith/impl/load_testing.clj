@@ -1,6 +1,6 @@
 (ns hyperlith.impl.load-testing
   (:require [org.httpkit.client :as http]
-            [hyperlith.impl.gzip :as gzip]
+            [hyperlith.impl.brotli :as br]
             [clojure.string :as str])
   (:import [org.httpkit DynamicBytes]
            [org.httpkit.client IFilter]))
@@ -37,7 +37,7 @@
       (method
         url
         (assoc request
-          ;; We have to do gzip ourselves otherwise the filter will wait
+          ;; We have to do decompress ourselves otherwise the filter will wait
           ;; for the stream to complete which could be never.
           :as :none
           :filter  (byte-capture-filter capture)))
@@ -51,8 +51,8 @@
 
 (defn parse-captured-response [capture]
   (cond-> capture
-    (= (get-in capture [:headers "content-encoding"]) "gzip")
-    (update :events gzip/gunzip)
+    (= (get-in capture [:headers "content-encoding"]) "br")
+    (update :events br/decompress-stream)
     :always (update :events parse-sse-events)))
 
 (comment
