@@ -96,12 +96,7 @@
 (defn action-user-move-star-to-dropzone
   [{:keys [db] {:strs [id]} :query-params}]
   (when id
-    (move-star db id)
-    ;; AI plays
-    (when (>= 0.40 (rand))
-      (Thread/sleep ^long (rand-int 2000))
-      (let [id (rand-nth (keys (:stars @db)))]
-        (move-star db id)))))
+    (move-star db id)))
 
 (def default-shim-handler
   (h/shim-handler
