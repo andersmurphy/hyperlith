@@ -32,7 +32,9 @@
 
 (defn compress-out-stream ^BrotliOutputStream
   [^ByteArrayOutputStream out-stream & {:as opts}]
-  (BrotliOutputStream/new out-stream (encoder-params opts)))
+  (BrotliOutputStream/new out-stream (encoder-params opts)
+    ;; TODO: Default buffer size for brotli library, needs to be tuned.
+    16384))
 
 (defn compress-stream [^ByteArrayOutputStream out ^BrotliOutputStream br chunk]
   (doto br
