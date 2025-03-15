@@ -26,4 +26,4 @@
    :extra-deps
    {com.aayushatharva.brotli4j/native-osx-x86_64   {:mvn/version "1.18.0"}
     com.aayushatharva.brotli4j/native-osx-aarch64  {:mvn/version "1.18.0"}
-    com.aayushatharva.brotli4j/native-linux-aarch6 {:mvn/version "1.18.0"}}}}}
+    com.aayushatharva.brotli4j/native-linux-aarch64 {:mvn/version "1.18.0"}}}}}
