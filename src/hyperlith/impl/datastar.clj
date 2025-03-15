@@ -56,38 +56,49 @@
                 :body    event}
     false))
 
+(def on-load-js
+  ;; Quirk with browsers is that cache settings are per URL not per
+  ;; URL + METHOD this means that GET and POST cache headers can
+  ;; mess with each other. To get around this an unused query param
+  ;; is added to the url.
+  "@post(window.location.pathname + (window.location.search + '&u=').replace(/^&/,'?'))")
+
 (defn build-shim-page-resp [head-hiccup]
-  {:status  200
-   :headers (assoc default-headers "Content-Encoding" "br")
-   :body
-   (-> (h/html
-         [h/doctype-html5
-          [:html  {:lang "en"}
-           [:head
-            [:meta {:charset "UTF-8"}]
-            (when head-hiccup head-hiccup)
-            ;; Scripts
-            [:script#js {:defer true :type "module"
-                         :src   (datastar :path)}]
-            ;; Enables responsiveness on mobile devices
-            [:meta {:name    "viewport"
-                    :content "width=device-width, initial-scale=1.0"}]]
-           [:body
-            [:div {:data-signals-csrf csrf-cookie-js}]
-            [:div {:data-on-load
-                   "@post(window.location.pathname + window.location.search)"}]
-            [:noscript "Your browser does not support JavaScript!"]
-            [:main {:id "morph"}]]]])
-     h/html->str
-     (br/compress :quality 11))})
+  (let [body (-> (h/html
+                   [h/doctype-html5
+                    [:html  {:lang "en"}
+                     [:head
+                      [:meta {:charset "UTF-8"}]
+                      (when head-hiccup head-hiccup)
+                      ;; Scripts
+                      [:script#js {:defer true :type "module"
+                                   :src   (datastar :path)}]
+                      ;; Enables responsiveness on mobile devices
+                      [:meta {:name    "viewport"
+                              :content "width=device-width, initial-scale=1.0"}]]
+                     [:body
+                      [:div {:data-signals-csrf csrf-cookie-js}]
+                      [:div {:data-on-load on-load-js}]
+                      [:noscript "Your browser does not support JavaScript!"]
+                      [:main {:id "morph"}]]]])
+               h/html->str)]
+    (-> {:status  200
+         :headers (assoc default-headers "Content-Encoding" "br")
+         :body    (-> body (br/compress :quality 11))}
+      ;; Etags ensure the shim is only sent again if it's contents have changed
+      (assoc-in [:headers "ETag"] (crypto/digest body)))))
 
 (def routes
   {[:get (datastar :path)]            (datastar :handler)
    [:get (datastar-source-map :path)] (datastar-source-map :handler)})
 
 (defn shim-handler [head-hiccup]
-  (let [resp (build-shim-page-resp head-hiccup)]
-    (fn handler [_req] resp)))
+  (let [resp (build-shim-page-resp head-hiccup)
+        etag (get-in resp [:headers "ETag"])]    
+    (fn handler [req]
+      (if (= (get-in req [:headers "if-none-match"]) etag)
+        {:status 304}
+        resp))))
 
 (defn signals [signals]
   {::signals signals})
