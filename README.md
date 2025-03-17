@@ -96,7 +96,7 @@ Router is a simple map, this means path parameters are not supported use query p
 
 #### Reverse proxy
 
-Hyperlith is designed to be deployed between a reverse proxy like caddy for handling HTTP2 (you want to be using HTTP2 with SSE).
+Hyperlith is designed to be deployed between a reverse proxy like caddy for handling HTTP2/3 (you want to be using HTTP2/3 with SSE).
 
 #### Minimal middleware 
 
