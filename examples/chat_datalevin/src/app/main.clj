@@ -27,24 +27,22 @@
       {:display        :flex
        :flex-direction :column}]]))
 
-(defn get-messages [db]
-  #_:clj-kondo/ignore
-  (d/q '[:find ?id ?content ?created-at
-         :where
-         [?m :message/id ?id]
-         [?m :message/content ?content]
-         [?m :db/created-at ?created-at]
-         :order-by [?created-at :desc]
-         :limit 100]
-    @db))
+(defn get-messages [q]
+  (q '[:find ?id ?content ?created-at
+       :where
+       [?m :message/id ?id]
+       [?m :message/content ?content]
+       [?m :db/created-at ?created-at]
+       :order-by [?created-at :desc]
+       :limit 100]))
 
 (def messages
   (h/cache
-    (fn [db]
-      (for [[id content] (get-messages db)]
+    (fn [q]
+      (for [[id content] (get-messages q)]
         [:p {:id id} content]))))
 
-(defn render-home [{:keys [db] :as _req}]
+(defn render-home [{:keys [q] :as _req}]
   (h/html
     [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
     [:main#morph.main
@@ -52,11 +50,11 @@
       [:input {:type "text" :data-bind "message"}]
       [:button
        {:data-on-click "@post('/send')"} "send"]]
-      (messages db)]))
+     (messages q)]))
 
-(defn action-send-message [{:keys [sid db] {:keys [message]} :body}]
+(defn action-send-message [{:keys [sid transact!] {:keys [message]} :body}]
   (when-not (str/blank? message)
-    (d/transact! db
+    (transact!
       [{:user/sid sid}
        {:message/id      (h/new-uid)
         :message/user    [:user/sid sid]
@@ -82,8 +80,12 @@
              {:validate-data?    true
               :closed-schema?    true
               :auto-entity-time? true})]
-    (d/listen! db :refresh-on-change h/refresh-all!)
-    {:db db}))
+    {:q         (fn [query & args] (apply d/q query @db args))
+     :transact! (h/batch! (fn [tx-data] (d/transact! db tx-data))
+                  :run-every-ms 100
+                  :max-size 1000
+                  :after-run (fn [] (h/refresh-all!)))
+     :db        db}))
 
 (defn -main [& _]
   (h/start-app
@@ -103,5 +105,5 @@
   ((server :stop))
 
   ;; query outside of handler
-  (get-messages (-> server :state :db))
+  (get-messages (-> server :state :q))
   ,)

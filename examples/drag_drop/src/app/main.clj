@@ -118,18 +118,17 @@
 (defn state-start []
   (let [db_ (atom {:stars-collected 0})]
     (place-stars db_ 15)
-    (add-watch db_ :refresh-on-change h/refresh-all!)
+    (add-watch db_ :refresh-on-change
+      (fn [_ ref _old-state new-state]
+        (when (empty? (:stars new-state))
+          (place-stars ref 15))
+        (h/refresh-all!)))
     {:db db_}))
-
-(defn on-refresh [_ ref _old-state new-state]
-  (when (empty? (:stars new-state))
-    (place-stars ref 15)))
 
 (defn -main [& _]
   (h/start-app
     {:router         #'router
      :max-refresh-ms 100
-     :on-refresh     #'on-refresh
      :state-start    state-start
      :state-stop     (fn [_] nil)
      :csrf-secret    (h/env :csrf-secret)}))

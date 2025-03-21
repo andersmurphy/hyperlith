@@ -3,7 +3,9 @@
 
 (defonce ^:private cache_ (atom {}))
 
-(defn cache [f]
+(defn cache
+  "Wraps function in a caching mechanism. This is a global cache."
+  [f]
   ;; Note: cache has no upper bound and is only cleared when a refresh
   ;; event is fire.
   (fn [& args]
@@ -14,5 +16,7 @@
           new-value (delay (apply f args))]
       @((swap! cache_ util/assoc-if-missing k new-value) k))))
 
-(defn invalidate-cache! []
+(defn invalidate-cache!
+  "Invalidates global cache."
+  []
   (reset! cache_ {}))

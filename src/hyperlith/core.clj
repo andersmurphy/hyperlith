@@ -14,6 +14,7 @@
             [hyperlith.impl.assets]
             [hyperlith.impl.trace]
             [hyperlith.impl.env]
+            [hyperlith.impl.batch]
             [clojure.core.async :as a]
             [org.httpkit.server :as hk]))
 
@@ -46,6 +47,9 @@
    action-handler
    render-handler
    debug-signals-el]
+  ;; BATCHING
+  [hyperlith.impl.batch
+   batch!]
   ;; HTTP
   [hyperlith.impl.http
    get!
@@ -65,28 +69,21 @@
 
 (defonce ^:private refresh-ch_ (atom nil))
 
-(defn refresh-all! [& args]
+(defn refresh-all! []
   (when-let [<refresh-ch @refresh-ch_]
-    (a/>!! <refresh-ch (or args []))))
+    (a/>!! <refresh-ch :refresh-event)))
 
 (defn start-app [{:keys [router port state-start state-stop csrf-secret
-                         max-refresh-ms on-refresh]}]
+                         max-refresh-ms]
+                  :or   {port           8080
+                         max-refresh-ms 100}}]
   (let [<refresh-ch  (a/chan (a/dropping-buffer 1))
         _            (reset! refresh-ch_ <refresh-ch)
         state        (state-start)
-        refresh-mult (-> (ds/throttle <refresh-ch (or max-refresh-ms 100))
+        refresh-mult (-> (ds/throttle <refresh-ch max-refresh-ms)
                        (a/pipe
-                         (a/chan 1
-                           (map
-                             (fn [args]
-                               ;; cache is only invalidate at most
-                               ;; every X msec and only if state has change
-                               (cache/invalidate-cache!)
-                               ;; run on-refresh
-                               (when (and on-refresh (seq args))
-                                 (apply on-refresh args))
-                               ;; No point sending the args past here
-                               :refresh-event))))
+                         (a/chan 1 ;; cache is invalidated before refresh
+                           (map (fn [event] (cache/invalidate-cache!) event))))
                        a/mult)
         wrap-state   (fn [handler] (fn [req]
                                      (handler
@@ -97,7 +94,7 @@
                        wrap-query-params
                        (wrap-session csrf-secret)
                        wrap-parse-json-body
-                       (hk/run-server {:port (or port 8080)}))]
+                       (hk/run-server {:port port}))]
     {:state state
      :stop  (fn stop []
               (stop-server)

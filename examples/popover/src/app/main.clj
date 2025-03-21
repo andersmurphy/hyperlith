@@ -64,7 +64,7 @@
 
 (defn state-start []
   (let [db_ (atom {:connected-users 0})]
-    (add-watch db_ :refresh-on-change h/refresh-all!)
+    (add-watch db_ :refresh-on-change (fn [& _] (h/refresh-all!)))
     {:db db_}))
 
 (defn -main [& _]

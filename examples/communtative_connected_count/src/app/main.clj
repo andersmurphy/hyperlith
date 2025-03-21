@@ -53,7 +53,8 @@
   ;; By using ref and commute to track user count allows for higher
   ;; level of concurrency.
   (let [connected-counter_ (ref 0)]
-    (add-watch connected-counter_ :refresh-on-change h/refresh-all!)
+    (add-watch connected-counter_ :refresh-on-change
+      (fn [& _] (h/refresh-all!)))
     {:connected-counter connected-counter_}))
 
 (defn -main [& _]
