@@ -14,7 +14,6 @@
             [hyperlith.impl.assets]
             [hyperlith.impl.trace]
             [hyperlith.impl.env]
-            [hyperlith.impl.batch]
             [clojure.core.async :as a]
             [org.httpkit.server :as hk]))
 
@@ -47,9 +46,6 @@
    action-handler
    render-handler
    debug-signals-el]
-  ;; BATCHING
-  [hyperlith.impl.batch
-   batch!]
   ;; HTTP
   [hyperlith.impl.http
    get!

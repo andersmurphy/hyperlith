@@ -80,11 +80,11 @@
              {:validate-data?    true
               :closed-schema?    true
               :auto-entity-time? true})]
+    (add-watch db :refresh-on-change (fn [& _] (h/refresh-all!)))
     {:q         (fn [query & args] (apply d/q query @db args))
-     :transact! (h/batch! (fn [tx-data] (d/transact! db tx-data))
-                  :run-every-ms 100
-                  :max-size 1000
-                  :after-run (fn [] (h/refresh-all!)))
+     ;; Using async transactions pairs really well with CQRS and gives
+     ;; the fasted write output
+     :transact! (fn [tx-data] (d/transact-async db tx-data))
      :db        db}))
 
 (defn -main [& _]
