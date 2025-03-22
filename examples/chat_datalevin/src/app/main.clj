@@ -52,13 +52,12 @@
        {:data-on-click "@post('/send')"} "send"]]
      (messages q)]))
 
-(defn action-send-message [{:keys [sid transact!] {:keys [message]} :body}]
+(defn action-send-message [{:keys [sid tx!] {:keys [message]} :body}]
   (when-not (str/blank? message)
-    (transact!
-      [{:user/sid sid}
-       {:message/id      (h/new-uid)
-        :message/user    [:user/sid sid]
-        :message/content message}])
+    (tx! [{:user/sid sid}
+          {:message/id      (h/new-uid)
+           :message/user    [:user/sid sid]
+           :message/content message}])
     (h/signals {:message ""})))
 
 (def default-shim-handler
@@ -81,11 +80,11 @@
               :closed-schema?    true
               :auto-entity-time? true})]
     (add-watch db :refresh-on-change (fn [& _] (h/refresh-all!)))
-    {:q         (fn [query & args] (apply d/q query @db args))
+    {:q   (fn [query & args] (apply d/q query @db args))
      ;; Using async transactions pairs really well with CQRS and gives
      ;; the fasted write output
-     :transact! (fn [tx-data] (d/transact-async db tx-data))
-     :db        db}))
+     :tx! (fn [tx-data] (d/transact-async db tx-data))
+     :db  db}))
 
 (defn -main [& _]
   (h/start-app
