@@ -1,8 +1,9 @@
 (ns hyperlith.impl.load-testing
-  (:require [org.httpkit.client :as http]
+  (:require [clojure.string :as str]
             [hyperlith.impl.brotli :as br]
-            [clojure.string :as str])
-  (:import [org.httpkit DynamicBytes]
+            [org.httpkit.client :as http])
+  (:import [java.util Arrays]
+           [org.httpkit DynamicBytes]
            [org.httpkit.client IFilter]))
 
 (defn parse-sse-events [events]
@@ -24,7 +25,17 @@
     (^boolean accept [_this ^DynamicBytes bytes]
      ;; As DynamicBytes accumulates we only care about the final result
      ;; before close or timeout.
-     (swap! capture assoc :events (.bytes bytes))
+     (let [prev-length (:length @capture)
+           next-length (int (.length bytes))]
+       (swap! capture
+         #(-> (assoc % :length next-length)
+            ;; Currently we only decompress these values at the end
+            ;; in theory this could be replaced with a streaming
+            ;; decompression.
+            (update :events into (Arrays/copyOfRange
+                                   ^byte/1 (.get bytes)
+                                   ^int prev-length
+                                   ^int next-length)))))
      true)
     (^boolean accept [_this ^java.util.Map m]
      (swap! capture assoc :headers m)
@@ -32,7 +43,8 @@
 
 (defn wrap-capture-sse-response [method]
   (fn [url request]
-    (let [capture (atom {})]
+    (let [capture (atom {:length 0
+                         :events   []})]
       #_:clj-kondo/ignore
       (method
         url
@@ -52,18 +64,18 @@
 (defn parse-captured-response [capture]
   (cond-> capture
     (= (get-in capture [:headers "content-encoding"]) "br")
-    (update :events br/decompress-stream)
+    (update :events (comp br/decompress-stream byte-array))
     :always (update :events parse-sse-events)))
 
 (comment
   (def capture
     (capture-sse-post!
-    "http://localhost:8080/"
-    {:timeout 1
-     :headers
-     {"Cookie"       "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY; __Host-csrf=3UsG62ic9wLsg9EVQhGupw"
-      "Content-Type" "application/json"}
-     :body    "{\"csrf\":\"3UsG62ic9wLsg9EVQhGupw\"}"}))
+      "http://localhost:8080/"
+      {:timeout 1
+       :headers
+       {"Cookie"       "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY; __Host-csrf=3UsG62ic9wLsg9EVQhGupw"
+        "Content-Type" "application/json"}
+       :body    "{\"csrf\":\"3UsG62ic9wLsg9EVQhGupw\"}"}))
 
   (-> @capture parse-captured-response)
 
