@@ -76,7 +76,7 @@ However, [datalevin](https://github.com/juji-io/datalevin) (my go to database wi
 
 So short answer is with datalevin you can have your cake and eat it (fast writes and atomic transactions).
 
-This also highlights that I'll probably steer hyperlith to focus on using datalevin. Though, I'll still allow the use your own data stores (sqlite/atoms/redis/maxmind) as often you want more than one. However, I'll probably leave batching as an exercise for the user if they are using sqlite or a database that a requires manual batching.
+This also highlights that I'll probably steer hyperlith to focus on using datalevin. Though, I'll still allow the use of other data stores (sqlite/atoms/redis/maxmind) as often need more than one. However, I'll probably leave batching as an exercise for the user if they are using sqlite or a database that requires manual batching.
 
 ## Other Radical choices
 
