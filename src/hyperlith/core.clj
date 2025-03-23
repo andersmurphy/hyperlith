@@ -14,6 +14,7 @@
             [hyperlith.impl.assets]
             [hyperlith.impl.trace]
             [hyperlith.impl.env]
+            [hyperlith.impl.tuples]
             [clojure.core.async :as a]
             [org.httpkit.server :as hk]))
 
@@ -57,6 +58,9 @@
   ;; ASSETS
   [hyperlith.impl.assets
    static-asset]
+  ;; TUPLES
+  [hyperlith.impl.tuples
+   tuples]
   ;; TRACE
   [hyperlith.impl.trace
    traces
