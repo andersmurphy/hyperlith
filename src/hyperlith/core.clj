@@ -16,8 +16,7 @@
             [hyperlith.impl.env]
             [hyperlith.impl.tuples]
             [clojure.core.async :as a]
-            [org.httpkit.server :as hk]
-            [hyperlith.impl.util :as util]))
+            [org.httpkit.server :as hk]))
 
 (import-vars
   ;; ENV
@@ -91,7 +90,7 @@
                        (handler
                          (-> (assoc req
                                :hyperlith.core/refresh-mult refresh-mult)
-                           (util/merge ctx)))))
+                           (u/merge ctx)))))
         stop-server  (-> router
                        wrap-ctx
                        wrap-query-params
