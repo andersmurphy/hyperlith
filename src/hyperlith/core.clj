@@ -68,6 +68,12 @@
    reset-traces!])
 
 (defonce ^:private refresh-ch_ (atom nil))
+(defonce ^:private app_ (atom nil))
+
+(defn get-app
+  "Return app for debugging at the repl."
+  []
+  @app_)
 
 (defn refresh-all! []
   (when-let [<refresh-ch @refresh-ch_]
@@ -86,19 +92,21 @@
                            (map (fn [event] (cache/invalidate-cache!) event))))
                        a/mult)
         wrap-ctx     (fn [handler]
-                     (fn [req]
-                       (handler
-                         (-> (assoc req
-                               :hyperlith.core/refresh-mult refresh-mult)
-                           (u/merge ctx)))))
+                       (fn [req]
+                         (handler
+                           (-> (assoc req
+                                 :hyperlith.core/refresh-mult refresh-mult)
+                             (u/merge ctx)))))
         stop-server  (-> router
                        wrap-ctx
                        wrap-query-params
                        (wrap-session csrf-secret)
                        wrap-parse-json-body
-                       (hk/run-server {:port port}))]
-    {:ctx  ctx
-     :stop (fn stop []
-             (stop-server)
-             (ctx-stop ctx)
-             (a/close! <refresh-ch))}))
+                       (hk/run-server {:port port}))
+        app          {:ctx  ctx
+                      :stop (fn stop [& [opts]]
+                              (stop-server opts)
+                              (ctx-stop ctx)
+                              (a/close! <refresh-ch))}]
+    (reset! app_ app)
+    app))

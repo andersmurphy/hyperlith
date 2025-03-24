@@ -72,23 +72,23 @@
 (h/refresh-all!)
 
 (comment
-  (def server (-main))
+  (-main)
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
   ;; stop server
-  ((server :stop))
+  (((h/get-app) :stop))
 
-  (-> server :ctx :db)
+  (-> (h/get-app) :ctx :db)
 
-  (reset! (-> server :ctx :db) {})
+  (reset! (-> (h/get-app) :ctx :db) {})
 
   ;; Example backend driven cursor test
   (doseq [_x (range 10000)]
     (Thread/sleep 1)
     (action-user-cursor-position
-      {:db   (-> server :ctx :db)
+      {:db   (-> (h/get-app) :ctx :db)
        :sid  (rand-nth (range 1000))
        :body {:x (rand-nth (range 1 400 20))
               :y (rand-nth (range 1 400 20))}}))
-  
+
   ,)

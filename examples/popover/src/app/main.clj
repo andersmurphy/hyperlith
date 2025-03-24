@@ -80,10 +80,10 @@
 
 (comment
 
-  (def server (-main))
+  (-main)
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
   ;; stop server
-  ((server :stop))
+  (((h/get-app) :stop))
 
   ,)

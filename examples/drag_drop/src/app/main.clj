@@ -137,27 +137,23 @@
 (h/refresh-all!)
 
 (comment
-  (def server (-main))
+  (-main)
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
   ;; stop server
-  ((server :stop))
+  (((h/get-app) :stop))
 
-  (:db (server :ctx))
+  (:db ((h/get-app) :ctx))
 
-  (reset! (server :ctx) {})
-
-  (place-stars (:db (server :ctx)) 10)
+  (place-stars (:db ((h/get-app) :ctx)) 10)
 
   ,)
 
 (comment
-  (def db (:db (server :ctx)))
-  (declare db)
-
-
-  (def db (:db (server :ctx)))
-  (place-stars (:db (server :ctx)) 60)
+  (def db (:db ((h/get-app) :ctx)))
+  
+  (place-stars (:db ((h/get-app) :ctx)) 60)
+  
   (do (mapv
         (fn [[k _]]
           (action-user-move-star-to-dropzone

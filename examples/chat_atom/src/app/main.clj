@@ -81,13 +81,12 @@
 (h/refresh-all!)
 
 (comment
-  
-  (def server (-main))
+  (-main)
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
   ;; stop server
-  ((server :stop))
+  (((h/get-app) :stop))
 
   ;; query outside of handler
-  (get-messages (-> server :ctx :db))
+  (get-messages (-> (h/get-app) :ctx :db))
   ,)
