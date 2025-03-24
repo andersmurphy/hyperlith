@@ -121,7 +121,8 @@
           ;; blocking other handlers. Mult distributes each event to all
           ;; taps in parallel and synchronously, i.e. each tap must
           ;; accept before the next item is distributed.
-          <ch     (a/tap (:refresh-mult req) (a/chan (a/dropping-buffer 1)))
+          <ch     (a/tap (:hyperlith.core/refresh-mult req)
+                    (a/chan (a/dropping-buffer 1)))
           ;; Ensures at least one render on connect
           _       (a/>!! <ch :refresh-event)
           ;; poison pill for work cancelling

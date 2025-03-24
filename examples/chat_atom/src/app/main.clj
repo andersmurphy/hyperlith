@@ -64,7 +64,7 @@
      [:post "/"]        (h/render-handler #'render-home)
      [:post "/send"]    (h/action-handler #'action-send-message)}))
 
-(defn state-start []
+(defn ctx-start []
   (let [db_ (atom {:messages []})]
     (add-watch db_ :refresh-on-change (fn [& _] (h/refresh-all!)))
     {:db db_}))
@@ -73,8 +73,8 @@
   (h/start-app
     {:router         #'router
      :max-refresh-ms 100
-     :state-start    state-start
-     :state-stop     (fn [_state] nil)
+     :ctx-start      ctx-start
+     :ctx-stop       (fn [_state] nil)
      :csrf-secret    (h/env :csrf-secret)}))
 
 ;; Refresh app when you re-eval file
@@ -89,5 +89,5 @@
   ((server :stop))
 
   ;; query outside of handler
-  (get-messages (-> server :state :db))
+  (get-messages (-> server :ctx :db))
   ,)

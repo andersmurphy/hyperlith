@@ -115,7 +115,7 @@
                              (swap! db update :cursors dissoc sid)))
      [:post "/dropzone"] (h/action-handler #'action-user-move-star-to-dropzone)}))
 
-(defn state-start []
+(defn ctx-start []
   (let [db_ (atom {:stars-collected 0})]
     (place-stars db_ 15)
     (add-watch db_ :refresh-on-change
@@ -129,8 +129,8 @@
   (h/start-app
     {:router         #'router
      :max-refresh-ms 100
-     :state-start    state-start
-     :state-stop     (fn [_] nil)
+     :ctx-start    ctx-start
+     :ctx-stop     (fn [_] nil)
      :csrf-secret    (h/env :csrf-secret)}))
 
 ;; Refresh app when you re-eval file
@@ -143,21 +143,21 @@
   ;; stop server
   ((server :stop))
 
-  (:db (server :state))
+  (:db (server :ctx))
 
-  (reset! (server :state) {})
+  (reset! (server :ctx) {})
 
-  (place-stars (:db (server :state)) 10)
+  (place-stars (:db (server :ctx)) 10)
 
   ,)
 
 (comment
-  (def db (:db (server :state)))
+  (def db (:db (server :ctx)))
   (declare db)
 
 
-  (def db (:db (server :state)))
-  (place-stars (:db (server :state)) 60)
+  (def db (:db (server :ctx)))
+  (place-stars (:db (server :ctx)) 60)
   (do (mapv
         (fn [[k _]]
           (action-user-move-star-to-dropzone

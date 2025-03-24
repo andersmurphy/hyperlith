@@ -55,7 +55,7 @@
                            (fn [{:keys [sid db]}] (swap! db dissoc sid)))
      [:post "/position"] (h/action-handler action-user-cursor-position)}))
 
-(defn state-start []
+(defn ctx-start []
   (let [db_ (atom {})]
     (add-watch db_ :refresh-on-change (fn [& _] (h/refresh-all!)))
     {:db db_}))
@@ -64,8 +64,8 @@
   (h/start-app
     {:router         #'router
      :max-refresh-ms 100
-     :state-start       state-start
-     :state-stop        (fn [_db] nil)
+     :ctx-start       ctx-start
+     :ctx-stop        (fn [_db] nil)
      :csrf-secret    (h/env :csrf-secret)}))
 
 ;; Refresh app when you re-eval file
@@ -78,15 +78,15 @@
   ;; stop server
   ((server :stop))
 
-  (-> server :state :db)
+  (-> server :ctx :db)
 
-  (reset! (-> server :state :db) {})
+  (reset! (-> server :ctx :db) {})
 
   ;; Example backend driven cursor test
   (doseq [_x (range 10000)]
     (Thread/sleep 1)
     (action-user-cursor-position
-      {:db   (-> server :state :db)
+      {:db   (-> server :ctx :db)
        :sid  (rand-nth (range 1000))
        :body {:x (rand-nth (range 1 400 20))
               :y (rand-nth (range 1 400 20))}}))

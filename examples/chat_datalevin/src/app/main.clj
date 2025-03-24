@@ -74,7 +74,7 @@
      [:post "/"]        (h/render-handler #'render-home)
      [:post "/send"]    (h/action-handler #'action-send-message)}))
 
-(defn state-start []
+(defn ctx-start []
   (let [db (d/get-conn "db" schema
              {:validate-data?    true
               :closed-schema?    true
@@ -88,8 +88,8 @@
   (h/start-app
     {:router         #'router
      :max-refresh-ms 100
-     :state-start    state-start
-     :state-stop     (fn [{:keys [db]}] (d/close db))
+     :ctx-start      ctx-start
+     :ctx-stop       (fn [{:keys [db]}] (d/close db))
      :csrf-secret    (h/env :csrf-secret)}))
 
 (h/refresh-all!)
@@ -102,5 +102,5 @@
   ((server :stop))
 
   ;; query outside of handler
-  (get-messages (-> server :state :q))
+  (get-messages (-> server :ctx :q))
   ,)

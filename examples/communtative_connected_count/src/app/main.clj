@@ -49,7 +49,7 @@
                           (fn [{:keys [connected-counter]}]
                             (dosync (commute connected-counter dec))))}))
 
-(defn state-start []
+(defn ctx-start []
   ;; By using ref and commute to track user count allows for higher
   ;; level of concurrency.
   (let [connected-counter_ (ref 0)]
@@ -61,8 +61,8 @@
   (h/start-app
     {:router         #'router
      :max-refresh-ms 100
-     :state-start       state-start
-     :state-stop        (fn [_db] nil)
+     :ctx-start       ctx-start
+     :ctx-stop        (fn [_db] nil)
      :csrf-secret    (h/env :csrf-secret)}))
 
 ;; Refresh app when you re-eval file

@@ -62,7 +62,7 @@
                           (fn [{:keys [_ db]}]
                             (swap! db update :connected-users dec)))}))
 
-(defn state-start []
+(defn ctx-start []
   (let [db_ (atom {:connected-users 0})]
     (add-watch db_ :refresh-on-change (fn [& _] (h/refresh-all!)))
     {:db db_}))
@@ -71,8 +71,8 @@
   (h/start-app
     {:router         #'router
      :max-refresh-ms 100
-     :state-start       state-start
-     :state-stop        (fn [_state] nil)
+     :ctx-start       ctx-start
+     :ctx-stop        (fn [_state] nil)
      :csrf-secret    (h/env :csrf-secret)}))
 
 ;; Refresh app when you re-eval file

@@ -16,7 +16,8 @@
             [hyperlith.impl.env]
             [hyperlith.impl.tuples]
             [clojure.core.async :as a]
-            [org.httpkit.server :as hk]))
+            [org.httpkit.server :as hk]
+            [hyperlith.impl.util :as util]))
 
 (import-vars
   ;; ENV
@@ -73,30 +74,32 @@
   (when-let [<refresh-ch @refresh-ch_]
     (a/>!! <refresh-ch :refresh-event)))
 
-(defn start-app [{:keys [router port state-start state-stop csrf-secret
+(defn start-app [{:keys [router port ctx-start ctx-stop csrf-secret
                          max-refresh-ms]
                   :or   {port           8080
                          max-refresh-ms 100}}]
   (let [<refresh-ch  (a/chan (a/dropping-buffer 1))
         _            (reset! refresh-ch_ <refresh-ch)
-        state        (state-start)
+        ctx          (ctx-start)
         refresh-mult (-> (ds/throttle <refresh-ch max-refresh-ms)
                        (a/pipe
                          (a/chan 1 ;; cache is invalidated before refresh
                            (map (fn [event] (cache/invalidate-cache!) event))))
                        a/mult)
-        wrap-state   (fn [handler] (fn [req]
-                                     (handler
-                                       (-> (u/merge req state)
-                                         (assoc :refresh-mult refresh-mult)))))
+        wrap-ctx     (fn [handler]
+                     (fn [req]
+                       (handler
+                         (-> (assoc req
+                               :hyperlith.core/refresh-mult refresh-mult)
+                           (util/merge ctx)))))
         stop-server  (-> router
-                       wrap-state
+                       wrap-ctx
                        wrap-query-params
                        (wrap-session csrf-secret)
                        wrap-parse-json-body
                        (hk/run-server {:port port}))]
-    {:state state
-     :stop  (fn stop []
-              (stop-server)
-              (state-stop state)
-              (a/close! <refresh-ch))}))
+    {:ctx  ctx
+     :stop (fn stop []
+             (stop-server)
+             (ctx-stop ctx)
+             (a/close! <refresh-ch))}))
