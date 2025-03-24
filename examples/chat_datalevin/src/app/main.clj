@@ -79,10 +79,8 @@
              {:validate-data?    true
               :closed-schema?    true
               :auto-entity-time? true})]
-    (add-watch db :refresh-on-change (fn [& _] (h/refresh-all!)))
+    (d/listen! db :refresh-on-change (fn [& _] (h/refresh-all!)))
     {:q   (fn [query & args] (apply d/q query @db args))
-     ;; Using async transactions pairs really well with CQRS and gives
-     ;; the fasted write output
      :tx! (fn [tx-data] (d/transact-async db tx-data))
      :db  db}))
 

@@ -101,11 +101,11 @@
         resp))))
 
 (defn signals [signals]
-  {::signals signals})
+  {:hyperlith.core/signals signals})
 
 (defn action-handler [thunk]
   (fn handler [req]
-    (if-let [signals (::signals (thunk req))]
+    (if-let [signals (:hyperlith.core/signals (thunk req))]
       {:status  200
        :headers (assoc default-headers
                   "Content-Type"  "text/event-stream"
