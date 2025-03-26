@@ -10,7 +10,8 @@
 
 (defmacro thread [& body]
   `(Thread/startVirtualThread
-     (fn [] ~@body)))
+     (bound-fn* ;; binding conveyance
+       (fn [] ~@body))))
 
 (defmacro while-some
   {:clj-kondo/lint-as 'clojure.core/let}

@@ -7,6 +7,7 @@
             [hyperlith.impl.brotli :as br]
             [hyperlith.impl.crypto :as crypto]
             [hyperlith.impl.html :as h]
+            [hyperlith.impl.error :as er]
             [org.httpkit.server :as hk]
             [clojure.string :as str]
             [clojure.core.async :as a]))
@@ -145,7 +146,7 @@
                (loop [last-view-hash (get-in req [:headers "last-event-id"])]
                  (a/alt!!
                    [<cancel] (do (a/close! <ch) (a/close! <cancel))
-                   [<ch]     (let [new-view      (render-fn req)
+                   [<ch]     (let [new-view      (er/try-log (render-fn req))
                                    new-view-hash (crypto/digest new-view)]
                                ;; only send an event if the view has changed
                                (when (not= last-view-hash new-view-hash)

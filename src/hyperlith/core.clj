@@ -4,7 +4,8 @@
             [hyperlith.impl.json :refer [wrap-parse-json-body]]
             [hyperlith.impl.params :refer [wrap-query-params]]
             [hyperlith.impl.datastar :as ds]            
-            [hyperlith.impl.util :as u]
+            [hyperlith.impl.util :as u]            
+            [hyperlith.impl.error :as er]
             [hyperlith.impl.crypto]
             [hyperlith.impl.css]
             [hyperlith.impl.http]
@@ -16,6 +17,7 @@
             [hyperlith.impl.env]
             [hyperlith.impl.tuples]
             [clojure.core.async :as a]
+            [clojure.pprint :as pprint]
             [org.httpkit.server :as hk]))
 
 (import-vars
@@ -80,11 +82,13 @@
     (a/>!! <refresh-ch :refresh-event)))
 
 (defn start-app [{:keys [router port ctx-start ctx-stop csrf-secret
-                         max-refresh-ms]
+                         max-refresh-ms on-error]
                   :or   {port           8080
-                         max-refresh-ms 100}}]
+                         max-refresh-ms 100
+                         on-error       pprint/pprint}}]
   (let [<refresh-ch  (a/chan (a/dropping-buffer 1))
         _            (reset! refresh-ch_ <refresh-ch)
+        _            (reset! er/on-error_ on-error)
         ctx          (ctx-start)
         refresh-mult (-> (ds/throttle <refresh-ch max-refresh-ms)
                        (a/pipe
@@ -97,12 +101,14 @@
                            (-> (assoc req
                                  :hyperlith.core/refresh-mult refresh-mult)
                              (u/merge ctx)))))
-        stop-server  (-> router
+        ;; middleware make for messy error stacks.
+        middleware   (-> router
                        wrap-ctx
                        wrap-query-params
                        (wrap-session csrf-secret)
                        wrap-parse-json-body
-                       (hk/run-server {:port port}))
+                       er/wrap-error)
+        stop-server  (hk/run-server middleware {:port port})
         app          {:ctx  ctx
                       :stop (fn stop [& [opts]]
                               (stop-server opts)
