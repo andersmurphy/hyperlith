@@ -43,7 +43,11 @@ Signals should only be used for ephemeral client side state. Things like: the cu
 
 #### Signals in fragments should be declared __ifmissing
 
-Because signals are only being used to represent ephemeral client state that means they can only be initialised by fragments and they can only be changed via expressions on the client or from the server via `merge-signals` in an action. Signals in fragments should be declared `__ifmissing` unless they are view only signals (signals that are not used for ephemeral client side state).
+Because signals are only being used to represent ephemeral client state that means they can only be initialised by fragments and they can only be changed via expressions on the client or from the server via `merge-signals` in an action. Signals in fragments should be declared `__ifmissing` unless they are "view only".
+
+#### View only signals
+
+View only signals, are signals that can only be changed by the server. These should not be declared `__ifmissing` instead they should be made "local" by starting their key with an `_` this prevents the client from sending them up to the server.
 
 #### Actions should not update the view themselves directly
 
