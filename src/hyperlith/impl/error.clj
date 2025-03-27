@@ -1,7 +1,21 @@
 (ns hyperlith.impl.error 
-  (:require [clojure.string :as str]))
+  (:require
+   [clojure.main :as main]
+   [clojure.string :as str]))
 
 (defonce on-error_ (atom nil))
+
+(def demunge-csl-xf
+  (map (fn [stack-element-data]
+         (update stack-element-data 0 (comp main/demunge str)))))
+
+(def remove-ignored-cls-xf
+  ;; We don't care about var indirection
+  (remove (fn [[cls _ _ _]] (#{"clojure.lang.Var"} cls))))
+
+(def not-hyperlith-cls-xf
+  ;; trim error trace to users space helps keep trace short
+  (take-while (fn [[cls _ _ _]] (not (str/starts-with? cls "hyperlith")))))
 
 (defn log-error [req t]
   (@on-error_
@@ -9,14 +23,12 @@
     :req   (dissoc req :async-channel :websocket?)
     :error (-> (Throwable->map t)
              (dissoc :via)
-             (update :trace
-               (fn [trace]
-                 (->> trace
-                   (take-while
-                     (fn [[cls _ _ _]]
-                       ;; trim error trace to users space helps keep trace short
-                       (not (str/starts-with? (str cls) "hyperlith"))))
-                   vec))))}))
+             (update :trace (fn [trace]
+                              (into []
+                                (comp demunge-csl-xf
+                                  remove-ignored-cls-xf
+                                  not-hyperlith-cls-xf)
+                                trace))))}))
 
 (defmacro try-log [data & body]
   `(try
@@ -26,4 +38,4 @@
 
 (defn wrap-error [handler]
   (fn [req]
-    (or (try-log req (handler req))  {:status 400})))
+    (or (try-log req (handler req)) {:status 400})))
