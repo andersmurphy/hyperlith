@@ -12,6 +12,8 @@
           (take-while
             (fn [[cls _ _ _]]
               ;; trim error trace to users space helps keep trace short
+              ;; Note: If starts-with "hyperlith" is too aggressive
+              ;; "hyperlith.impl.router" still would trim a lot of the noise.
               (not (str/starts-with? (str cls) "hyperlith"))))
           vec)))
     (@on-error_)))
