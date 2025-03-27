@@ -1,5 +1,6 @@
 (ns hyperlith.impl.error 
   (:require
+   [hyperlith.impl.crypto :as crypto]
    [clojure.main :as main]
    [clojure.string :as str]))
 
@@ -17,6 +18,9 @@
   ;; trim error trace to users space helps keep trace short
   (take-while (fn [[cls _ _ _]] (not (str/starts-with? cls "hyperlith")))))
 
+(defn add-error-id [{:keys [trace] :as error}]
+  (assoc error :id (crypto/digest trace)))
+
 (defn log-error [req t]
   (@on-error_
    {;; req is under own key as it can contain data you don't want to log.
@@ -28,7 +32,8 @@
                                 (comp demunge-csl-xf
                                   remove-ignored-cls-xf
                                   not-hyperlith-cls-xf)
-                                trace))))}))
+                                trace)))
+             add-error-id)}))
 
 (defmacro try-log [data & body]
   `(try

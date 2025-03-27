@@ -36,3 +36,8 @@
   (let [res (io/resource path)]
     (assert res (str path " not found."))
     `(resource->bytes (io/resource ~path))))
+
+(defn qualify-keys
+  "Adds qualifier to key. Overwrites existing qualifier. Is idempotent."
+  [m ns]
+  (update-keys m (fn [k] (keyword (name ns) (name k)))))

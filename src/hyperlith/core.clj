@@ -28,7 +28,8 @@
   [hyperlith.impl.util
    load-resource
    assoc-if-missing
-   assoc-in-if-missing]
+   assoc-in-if-missing
+   qualify-keys]
   ;; HTML
   [hyperlith.impl.html
    html]
