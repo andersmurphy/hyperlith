@@ -10,7 +10,7 @@
   (fn [url request]
     (let [req @(method url request)]
       (cond-> req
-        (has-json-body? req) (update :body json/try-json->edn)))))
+        (has-json-body? req) (update :body json/json->edn)))))
 
 (def get! (wrap-json-response #_:clj-kondo/ignore http/get))
 

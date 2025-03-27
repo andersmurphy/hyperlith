@@ -137,8 +137,8 @@
              ;; connection and html compresses well we get insane compression.
              ;; To the point were it's more network efficient and more
              ;; performant than diffing.
-             (with-open [out  (br/byte-array-out-stream)
-                         br (br/compress-out-stream out
+             (with-open [out (br/byte-array-out-stream)
+                         br  (br/compress-out-stream out
                               ;; Window size can be tuned to trade bandwidth
                               ;; for memory. 65KB is double of gzip's 32KB.
                               ;; (br/window-size->kb 16) => 65KB
@@ -146,7 +146,8 @@
                (loop [last-view-hash (get-in req [:headers "last-event-id"])]
                  (a/alt!!
                    [<cancel] (do (a/close! <ch) (a/close! <cancel))
-                   [<ch]     (let [new-view      (er/try-log (render-fn req))
+                   [<ch]     (let [new-view      (er/try-log req
+                                                   (render-fn req))
                                    new-view-hash (crypto/digest new-view)]
                                ;; only send an event if the view has changed
                                (when (not= last-view-hash new-view-hash)

@@ -85,14 +85,15 @@
                          max-refresh-ms on-error]
                   :or   {port           8080
                          max-refresh-ms 100
-                         on-error       pprint/pprint}}]
+                         on-error       (fn [_ctx {:keys [error]}]
+                                          (pprint/pprint error))}}]
   (let [<refresh-ch  (a/chan (a/dropping-buffer 1))
-        _            (reset! refresh-ch_ <refresh-ch)
-        _            (reset! er/on-error_ on-error)
+        _            (reset! refresh-ch_ <refresh-ch)        
         ctx          (ctx-start)
+        _            (reset! er/on-error_ (partial on-error ctx))
         refresh-mult (-> (ds/throttle <refresh-ch max-refresh-ms)
                        (a/pipe
-                         (a/chan 1 ;; cache is invalidated before refresh
+                         (a/chan 1 ;; Cache is invalidated before refresh.
                            (map (fn [event] (cache/invalidate-cache!) event))))
                        a/mult)
         wrap-ctx     (fn [handler]
@@ -101,13 +102,17 @@
                            (-> (assoc req
                                  :hyperlith.core/refresh-mult refresh-mult)
                              (u/merge ctx)))))
-        ;; middleware make for messy error stacks.
+        ;; Middleware make for messy error stacks.
         middleware   (-> router
                        wrap-ctx
+                       ;; Wrap error here because req params/body/session
+                       ;; have been handled (and provide useful context).
+                       er/wrap-error
+                       ;; The handlers after this point do not throw errors
+                       ;; are robust/lenient.
                        wrap-query-params
                        (wrap-session csrf-secret)
-                       wrap-parse-json-body
-                       er/wrap-error)
+                       wrap-parse-json-body)
         stop-server  (hk/run-server middleware {:port port})
         app          {:ctx  ctx
                       :stop (fn stop [& [opts]]

@@ -2,9 +2,11 @@
   (:require [hyperlith.impl.crypto :as crypto]))
 
 (defn get-sid [req]
-  (some->> (get-in req [:headers "cookie"])
-    (re-find #"__Host-sid=([^;^ ]+)")
-    second))
+  (try ;; In case we get garbage
+    (some->> (get-in req [:headers "cookie"])
+      (re-find #"__Host-sid=([^;^ ]+)")
+      second)
+    (catch Throwable _)))
 
 (defn wrap-session
   [handler csrf-secret]
@@ -38,7 +40,7 @@
                    "__Host-csrf=" csrf
                    "; Path=/; Secure; SameSite=Lax")])))
 
-          ;; not a :get request and user does not have session we 403
+          ;; Not a :get request and user does not have session we 403
           ;; Note: If the updates SSE connection is a not a :get then this 
           ;; will close the connection until the user reloads the page.
           :else
