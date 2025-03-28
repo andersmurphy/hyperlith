@@ -39,7 +39,9 @@
   `(try
      ~@body
      (catch Throwable ~'t
-       (log-error ~data ~'t))))
+       (log-error ~data ~'t)
+       ;; Return nil when there is an error
+       nil)))
 
 (defn wrap-error [handler]
   (fn [req]
