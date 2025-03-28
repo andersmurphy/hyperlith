@@ -146,18 +146,20 @@
                (loop [last-view-hash (get-in req [:headers "last-event-id"])]
                  (a/alt!!
                    [<cancel] (do (a/close! <ch) (a/close! <cancel))
-                   [<ch]     (let [new-view      (er/try-log req
-                                                   (render-fn req))
-                                   new-view-hash (crypto/digest new-view)]
-                               ;; only send an event if the view has changed
-                               (when (not= last-view-hash new-view-hash)
-                                 (->> (merge-fragments
-                                        new-view-hash (h/html->str new-view))
-                                   (br/compress-stream out br)
-                                   (send! ch)))
-                               (recur new-view-hash))
+                   [<ch]     (when-some ;; stop in case of error
+                                 [new-view (er/try-log req (render-fn req))]
+                               (let [new-view-hash (crypto/digest new-view)]
+                                 ;; only send an event if the view has changed
+                                 (when (not= last-view-hash new-view-hash)
+                                   (->> (merge-fragments
+                                          new-view-hash (h/html->str new-view))
+                                     (br/compress-stream out br)
+                                     (send! ch)))
+                                 (recur new-view-hash)))
                    ;; we want work cancelling to have higher priority
-                   :priority true))))
+                   :priority true))
+               ;; Close channel on error or when thread stops
+               (hk/close ch)))
            (when on-open (on-open req)))
          :on-close (fn hk-on-close [_ _]
                      (a/>!! <cancel :cancel)
