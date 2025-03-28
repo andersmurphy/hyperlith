@@ -68,7 +68,10 @@
   [hyperlith.impl.trace
    traces
    trace>
-   reset-traces!])
+   reset-traces!]
+  ;;ERROR
+  [hyperlith.impl.error
+   try-log])
 
 (defonce ^:private refresh-ch_ (atom nil))
 (defonce ^:private app_ (atom nil))
