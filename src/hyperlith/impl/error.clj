@@ -10,9 +10,23 @@
   (map (fn [stack-element-data]
          (update stack-element-data 0 (comp main/demunge str)))))
 
+(def ingored-cls?
+  #{;; A lot of this stuff is filler
+    "clojure.lang.Var"
+    "clojure.lang.AFn"
+    "java.util.concurrent.FutureTask"
+    "java.util.concurrent.ThreadPoolExecutor"
+    "java.util.concurrent.ThreadPoolExecutor/Worker"
+    "java.lang.Thread"})
+
 (def remove-ignored-cls-xf
   ;; We don't care about var indirection
-  (remove (fn [[cls _ _ _]] (#{"clojure.lang.Var"} cls))))
+  (remove (fn [[cls _ _ _]] (ignored-cls? cls))))
+
+(def remove-invoke
+  "We remove stack elements that have invoke as stack elments that call
+  invokeStatic have more useful line information."
+  (remove (fn [[_ meth _ _]] (= (str meth) "invokeStatic"))))
 
 (def not-hyperlith-cls-xf
   ;; trim error trace to users space helps keep trace short
