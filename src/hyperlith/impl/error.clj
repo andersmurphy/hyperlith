@@ -14,6 +14,7 @@
   #{;; A lot of this stuff is filler
     "clojure.lang.Var"
     "clojure.lang.AFn"
+    "clojure.lang.RestFn"
     "java.util.concurrent.FutureTask"
     "java.util.concurrent.ThreadPoolExecutor"
     "java.util.concurrent.ThreadPoolExecutor/Worker"
@@ -26,7 +27,7 @@
 (def remove-invoke
   "We remove stack elements that have invoke as stack elments that call
   invokeStatic have more useful line information."
-  (remove (fn [[_ meth _ _]] (= (str meth) "invokeStatic"))))
+  (remove (fn [[_ meth _ _]] (= (str meth) "invoke"))))
 
 (def not-hyperlith-cls-xf
   ;; trim error trace to users space helps keep trace short
@@ -43,8 +44,9 @@
              (update :trace (fn [trace]
                               (into []
                                 (comp demunge-csl-xf
+                                  not-hyperlith-cls-xf
                                   remove-ignored-cls-xf
-                                  not-hyperlith-cls-xf)
+                                  remove-invoke)
                                 trace)))
              add-error-id)}))
 
