@@ -10,7 +10,7 @@
   (map (fn [stack-element-data]
          (update stack-element-data 0 (comp main/demunge str)))))
 
-(def ingored-cls?
+(def ignored-cls?
   #{;; A lot of this stuff is filler
     "clojure.lang.Var"
     "clojure.lang.AFn"
