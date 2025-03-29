@@ -1,10 +1,11 @@
 (ns hyperlith.impl.http
   (:require [org.httpkit.client :as http]
-            [hyperlith.impl.json :as json]))
+            [hyperlith.impl.json :as json]
+            [clojure.string :as str]))
 
 (defn has-json-body? [resp]
   (and (:body resp)
-    (-> resp :headers :content-type (= "application/json"))))
+    (-> resp :headers :content-type (str/starts-with? "application/json"))))
 
 (defn wrap-json-response [method]
   (fn [url request]
