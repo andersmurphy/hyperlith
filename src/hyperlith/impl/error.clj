@@ -11,6 +11,10 @@
   (map (fn [stack-element-data]
          (update stack-element-data 0 (comp main/demunge str)))))
 
+(def demunge-anonymous-functions-xf
+  (map (fn [stack-element-data]
+         (update stack-element-data 0 str/replace #"(/[^/]+)--\d+" "$1"))))
+
 (def ignored-cls-re
   (re-pattern
     (str "^("
@@ -47,6 +51,7 @@
                                 (comp demunge-csl-xf
                                   not-hyperlith-cls-xf
                                   remove-ignored-cls-xf
+                                  demunge-anonymous-functions-xf
                                   ;; This shrinks the trace to the most
                                   ;; relevant line
                                   (u/dedupe-with first)
