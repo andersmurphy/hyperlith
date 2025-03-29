@@ -26,7 +26,6 @@
    {;; req is under own key as it can contain data you don't want to log.
     :req   (dissoc req :async-channel :websocket?)
     :error (-> (Throwable->map t)
-             (dissoc :via)
              (update :trace (fn [trace]
                               (into []
                                 (comp demunge-csl-xf
