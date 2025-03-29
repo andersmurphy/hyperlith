@@ -41,3 +41,19 @@
   "Adds qualifier to key. Overwrites existing qualifier. Is idempotent."
   [m ns]
   (update-keys m (fn [k] (keyword (name ns) (name k)))))
+
+(defn dedupe-with
+  ([f]
+   (fn [rf]
+     (let [pv (volatile! ::none)]
+       (fn
+         ([] (rf))
+         ([result] (rf result))
+         ([result input]
+          (let [prior   @pv
+                f-input (f input)]
+            (vreset! pv f-input)
+            (if (= prior f-input)
+              result
+              (rf result input))))))))
+  ([f coll] (sequence (dedupe-with f) coll)))

@@ -1,6 +1,7 @@
 (ns hyperlith.impl.error 
   (:require
    [hyperlith.impl.crypto :as crypto]
+   [hyperlith.impl.util :as u]
    [clojure.main :as main]
    [clojure.string :as str]))
 
@@ -24,11 +25,6 @@
   ;; We don't care about var indirection
   (remove (fn [[cls _ _ _]] (ignored-cls? cls))))
 
-(def remove-invoke
-  "We remove stack elements that have invoke as stack elments that call
-  invokeStatic have more useful line information."
-  (remove (fn [[_ meth _ _]] (= (str meth) "invoke"))))
-
 (def not-hyperlith-cls-xf
   ;; trim error trace to users space helps keep trace short
   (take-while (fn [[cls _ _ _]] (not (str/starts-with? cls "hyperlith")))))
@@ -45,7 +41,12 @@
                               (into []
                                 (comp demunge-csl-xf
                                   not-hyperlith-cls-xf
-                                  remove-ignored-cls-xf)
+                                  remove-ignored-cls-xf
+                                  ;; This shrinks the trace to the most
+                                  ;; relevant line
+                                  (u/dedupe-with first)
+                                  ;; max number of lines
+                                  (take 15))
                                 trace)))
              add-error-id)}))
 
