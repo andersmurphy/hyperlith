@@ -45,8 +45,7 @@
                               (into []
                                 (comp demunge-csl-xf
                                   not-hyperlith-cls-xf
-                                  remove-ignored-cls-xf
-                                  remove-invoke)
+                                  remove-ignored-cls-xf)
                                 trace)))
              add-error-id)}))
 
