@@ -11,19 +11,22 @@
   (map (fn [stack-element-data]
          (update stack-element-data 0 (comp main/demunge str)))))
 
-(def ignored-cls?
-  #{;; A lot of this stuff is filler
-    "clojure.lang.Var"
-    "clojure.lang.AFn"
-    "clojure.lang.RestFn"
-    "java.util.concurrent.FutureTask"
-    "java.util.concurrent.ThreadPoolExecutor"
-    "java.util.concurrent.ThreadPoolExecutor/Worker"
-    "java.lang.Thread"})
+(def ignored-cls-re
+  (re-pattern
+    (str "$("
+      (str/join "|"
+        [;; A lot of this stuff is filler
+         "clojure.lang"
+         "clojure.main"
+         "java.util.concurrent.FutureTask"
+         "java.util.concurrent.ThreadPoolExecutor"
+         "java.util.concurrent.ThreadPoolExecutor/Worker"
+         "java.lang.Thread"])
+      ").*")))
 
 (def remove-ignored-cls-xf
   ;; We don't care about var indirection
-  (remove (fn [[cls _ _ _]] (ignored-cls? cls))))
+  (remove (fn [[cls _ _ _]] (re-find ignored-cls-re cls))))
 
 (def not-hyperlith-cls-xf
   ;; trim error trace to users space helps keep trace short
