@@ -24,6 +24,7 @@
          "clojure.main"
          "clojure.core.server"
          "clojure.core/eval"
+         "clojure.core/binding-conveyor-fn"
          "java.util.concurrent.FutureTask"
          "java.util.concurrent.ThreadPoolExecutor"
          "java.util.concurrent.ThreadPoolExecutor/Worker"
