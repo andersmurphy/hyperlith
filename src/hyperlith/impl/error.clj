@@ -39,28 +39,31 @@
   ;; trim error trace to users space helps keep trace short
   (take-while (fn [[cls _ _ _]] (not (str/starts-with? cls "hyperlith")))))
 
-(defn add-error-id [{:keys [trace] :as error}]
-  (assoc error :id (crypto/digest trace)))
+(defn add-error-id
+  [error]
+  (assoc error :id (crypto/digest (select-keys error [:trace :type]))))
 
 (defn log-error [req t]
   (@on-error_
    {;; req is under own key as it can contain data you don't want to log.
     :req   (dissoc req :async-channel :websocket?)
-    :error (-> (Throwable->map t)
-             (update :cause str/replace #"\"" "'")
-             (update :trace (fn [trace]
-                              (into []
-                                (comp demunge-csl-xf
-                                  not-hyperlith-cls-xf
-                                  remove-ignored-cls-xf
-                                  demunge-anonymous-functions-xf
-                                  ;; This shrinks the trace to the most
-                                  ;; relevant line
-                                  (u/dedupe-with first)
-                                  ;; max number of lines
-                                  (take 15))
-                                trace)))
-             add-error-id)}))
+    :error (let [m (Throwable->map t)]
+             (-> m
+               (update :cause str/replace #"\"" "'")
+               (update :trace (fn [trace]
+                                (into []
+                                  (comp demunge-csl-xf
+                                    not-hyperlith-cls-xf
+                                    remove-ignored-cls-xf
+                                    demunge-anonymous-functions-xf
+                                    ;; This shrinks the trace to the most
+                                    ;; relevant line
+                                    (u/dedupe-with first)
+                                    ;; max number of lines
+                                    (take 15))
+                                  trace)))
+               (assoc :type (-> m :via first :type str))
+               add-error-id))}))
 
 (defmacro try-log [data & body]
   `(try
