@@ -13,7 +13,7 @@
 
 (def ignored-cls-re
   (re-pattern
-    (str "$("
+    (str "^("
       (str/join "|"
         [;; A lot of this stuff is filler
          "clojure.lang"
