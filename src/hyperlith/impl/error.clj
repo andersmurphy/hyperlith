@@ -18,6 +18,8 @@
         [;; A lot of this stuff is filler
          "clojure.lang"
          "clojure.main"
+         "clojure.core.server"
+         "clojure.core/eval"
          "java.util.concurrent.FutureTask"
          "java.util.concurrent.ThreadPoolExecutor"
          "java.util.concurrent.ThreadPoolExecutor/Worker"
