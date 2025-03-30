@@ -55,10 +55,19 @@
 
 (defn action-send-message [{:keys [sid db] {:keys [message]} :body}]
   (when-not (str/blank? message)
-    (d/tx! db [{:user/sid sid}
-               {:message/id      (h/new-uid)
-                :message/user    [:user/sid sid]
-                :message/content message}])
+    (let [user-id (or (d/q '[:find ?user-id .
+                             :in $ ?sid
+                             :where [?s :session/id ?sid]
+                             [?s :session/user ?u]
+                             [?u :user/id ?user-id]]
+                        @db sid)
+                    (h/new-uid))]
+      (d/tx! db [{:user/id user-id}
+                 {:session/id   sid
+                  :session/user [:user/id user-id]}
+                 {:message/id      (h/new-uid)
+                  :message/user    [:user/id user-id]
+                  :message/content message}]))
     (h/signals {:message ""})))
 
 (def default-shim-handler
@@ -81,7 +90,8 @@
      :max-refresh-ms 100
      :ctx-start      (fn [] (-> (d/ctx-start "db" schema)))
      :ctx-stop       (fn [ctx] (d/ctx-stop ctx))
-     :csrf-secret    (h/env :csrf-secret)}))
+     :csrf-secret    (h/env :csrf-secret)
+     :on-error       #'d/log-on-error}))
 
 (h/refresh-all!)
 
@@ -91,7 +101,38 @@
 
   ;; stop server
   (((h/get-app) :stop))
-
-  ;; query outside of handler
-  (get-messages (-> (h/get-app) :ctx :q))
+  
   ,)
+
+(comment
+  ;; query outside of handler
+  (def db (-> (h/get-app) :ctx :db))
+  
+  (d/q '[:find (pull ?e [*])
+         :where [?e :error/id _]]
+    @db)
+
+  (d/q '[:find ?e (count ?ee)
+         :where
+         [?e :error/id _]
+         [?ee :error-event/error ?e]]
+    @db)
+
+  (d/q '[:find ?e (count ?ee)
+         :where
+         [?e :error/id _]
+         [?ee :error-event/error ?e]]
+    @db)
+
+  (d/q '[:find (count ?e)
+         :where
+         [?e :user/id _]]
+    @db)
+
+  (d/q '[:find (pull ?u [*])
+         :in $ ?sid
+         :where [?s :session/id ?sid]
+         [?s :session/user ?u]
+         ]
+    @db "5hv_MCnra7PpeKICamsMxALYLG4")
+  )

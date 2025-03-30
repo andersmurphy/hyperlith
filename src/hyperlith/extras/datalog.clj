@@ -10,6 +10,13 @@
 (def default-schema
   (merge
     #:session
+    {:id   {:db/unique      :db.unique/identity
+            :db/valueType   :db.type/string
+            :db/cardinality :db.cardinality/one}
+     :user {:db/valueType   :db.type/ref
+            :db/cardinality :db.cardinality/one}}
+
+    #:user
     {:id {:db/unique      :db.unique/identity
           :db/valueType   :db.type/string
           :db/cardinality :db.cardinality/one}}
