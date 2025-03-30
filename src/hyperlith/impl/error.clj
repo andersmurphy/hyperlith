@@ -62,7 +62,7 @@
                                     ;; max number of lines
                                     (take 15))
                                   trace)))
-               (assoc :type (-> m :via reverse first :type str))
+               (assoc :type (-> m :via peek :type str))
                add-error-id))}))
 
 (defmacro try-log [data & body]
