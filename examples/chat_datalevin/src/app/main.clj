@@ -132,7 +132,10 @@
   (d/q '[:find (pull ?u [*])
          :in $ ?sid
          :where [?s :session/id ?sid]
-         [?s :session/user ?u]
-         ]
+         [?s :session/user ?u]]
     @db "5hv_MCnra7PpeKICamsMxALYLG4")
+
+  (let [bar (atom nil)]
+    (h/try-log {}
+      (throw (ex-info "boom" {:data bar}))))
   )

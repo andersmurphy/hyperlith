@@ -60,13 +60,17 @@
   (let [sid (or (:sid req) "no-sid")
         txs [{:session/id sid} ;; users might not have a session in the db
              (h/qualify-keys
-               (dissoc error :data :via) ;; some data elements don't serialize
+               (dissoc error :via)
                :error)
              (h/qualify-keys
                {:session [:session/id sid]
                 :error   [:error/id (:id error)]}
                :error-event)]]
-    @(tx! db txs)))
+    (try ;; tx! can fail if data contains un-serialisable items
+      @(tx! db txs)
+      (catch Throwable _
+        ;; if data elements can't be serialized we remove them
+        @(tx! db (update txs 1 dissoc :error/data))))))
 
 (defn backup-copy!
   "Make a backup copy of the database. `dest-dir` is the destination
