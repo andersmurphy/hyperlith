@@ -5,12 +5,12 @@
 (def traces_ (atom initial-value))
   
 (defn traces-reset!
-  "Clear previous recorded traces."
+  "Clear previous logged traces."
   []
   (reset! traces_ initial-value))
 
 (defn traces
-  "Recorded traces."
+  "Logged traces."
   []
   (:events @traces_))
 
