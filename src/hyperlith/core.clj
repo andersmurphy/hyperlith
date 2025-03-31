@@ -15,7 +15,6 @@
             [hyperlith.impl.assets]
             [hyperlith.impl.trace]
             [hyperlith.impl.env]
-            [hyperlith.impl.tuples]
             [clojure.core.async :as a]
             [clojure.pprint :as pprint]
             [org.httpkit.server :as hk]))
