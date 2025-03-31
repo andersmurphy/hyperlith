@@ -64,7 +64,7 @@
   [hyperlith.impl.trace
    traces
    trace>
-   reset-traces!]
+   traces-reset!]
   ;;ERROR
   [hyperlith.impl.error
    try-log])
