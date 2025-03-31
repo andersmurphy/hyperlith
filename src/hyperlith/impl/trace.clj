@@ -1,23 +1,35 @@
 (ns hyperlith.impl.trace)
 
-(def traces_ (atom []))
+(def initial-value {:already-seen #{} :events []})
 
-(defn traces [] @traces_)
+(def traces_ (atom initial-value))
+  
+(defn traces-reset!
+  "Clear previous recorded traces."
+  []
+  (reset! traces_ initial-value))
 
-(defn reset-traces! []
-  (reset! traces_ []))
+(defn traces
+  "Recorded traces."
+  []
+  (:events @traces_))
 
 (def trace-tap
   (do (remove-tap trace-tap) ;; Remove old tap
-      (let [f (partial swap! traces_ conj)]
+      (let [f (fn [{:keys [exp] :as trace}]
+                (swap! traces_
+                  (fn [{:keys [already-seen] :as traces}]
+                    (if (already-seen (hash exp))
+                      traces
+                      (-> (update traces :already-seen conj (hash exp))
+                        (update :events conj trace))))))]
         (add-tap f)
         f)))
 
 (defmacro trace>
   "Trace macro that logs expression and return value to traces atom via
-  tap>."
+  tap>. Only logs a given expression once."
   [args]
   `(let [result# ~args]
-     (tap> (sorted-map :exp (quote ~args) :ret result#))
+     (tap> (sorted-map :exp (quote ~args) :ret result# :meta ~(meta args)))
      result#))
-
