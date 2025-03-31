@@ -41,7 +41,7 @@
 
 (defn add-error-id
   [error]
-  (assoc error :id (crypto/digest (select-keys error [:trace :type]))))
+  (assoc error :id (crypto/digest (select-keys error [:trace :type :cause]))))
 
 (defn log-error [req t]
   (@on-error_
