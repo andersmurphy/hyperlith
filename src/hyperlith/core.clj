@@ -61,9 +61,6 @@
   ;; ASSETS
   [hyperlith.impl.assets
    static-asset]
-  ;; TUPLES
-  [hyperlith.impl.tuples
-   tuples]
   ;; TRACE
   [hyperlith.impl.trace
    traces
