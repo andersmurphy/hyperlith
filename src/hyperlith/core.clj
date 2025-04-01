@@ -41,7 +41,8 @@
    digest]
   ;; ROUTER
   [hyperlith.impl.router
-   router]
+   router
+   wrap-routes]
   ;; DATASTAR
   [hyperlith.impl.datastar
    shim-handler
