@@ -7,6 +7,14 @@ Hyperlith only uses a subset of Datastar's feartures. If you want a production r
 
 >⚠️ **WARNING:**  API can change at any time! Use at your own risk. 
 
+## Goals / Priorities
+
+- **Opinionated** - does not try to be a general solution.
+- **Production REPL first** - a running system should be simple to modify/patch.
+- **Minimal dependencies** - ensures the project is robust and secure long term.
+- **Operationally Simple** - handles all operational tasks in process.
+- **Sovereign** - can be deployed on any VPS provider.
+
 ## Rational (more like a collection of opinions)
 
 #### Why large/fat/main morphs (immediate mode)?
