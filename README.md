@@ -10,6 +10,7 @@ Hyperlith only uses a subset of Datastar's feartures. If you want a production r
 ## Goals / Priorities
 
 - **Opinionated** - does not try to be a general solution.
+- **Server driven** - push based multiplayer and streaming updates from day 1.
 - **Production REPL first** - a running system should be simple to: introspect,  modify and patch.
 - **Minimal dependencies** - ensures the project is robust and secure long term.
 - **Operationally Simple** - handles all operational tasks in process.
