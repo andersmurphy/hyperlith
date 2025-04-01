@@ -10,7 +10,7 @@ Hyperlith only uses a subset of Datastar's feartures. If you want a production r
 ## Goals / Priorities
 
 - **Opinionated** - does not try to be a general solution.
-- **Production REPL first** - a running system should be simple to modify/patch.
+- **Production REPL first** - a running system should be simple to: introspect,  modify and patch.
 - **Minimal dependencies** - ensures the project is robust and secure long term.
 - **Operationally Simple** - handles all operational tasks in process.
 - **Sovereign** - can be deployed on any VPS provider.
