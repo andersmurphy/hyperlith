@@ -1,7 +1,7 @@
 (ns app.main
   (:gen-class)
   (:require [hyperlith.core :as h]
-            [hyperlith.extras.datalog :as d]
+            [hyperlith.extras.datalevin :as d]
             [clojure.string :as str]
             [app.schema :refer [schema]]))
 

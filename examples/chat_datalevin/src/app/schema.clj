@@ -1,5 +1,5 @@
 (ns app.schema
-  (:require [hyperlith.extras.datalog :as d]))
+  (:require [hyperlith.extras.datalevin :as d]))
 
 (def schema
   (merge ;; Using merge we can define each logical entity separately

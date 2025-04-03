@@ -1,6 +1,5 @@
-(ns hyperlith.extras.datalog
-  "Datalevin (datalog db) wrapper for hyperlith. Requires datalevin 9.15+ as
-  a dependency."
+(ns hyperlith.extras.datalevin
+  "Datalevin wrapper for hyperlith. Requires datalevin 9.15+ as a dependency."
   (:require [hyperlith.core :as h]
             [datalevin.core :as d]
             [datalevin.lmdb :as l])
