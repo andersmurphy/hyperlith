@@ -17,7 +17,8 @@
             [hyperlith.impl.env]
             [clojure.core.async :as a]
             [clojure.pprint :as pprint]
-            [org.httpkit.server :as hk]))
+            [org.httpkit.server :as hk]
+            [hyperlith.impl.codec :as codec]))
 
 (import-vars
   ;; ENV
@@ -67,9 +68,13 @@
    traces
    trace>
    traces-reset!]
-  ;;ERROR
+  ;; ERROR
   [hyperlith.impl.error
-   try-log])
+   try-log]
+  ;; CODEC
+  [hyperlith.impl.codec
+   url-query-string
+   url-encode])
 
 (defonce ^:private refresh-ch_ (atom nil))
 (defonce ^:private app_ (atom nil))
@@ -123,3 +128,7 @@
                               (a/close! <refresh-ch))}]
     (reset! app_ app)
     app))
+
+
+;; TODO: url-encode / build-query-string
+;; Do these exist in ring.codex?

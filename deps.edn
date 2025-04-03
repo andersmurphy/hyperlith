@@ -14,9 +14,6 @@
   ;; Assumes you deploy uberjar on linux x86_64
   com.aayushatharva.brotli4j/native-linux-x86_64 {:mvn/version "1.18.0"}
   io.netty/netty-buffer                          {:mvn/version "4.1.119.Final"}
-
-  ;; QUERY PARSING
-  ring/ring-codec           {:mvn/version "1.2.0"}
   
   ;; TEMPLATING
   dev.onionpancakes/chassis {:mvn/version "1.0.365"}}
