@@ -53,7 +53,8 @@
   ;; HTTP
   [hyperlith.impl.http
    get!
-   post!]
+   post!
+   throw-if-status-not!]
   ;; CSS
   [hyperlith.impl.css
    static-css

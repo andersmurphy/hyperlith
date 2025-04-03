@@ -17,4 +17,12 @@
 
 (def post! (wrap-json-response #_:clj-kondo/ignore http/post))
 
+(defn throw-if-status-not!
+  "Convert response status that is not in the status-set into an ex-info and
+  then throw."
+  [status-set message {:keys [body status]}]
+  (if ((complement status-set) status) body
+      (throw (ex-info (str message ": " status)
+               (assoc body :status status)))))
+
 
