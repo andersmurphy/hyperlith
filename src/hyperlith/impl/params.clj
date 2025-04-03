@@ -6,7 +6,7 @@
 
 (defn parse-query-string [query-string]
   (try
-    (codec/form-decode query-string "UTF-8")
+    (codec/form-decode query-string)
     (catch Throwable _)))
 
 (defn wrap-query-params
