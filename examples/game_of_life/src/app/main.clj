@@ -65,9 +65,9 @@
         " and "
         [:a {:href "https://data-star.dev"} "Datastar"]
         "🚀"]
-       [:p "Source code can bee found "
+       [:p "Source code can be found "
         [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/app/main.clj"} "here"]]
-       [:p [:i (str "Connected players: " (:connected-counter @db))]]
+       [:p [:i nil (str "Connected players: " (:connected-counter @db))]]
        [:div
         [:div.b nil
          (board-state db)]]]))
