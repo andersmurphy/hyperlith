@@ -108,7 +108,7 @@
 
 (defn start-game! [db]
   (let [running_ (atom true)]
-    (u/thread
+    (h/thread
       (while @running_
         (Thread/sleep 200) ;; 5 fps
         (next-generation! db)))
