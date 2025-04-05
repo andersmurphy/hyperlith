@@ -29,7 +29,8 @@
    load-resource
    assoc-if-missing
    assoc-in-if-missing
-   qualify-keys]
+   qualify-keys
+   thread]
   ;; HTML
   [hyperlith.impl.html
    html]

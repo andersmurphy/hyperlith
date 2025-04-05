@@ -3,7 +3,7 @@
   (:require [clojure.pprint :as pprint]
             [hyperlith.core :as h]
             [app.game :as game]
-            [hyperlith.impl.util :as u]))
+            [clojure.string :as str]))
 
 (def board-size 40)
 
