@@ -42,7 +42,7 @@
 
        [:.t
         {:background :white
-         :transition "all 0.4s ease"}]])))
+         :transition "background 0.4s ease"}]])))
 
 (def board-state
   (h/cache
