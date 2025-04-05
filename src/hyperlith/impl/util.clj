@@ -70,3 +70,9 @@
               result
               (rf result input))))))))
   ([f coll] (sequence (dedupe-with f) coll)))
+
+(defn modulo-pick
+  "Given a coll and a value x. Returns a random value from coll.
+  Always returns the same value for a given coll and value."
+  [coll x]
+  (-> (hash x) (mod (count coll)) coll))

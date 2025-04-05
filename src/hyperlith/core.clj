@@ -30,6 +30,7 @@
    assoc-if-missing
    assoc-in-if-missing
    qualify-keys
+   modulo-pick
    thread]
   ;; HTML
   [hyperlith.impl.html
