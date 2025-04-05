@@ -18,11 +18,16 @@
       (sort-by (comp to-str key) v))
     "}"))
 
-(defn static-css [css-rules]
+(defn static-css [& css-rule-sources]
   (static-asset
-    {:body         (if (vector? css-rules)
-                     (->> (map format-rule css-rules) (reduce str ""))
-                     css-rules)
+    {:body         (reduce
+                     (fn [result css-rule-source]
+                       (apply str result
+                         (if (vector? css-rule-source)
+                           (mapv format-rule css-rule-source)
+                           [css-rule-source])))
+                     ""
+                     css-rule-sources)
      :content-type "text/css"
      :compress?    true}))
 
