@@ -41,7 +41,8 @@
          :grid-template-columns (str "repeat(" board-size ", 1fr)")}]
 
        [:.t
-        {:background :white}]])))
+        {:background :white
+         :transition "all 0.4s ease"}]])))
 
 (def board-state
   (h/cache
