@@ -7,11 +7,11 @@
                [0 -1]  #_cell [0 1]
                [1 -1]  [1 0]  [1 1]]})
 
-(defn dead-cell [] false)
+(defn dead-cell [] :dead)
 
-(defn alive-cell [] true)
+(defn alive-cell [living-neighbors] (rand-nth living-neighbors))
 
-(defn alive? [cell] cell)
+(defn alive? [cell] (not= cell :dead))
 
 (defn coordinates->index [row col max-cols]
   (+ col (* row max-cols)))
@@ -40,32 +40,31 @@
                     (coordinates->index r c max-cols)))))
          (filter some?))))
 
-(defn count-neighbors [board [row col] max-rows max-cols]
-  (let [neighbors   (:neighbors grid-config)
-        neighbor-cells (get-neighbors neighbors [row col] max-rows max-cols)
-        alive-cells?   (filter alive? (map #(get-cell board %) neighbor-cells))]
-      (count alive-cells?)))
-
-(defn cell-transition [cell count-neighbors]
-  (if (or (and (alive? cell) (or (= count-neighbors 2) (= count-neighbors 3)))
-          (and (not (alive? cell)) (= count-neighbors 3)))
-    (alive-cell)
+(defn cell-transition [cell neighbors-count living-neighbors]
+  (if (or (and (alive? cell) (or (= neighbors-count 2) (= neighbors-count 3)))
+          (and (not (alive? cell)) (= neighbors-count 3)))
+    (alive-cell living-neighbors)
     (dead-cell)))
 
 (defn next-gen-board [{:keys [board max-rows max-cols]}]
   (let [next-board (transient board)
-        size (* max-rows  max-cols)
-        _ (dotimes [idx size]
-            (let [coords  (index->coordinates idx max-cols)
-                  cell (get-cell board idx)
-                  neighbor-count (count-neighbors board coords max-rows max-cols)]
-              (assoc! next-board idx (cell-transition cell neighbor-count))))]
+        size       (* max-rows  max-cols)]
+    (dotimes [idx size]
+      (let [coords         (index->coordinates idx max-cols)
+            cell           (get-cell board idx)
+            neighbors      (:neighbors grid-config)
+            neighbor-cells (get-neighbors neighbors coords max-rows max-cols)
+            living-neighbors   (filter alive? (map #(get-cell board %)
+                                            neighbor-cells))
+            neighbor-count (count living-neighbors)]
+        (assoc! next-board idx (cell-transition cell neighbor-count
+                                 living-neighbors))))
     (persistent! next-board)))
 
 (comment
 
   (empty-board 10 10)
 
-  (next-gen-board {:board (empty-board 10 10)
+  (next-gen-board {:board    (empty-board 10 10)
                    :max-rows 10
                    :max-cols 10}))

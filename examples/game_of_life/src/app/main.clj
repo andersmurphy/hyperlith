@@ -7,6 +7,9 @@
 
 (def board-size 40)
 
+(def colors
+  [:red :blue :green :orange :yellow :purple])
+
 (def css
   (let [black :black]
     (h/static-css
@@ -29,7 +32,7 @@
          :gap            :5px
          :flex-direction :column}]
 
-       [:.b
+       [:.board
         {:background            black
          :gap                   :2px
          :padding               :2px
@@ -40,18 +43,29 @@
          :grid-template-rows    (str "repeat(" board-size ", 1fr)")
          :grid-template-columns (str "repeat(" board-size ", 1fr)")}]
 
-       [:.t
-        {:background :white
-         :transition "background 0.4s ease"}]])))
+       [:.tile
+        {:transition "background 0.4s ease"}]
+
+       [:.dead
+        {:background :white}]
+
+       [:.red
+        {:background :red}]
+       [:.blue
+        {:background :blue}]
+       [:.green
+        {:background :green}]
+       [:.orange
+        {:background :orange}]])))
 
 (def board-state
   (h/cache
     (fn [db]
       (map-indexed
-        (fn [id full]
+        (fn [id color-class]
           (h/html
-            [:div
-             {:class         (if full "" "t")
+            [:div.tile
+             {:class         color-class
               :id            id
               :data-on-click (format "@post('/tap?id=%s')" id)}]))
         (:board @db)))))
@@ -68,27 +82,27 @@
         "🚀"]
        [:p "Source code can be found "
         [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/app/main.clj"} "here"]]
-       [:p [:i nil (str "Connected players: " (:connected-counter @db))]]
        [:div
-        [:div.b nil
+        [:div.board nil
          (board-state db)]]]))
 
-(defn fill-cell [board id]
+(defn fill-cell [board color id]
   (if ;; crude overflow check
       (<= 0 id (dec (* board-size board-size)))
-    (assoc board id true)
+    (assoc board id color)
     board))
 
-(defn fill-cross [db id]
-  (-> db
-    (update :board fill-cell (- id board-size))
-    (update :board fill-cell (- id 1))
-    (update :board fill-cell    id)
-    (update :board fill-cell (+ id 1))
-    (update :board fill-cell (+ id board-size))))
+(defn fill-cross [db id sid]
+  (let[user-color (h/modulo-pick colors sid)]
+    (-> db
+      (update :board fill-cell user-color (- id board-size))
+      (update :board fill-cell user-color (- id 1))
+      (update :board fill-cell user-color id)
+      (update :board fill-cell user-color (+ id 1))
+      (update :board fill-cell user-color (+ id board-size)))))
 
-(defn action-tap-cell [{:keys [_sid db] {:strs [id]} :query-params}]
-  (swap! db fill-cross (parse-long id)))
+(defn action-tap-cell [{:keys [sid db] {:strs [id]} :query-params}]
+  (swap! db fill-cross (parse-long id) sid))
 
 (def default-shim-handler
   (h/shim-handler
@@ -118,18 +132,11 @@
   (h/router
     {[:get (css :path)] (css :handler)
      [:get  "/"]        default-shim-handler
-     [:post "/"]        (h/render-handler #'render-home
-                          :on-open
-                          (fn [{:keys [db]}]
-                            (swap! db update :connected-counter inc))
-                          :on-close
-                          (fn [{:keys [db]}]
-                            (swap! db update :connected-counter dec)))
+     [:post "/"]        (h/render-handler #'render-home)
      [:post "/tap"]     (h/action-handler #'action-tap-cell)}))
 
 (defn ctx-start []
-  (let [db_ (atom {:board             (game/empty-board board-size board-size)
-                   :connected-counter 0})]
+  (let [db_ (atom {:board (game/empty-board board-size board-size)})]
     (add-watch db_ :refresh-on-change
       (fn [_ _ old-state new-state]
         ;; Only refresh if state has changed
