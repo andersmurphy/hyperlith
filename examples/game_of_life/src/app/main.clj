@@ -69,9 +69,9 @@
         (fn [id color-class]
           (h/html
             [:div.tile
-             {:class         color-class
-              :id            id
-              :data-on-click (format "@post('/tap?id=%s')" id)}]))
+             {:class             color-class
+              :id                id
+              :data-on-mousedown (format "@post('/tap?id=%s')" id)}]))
         (:board @db)))))
 
 (defn render-home [{:keys [db] :as _req}]
