@@ -152,7 +152,7 @@
 (defn -main [& _]
   (h/start-app
     {:router         #'router
-     :max-refresh-ms 100
+     :max-refresh-ms 200
      :ctx-start      ctx-start
      :ctx-stop       (fn [{:keys [game-stop]}] (game-stop))
      :csrf-secret    (h/env :csrf-secret)
@@ -176,9 +176,3 @@
 
   
   ,)
-
-(comment
-  (game/next-gen-board
-    {:board     (game/empty-board board-size board-size)
-     :max-rows board-size
-     :max-cols board-size}))
