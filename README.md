@@ -83,13 +83,15 @@ To add something to the cache wrap the function in the `cache` higher order func
 
 Batching pairs really well with CQRS as you have a resolution window, this defines the maximum frequency the view can update, or in other terms the granularity/resolution of the view. Batching can generally be used to improve throughput by batching changes. 
 
-However, there are some downsides with batching is that you don't get atomic transactions. The transaction becomes at the batch level, not the transact level. This is fine in some situations but it limits what you can do with [transaction functions](https://docs.datomic.com/transactions/transaction-functions.html). Transaction functions matter when you are dealing with constraints you want to deal with at the database level, classic example is accounting systems or ledgers where you want to be able to fail an atomic transaction that violates a constraint (like user balance going negative). The problem with batching is that that transaction constraint failure, fails the whole batch not only the transact that was culpable.
+However, there is one downsides with batching to keep in mind and that is you don't get atomic transactions. The transaction move to the batch level, not the transact/insert level. Transaction matter when you are dealing with constraints you want to deal with at the database level, classic example is accounting systems or ledgers where you want to be able to fail an atomic transaction that violates a constraint (like user balance going negative). The problem with batching is that that transaction constraint failure, fails the whole batch not only the transact that was culpable.
 
-However, [datalevin](https://github.com/juji-io/datalevin) (my go to database with hyperlith) recently added it's [own batching mechanism](https://github.com/juji-io/datalevin/tree/master/benchmarks/write-bench) when you use `transact-async` this gives you really good write performance (it does dynamic batching) and atomic transaction failures. I hadn't considered it before because what good is an async transaction, I obviously care about the result? But, that's the thing in CQRS you don't care about the result of a command/action, so `transact-async` fits perfectly.
+Some systems don't need manual batching. For example [datalevin](https://github.com/juji-io/datalevin) (my go to database with hyperlith) recently added it's [own batching mechanism](https://github.com/juji-io/datalevin/tree/master/benchmarks/write-bench) when you use `transact-async` this gives you really good write performance (it does dynamic batching) and atomic transaction failures. This gives you the best of both worlds: fast writes and atomic transactions.
 
-So short answer is with datalevin you can have your cake and eat it (fast writes and atomic transactions).
+If you are using a database like sqlite, don't require fine grained transaction and want better write performance I'd recommend batching as it's trivial to implement in a system that has a resolution window.
 
-This also highlights that I'll probably steer hyperlith to focus on using datalevin. Though, I'll still allow the use of other data stores (sqlite/atoms/redis/maxmind) as often need more than one. However, I'll probably leave batching as an exercise for the user if they are using sqlite or a database that requires manual batching.
+#### Use `data-on-mousedown` over  `data-on-click`
+
+This is a small one but can make even the slowest of networks feel much snappier.
 
 ## Other Radical choices
 
