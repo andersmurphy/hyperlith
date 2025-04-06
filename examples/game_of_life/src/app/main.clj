@@ -56,7 +56,11 @@
        [:.green
         {:background :green}]
        [:.orange
-        {:background :orange}]])))
+        {:background :orange}]
+       [:.yellow
+        {:background :orange}]
+       [:.purple
+        {:background :purple}]])))
 
 (def board-state
   (h/cache
