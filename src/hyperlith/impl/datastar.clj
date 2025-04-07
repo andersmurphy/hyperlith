@@ -139,10 +139,10 @@
              ;; performant than diffing.
              (with-open [out (br/byte-array-out-stream)
                          br  (br/compress-out-stream out
-                              ;; Window size can be tuned to trade bandwidth
-                              ;; for memory. 65KB is double of gzip's 32KB.
-                              ;; (br/window-size->kb 16) => 65KB
-                              :window-size 16)]
+                               ;; Window size can be tuned to trade bandwidth
+                               ;; for memory. 262KB is 8x of gzip's 32KB.
+                               ;; (br/window-size->kb 18) => 262KB
+                               :window-size 18)]
                (loop [last-view-hash (get-in req [:headers "last-event-id"])]
                  (a/alt!!
                    [<cancel] (do (a/close! <ch) (a/close! <cancel))
