@@ -8,6 +8,12 @@
       second)
     (catch Throwable _)))
 
+(defn session-cookie [sid]
+  (str "__Host-sid=" sid "; Path=/; Secure; HttpOnly; SameSite=Lax"))
+
+(defn csrf-cookie [csrf]
+  (str "__Host-csrf=" csrf "; Path=/; Secure; SameSite=Lax"))
+
 (defn wrap-session
   [handler csrf-secret]
   (let [;; Only create the spec once.
@@ -28,20 +34,16 @@
                 csrf    (sid->csrf new-sid)]
             (-> (handler (assoc req :sid new-sid :csrf csrf))
               (assoc-in [:headers "Set-Cookie"]
-                ;; This cookie won't be set on local host on chrome/safari as
-                ;; it's using secure needs to be true and local host
+                ;; These cookies won't be set on local host on chrome/safari
+                ;; as it's using secure needs to be true and local host
                 ;; does not have HTTPS. SameSite is set to lax as it
                 ;; allows the same cookie session to be used following a
                 ;; link from another site.
-                [(str ;; Set session cookie
-                   "__Host-sid=" new-sid
-                   "; Path=/; Secure; HttpOnly; SameSite=Lax")
-                 (str ;; Set csrf cookie
-                   "__Host-csrf=" csrf
-                   "; Path=/; Secure; SameSite=Lax")])))
+                [(session-cookie new-sid)
+                 (csrf-cookie csrf)])))
 
           ;; Not a :get request and user does not have session we 403
-          ;; Note: If the updates SSE connection is a not a :get then this 
+          ;; Note: If the updates SSE connection is a not a :get then this
           ;; will close the connection until the user reloads the page.
           :else
           {:status 403})))))
