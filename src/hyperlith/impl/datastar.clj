@@ -116,7 +116,14 @@
       {:status  204
        :headers default-headers})))
 
-(defn render-handler [render-fn & {:keys [on-close on-open] :as _opts}]
+(defn render-handler
+  [render-fn & {:keys [on-close on-open br-window-size] :as _opts
+                :or   {;; Window size can be tuned to trade memory
+                       ;; for reduced bandwidth and compute.
+                       ;; The right window size can significantly improve
+                       ;; compression of highly variable streams of data.
+                       ;; (br/window-size->kb 18) => 262KB
+                       br-window-size 18}}]
   (fn handler [req]
     (let [;; Dropping buffer is used here as we don't want a slow handler
           ;; blocking other handlers. Mult distributes each event to all
@@ -139,10 +146,7 @@
              ;; performant than diffing.
              (with-open [out (br/byte-array-out-stream)
                          br  (br/compress-out-stream out
-                               ;; Window size can be tuned to trade bandwidth
-                               ;; for memory. 262KB is 8x of gzip's 32KB.
-                               ;; (br/window-size->kb 18) => 262KB
-                               :window-size 18)]
+                               :window-size br-window-size)]
                (loop [last-view-hash (get-in req [:headers "last-event-id"])]
                  (a/alt!!
                    [<cancel] (do (a/close! <ch) (a/close! <cancel))
