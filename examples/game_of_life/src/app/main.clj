@@ -8,7 +8,7 @@
 (def board-size 40)
 
 (def colors
-  [:red :blue :green :orange :yellow :purple])
+  [:red :blue :green :orange :fuchsia :purple])
 
 (def css
   (let [black :black]
@@ -34,7 +34,7 @@
 
        [:.board
         {:background            black
-         :gap                   :2px
+         :gap                   :1px
          :padding               :2px
          :margin-inline         :auto
          :max-width             "min(100%, 30rem)"
@@ -57,8 +57,8 @@
         {:background :green}]
        [:.orange
         {:background :orange}]
-       [:.yellow
-        {:background :orange}]
+       [:.fuchsia
+        {:background :fuchsia}]
        [:.purple
         {:background :purple}]])))
 
