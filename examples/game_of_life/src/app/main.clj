@@ -2,10 +2,9 @@
   (:gen-class)
   (:require [clojure.pprint :as pprint]
             [hyperlith.core :as h]
-            [app.game :as game]
-            [clojure.string :as str]))
+            [app.game :as game]))
 
-(def board-size 40)
+(def board-size 50)
 
 (def colors
   [:red :blue :green :orange :fuchsia :purple])
@@ -70,8 +69,7 @@
           (h/html
             [:div.tile
              {:class             color-class
-              :id                id
-              :data-on-mousedown (format "@post('/tap?id=%s')" id)}]))
+              :id                id}]))
         (:board @db)))))
 
 (defn render-home [{:keys [db] :as _req}]
@@ -87,7 +85,7 @@
        [:p "Source code can be found "
         [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/app/main.clj"} "here"]]
        [:div
-        [:div.board nil
+        [:div.board {:data-on-mousedown "@post('/tap?id='+evt.target.id)"}
          (board-state db)]]]))
 
 (defn fill-cell [board color id]
@@ -136,7 +134,7 @@
   (h/router
     {[:get (css :path)] (css :handler)
      [:get  "/"]        default-shim-handler
-     [:post "/"]        (h/render-handler #'render-home)
+     [:post "/"]        (h/render-handler #'render-home {:br-window-size 18})
      [:post "/tap"]     (h/action-handler #'action-tap-cell)}))
 
 (defn ctx-start []
