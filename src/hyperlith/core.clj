@@ -31,7 +31,8 @@
    assoc-in-if-missing
    qualify-keys
    modulo-pick
-   thread]
+   thread
+   circular-subvec]
   ;; HTML
   [hyperlith.impl.html
    html]

@@ -76,3 +76,13 @@
   Always returns the same value for a given coll and value."
   [coll x]
   (-> (hash x) (mod (count coll)) coll))
+
+(defn circular-subvec
+  "Like subvec but loops round. Result can never be larger than the initial
+  vector v."
+  [v start end]
+  (let [size (count v)]
+    (if (>= end size)
+      (let [v1 (subvec v start size)]
+        (into v1 (subvec v 0 (min (- end size) (- size (count v1))))))
+      (subvec v start end))))
