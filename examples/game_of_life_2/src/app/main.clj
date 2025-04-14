@@ -42,6 +42,17 @@
          :grid-template-rows    (str "repeat(" board-size ", 1fr)")
          :grid-template-columns (str "repeat(" board-size ", 1fr)")}]
 
+       [:.boardsmall
+        {:background            black
+         :gap                   :1px
+         :padding               :2px
+         :margin-inline         :auto
+         :max-width             "min(100%, 30rem)"
+         :display               :grid
+         :aspect-ratio          "1/1"
+         :grid-template-rows    (str "repeat(" (- board-size 10) ", 1fr)")
+         :grid-template-columns (str "repeat(" (- board-size 10) ", 1fr)")}]
+
        [:.tile
         {:transition "background 0.4s ease"}]
 
@@ -64,13 +75,24 @@
 (def board-state
   (h/cache
     (fn [db]
-      (map-indexed
-        (fn [id color-class]
-          (h/html
-            [:div.tile
-             {:class             color-class
-              :id                id}]))
+      (into []
+        (comp
+          (map-indexed
+            (fn [id color-class]
+              (h/html
+                [:div.tile
+                 {:class color-class
+                  :id    id}])))
+          (partition-all board-size)
+          (map vec))
         (:board @db)))))
+
+(defn user-view [view-size [x y] board-state]
+  (reduce
+    (fn [view board-row]
+      (into view (h/circular-subvec board-row x (+ x view-size))))
+    []
+    (h/circular-subvec board-state y (+ y view-size))))
 
 (defn render-home [{:keys [db] :as _req}]
     (h/html
@@ -86,16 +108,16 @@
         [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/app/main.clj"} "here"]]
        [:div
         [:div.board {:data-on-mousedown "@post('/tap?id='+evt.target.id)"}
-         (board-state db)]]]))
+         (user-view board-size [0 0] (board-state db))]]]))
 
-;; Render for the Datastar site embed 
 (defn render-home-star [{:keys [db] :as _req}]
   (h/html
     [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
     [:main#morph.main
      [:div
-      [:div.board {:data-on-mousedown "@post('/tap?id='+evt.target.id)"}
-       (board-state db)]]]))
+      [:div.boardsmall
+       {:data-on-mousedown "@post('/tap?id='+evt.target.id)"}
+       (user-view (- board-size 10) [0 0] (board-state db))]]]))
 
 (defn fill-cell [board color id]
   (if ;; crude overflow check
