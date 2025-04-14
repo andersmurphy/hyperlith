@@ -88,6 +88,15 @@
         [:div.board {:data-on-mousedown "@post('/tap?id='+evt.target.id)"}
          (board-state db)]]]))
 
+;; Render for the Datastar site embed 
+(defn render-home-star [{:keys [db] :as _req}]
+  (h/html
+    [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
+    [:main#morph.main
+     [:div
+      [:div.board {:data-on-mousedown "@post('/tap?id='+evt.target.id)"}
+       (board-state db)]]]))
+
 (defn fill-cell [board color id]
   (if ;; crude overflow check
       (<= 0 id (dec (* board-size board-size)))
@@ -135,6 +144,9 @@
     {[:get (css :path)] (css :handler)
      [:get  "/"]        default-shim-handler
      [:post "/"]        (h/render-handler #'render-home {:br-window-size 18})
+     [:get  "/star"]    default-shim-handler
+     [:post "/star"]    (h/render-handler #'render-home-star
+                          {:br-window-size 18})
      [:post "/tap"]     (h/action-handler #'action-tap-cell)}))
 
 (defn ctx-start []
