@@ -73,8 +73,9 @@
       "http://localhost:8080/"
       {:timeout 1
        :headers
-       {"Cookie"       "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY; __Host-csrf=3UsG62ic9wLsg9EVQhGupw"
-        "Content-Type" "application/json"}
+       {"accept-encoding" "br"
+        "cookie"       "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY; __Host-csrf=3UsG62ic9wLsg9EVQhGupw"
+        "content-type" "application/json"}
        :body    "{\"csrf\":\"3UsG62ic9wLsg9EVQhGupw\"}"}))
 
   (-> @capture parse-captured-response)

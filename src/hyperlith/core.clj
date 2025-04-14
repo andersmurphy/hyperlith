@@ -3,8 +3,9 @@
             [hyperlith.impl.session :refer [wrap-session]]
             [hyperlith.impl.json :refer [wrap-parse-json-body]]
             [hyperlith.impl.params :refer [wrap-query-params]]
-            [hyperlith.impl.datastar :as ds]            
-            [hyperlith.impl.util :as u]            
+            [hyperlith.impl.blocker :refer [wrap-blocker]]
+            [hyperlith.impl.datastar :as ds]
+            [hyperlith.impl.util :as u]
             [hyperlith.impl.error :as er]
             [hyperlith.impl.crypto]
             [hyperlith.impl.css]
@@ -122,7 +123,8 @@
                        ;; are robust/lenient.
                        wrap-query-params
                        (wrap-session csrf-secret)
-                       wrap-parse-json-body)
+                       wrap-parse-json-body
+                       wrap-blocker)
         stop-server  (hk/run-server middleware {:port port})
         app          {:ctx  ctx
                       :stop (fn stop [& [opts]]
