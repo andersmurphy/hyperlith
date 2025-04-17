@@ -36,7 +36,8 @@
    circular-subvec]
   ;; HTML
   [hyperlith.impl.html
-   html]
+   html
+   html-resolve-alias]
   ;; CACHE / WORK SHARING
   [hyperlith.impl.cache
    cache]

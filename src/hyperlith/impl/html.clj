@@ -16,3 +16,5 @@
   [& hiccups]
   (let [node (vec hiccups)]
     `(cc/compile ~node)))
+
+(def html-resolve-alias h/resolve-alias)
