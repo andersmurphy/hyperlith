@@ -127,7 +127,7 @@ Rather than returning the whole page on initial render and having two render pat
 
 Router is a simple map, this means path parameters are not supported use query parameters or body instead. I've found over time that path parameters force you to adopt an arbitrary hierarchy that is often wrong (and place oriented programming). Removing them avoids this and means routing can be simplified to a map and have better performance than a more traditional adaptive radix tree router.
 
->📝 Note: The Hyperlith router completely optional and you can swap it out for reitit if you want to support path params. 
+>📝 Note: The Hyperlith router is completely optional and you can swap it out for reitit if you want to support path params. 
 
 #### Reverse proxy
 
