@@ -2,7 +2,8 @@
   (:require [hyperlith.impl.assets :refer [static-asset]]
             [hyperlith.impl.session :refer [csrf-cookie-js]]
             [hyperlith.impl.json :as j]
-            [hyperlith.impl.headers :refer [default-headers]]
+            [hyperlith.impl.headers
+             :refer [default-headers strict-transport]]
             [hyperlith.impl.util :as util]
             [hyperlith.impl.brotli :as br]
             [hyperlith.impl.crypto :as crypto]
@@ -108,13 +109,16 @@
   (fn handler [req]
     (if-let [signals (:hyperlith.core/signals (thunk req))]
       {:status  200
-       :headers (assoc default-headers
-                  "Content-Type"  "text/event-stream"
-                  "Cache-Control" "no-store"
-                  "Content-Encoding" "br")
+       ;; 200 signal responses have reduced headers
+       :headers {"Content-Type"              "text/event-stream"
+                 "Cache-Control"             "no-store"
+                 "Content-Encoding"          "br"
+                 "Strict-Transport-Security" strict-transport}
        :body    (br/compress (merge-signals signals))}
-      {:status  204
-       :headers default-headers})))
+      ;; 204 needs even less
+      {:headers {"Strict-Transport-Security" strict-transport
+                 "Cache-Control"             "no-store"}
+       :status  204})))
 
 (defn render-handler
   [render-fn & {:keys [on-close on-open br-window-size] :as _opts

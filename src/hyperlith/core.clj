@@ -134,7 +134,3 @@
                               (a/close! <refresh-ch))}]
     (reset! app_ app)
     app))
-
-
-;; TODO: url-encode / build-query-string
-;; Do these exist in ring.codex?
