@@ -13,7 +13,7 @@
 
 (def css
   (let [black           :black
-        cell-transition "background 0.4s ease"
+        cell-transition "background 0.8s ease"
         board-size-px (str board-size-px "px")]
     (h/static-css
       [["*, *::before, *::after"
@@ -52,24 +52,29 @@
 
        [:.tile
         {:border-bottom "1px solid black"
-         :border-right  "1px solid black"
-         :transition    cell-transition}]
+         :border-right  "1px solid black"}]
 
        [:.dead
         {:background :white}]
 
        [:.red
-        {:background   :red}]
+        {:background   :red
+         :transition    cell-transition}]
        [:.blue
-        {:background   :blue}]
+        {:background   :blue
+         :transition    cell-transition}]
        [:.green
-        {:background   :green}]
+        {:background   :green
+         :transition    cell-transition}]
        [:.orange
-        {:background   :orange}]
+        {:background   :orange
+         :transition    cell-transition}]
        [:.fuchsia
-        {:background   :fuchsia}]
+        {:background   :fuchsia
+         :transition    cell-transition}]
        [:.purple
-        {:background   :purple}]])))
+        {:background   :purple
+         :transition    cell-transition}]])))
 
 (def board-state
   (h/cache
@@ -81,8 +86,11 @@
               (let [[x y] (game/index->coordinates id board-size)]
                 (h/html
                   [:div.tile
-                   {:style {:grid-row (inc x) :grid-column (inc y)}
-                    :class color-class :id (str "c" id)}]))))
+                   (cond->
+                       {:style   {:grid-row (inc x) :grid-column (inc y)}
+                        :class   color-class
+                        :data-id (str "c" id)}
+                     (not= :dead color-class) (assoc :id (str "c" id)))]))))
           (partition-all board-size)
           (map vec))
         (:board db)))))
@@ -102,7 +110,7 @@
        {:data-on-scroll__debounce.200ms
         "@post(`/scroll?x=${el.scrollLeft}&y=${el.scrollTop}`)"}
        [:div.board
-        {:data-on-mousedown "@post(`/tap?id=${evt.target.id}`)"}
+        {:data-on-mousedown "@post(`/tap?id=${evt.target.dataset.id}`)"}
         view]])))
 
 (defn render-home [{:keys [db sid] :as _req}]
