@@ -101,10 +101,9 @@
       [:div#view.view
        {:data-on-scroll__debounce.200ms
         "@post(`/scroll?x=${el.scrollLeft}&y=${el.scrollTop}`)"}
-       [:div.chunk-grid
-        [:div.board
-         {:data-on-mousedown "@post(`/tap?id=${evt.target.id}`)"}
-         view]]])))
+       [:div.board
+        {:data-on-mousedown "@post(`/tap?id=${evt.target.id}`)"}
+        view]])))
 
 (defn render-home [{:keys [db sid] :as _req}]
   (let [snapshot @db]
@@ -125,7 +124,7 @@
   (let [snapshot @db]
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
-      [:main#morph.main
+      [:main#morph.main nil
        (game-view snapshot sid)])))
 
 (defn fill-cell [board color id]
