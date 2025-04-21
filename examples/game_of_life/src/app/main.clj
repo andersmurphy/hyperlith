@@ -245,9 +245,6 @@ el.scrollTop = el.scrollTop + $_y;")
   (def db (-> (h/get-app) :ctx :db))
   (reset! db {:board (game/empty-board board-size board-size)
               :users {}})
-  ;; Virtualize vanila
-
-  ;; modulo wrap
 
   (->> @db :users)
 

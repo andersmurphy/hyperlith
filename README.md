@@ -16,6 +16,11 @@ Hyperlith only uses a subset of Datastar's feartures. If you want a production r
 - **Operationally Simple** - handles all operational tasks in process.
 - **Sovereign** - can be deployed on any VPS provider.
 
+## F.A.Q
+
+**Q:** Why do I get 403 when running the examples locally in Chrome or Safari?
+**A:** The session and csrf cookies use `Secure` this means that these cookies won't be set on localhost when using chrome or safari (as they require HTTPS) . If you want to use Chrome or Safari for local development you can run `caddy run` to start a local https proxy on https://localhost:3030. The local `caddyfile` can be [found here](https://github.com/andersmurphy/hyperlith/blob/master/Caddyfile). The goal is for development to be a close to production as possible, and Hyperlith is designed to be run behind a reverse proxy.
+
 ## Rational (more like a collection of opinions)
 
 #### Why large/fat/main morphs (immediate mode)?
@@ -85,7 +90,7 @@ Batching pairs really well with CQRS as you have a resolution window, this defin
 
 However, there is one downsides with batching to keep in mind and that is you don't get atomic transactions. The transaction move to the batch level, not the transact/insert level. Transaction matter when you are dealing with constraints you want to deal with at the database level, classic example is accounting systems or ledgers where you want to be able to fail an atomic transaction that violates a constraint (like user balance going negative). The problem with batching is that that transaction constraint failure, fails the whole batch not only the transact that was culpable.
 
-Some systems don't need manual batching. For example [datalevin](https://github.com/juji-io/datalevin) (my go to database with hyperlith) recently added it's [own batching mechanism](https://github.com/juji-io/datalevin/tree/master/benchmarks/write-bench) when you use `transact-async` this gives you really good write performance (it does dynamic batching) and atomic transaction failures. This gives you the best of both worlds: fast writes and atomic transactions.
+Some systems don't need manual batching. For example [datalevin](https://github.com/juji-io/datalevin) (my go to database with Hyperlith) recently added it's [own batching mechanism](https://github.com/juji-io/datalevin/tree/master/benchmarks/write-bench) when you use `transact-async` this gives you really good write performance (it does dynamic batching) and atomic transaction failures. This gives you the best of both worlds: fast writes and atomic transactions.
 
 If you are using a database like sqlite, don't require fine grained transaction and want better write performance I'd recommend batching as it's trivial to implement in a system that has a resolution window.
 
@@ -119,7 +124,9 @@ Rather than returning the whole page on initial render and having two render pat
 
 #### Routing
 
-Router is a simple map, this means path parameters are not supported use query parameters or body instead. I've found over time that path parameters force you to adopt an arbitrary hierarchy that is often wrong (and place oriented programming) . Removing them avoids this and means routing can be simplified to a map and have better performance than a more traditional adaptive radix tree router.
+Router is a simple map, this means path parameters are not supported use query parameters or body instead. I've found over time that path parameters force you to adopt an arbitrary hierarchy that is often wrong (and place oriented programming). Removing them avoids this and means routing can be simplified to a map and have better performance than a more traditional adaptive radix tree router.
+
+>📝 Note: The Hyperlith router completely optional and you can swap it out for reitit if you want to support path params. 
 
 #### Reverse proxy
 
