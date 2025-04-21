@@ -12,7 +12,8 @@
   [:red :blue :green :orange :fuchsia :purple])
 
 (def css
-  (let [black :black]
+  (let [black           :black
+        cell-transition "background 0.4s ease"]
     (h/static-css
       [["*, *::before, *::after"
         {:box-sizing :border-box
@@ -45,10 +46,8 @@
          :width                 :1000px
          :display               :grid
          :aspect-ratio          "1/1"
-         :grid-template-rows
-         (str "0.2px " "repeat("view-size", 1fr)" " 0.2px")
-         :grid-template-columns
-         (str "0.2px " "repeat("view-size", 1fr)" " 0.2px")}]
+         :grid-template-rows    (str "repeat(" view-size ", 1fr)")
+         :grid-template-columns (str "repeat(" view-size ", 1fr)")}]
 
        [:.old-board
         {:background   black
@@ -61,26 +60,8 @@
          :grid-template-columns
          (str "0.2px " "repeat("view-size", 1fr)" " 0.2px")}]
 
-       [:.north
-        {:grid-column (str "1 /" (+ view-size 3))
-         :background  :white}]
-
-       [:.west
-        {:grid-row    (str "2 /" (+ view-size 2))
-         :background  :white}]
-
-       [:.south
-        {:grid-column    (str "1 /" (+ view-size 3))
-         :grid-row (+ view-size 2)
-         :background  :white}]
-
-       [:.east
-        {:grid-row    (str "2 /" (+ view-size 2))
-         :grid-column (+ view-size 2)
-         :background  :white}]
-
        [:.tile
-        {:transition "background 0.4s ease"}]
+        {:transition cell-transition}]
 
        [:.dead
         {:background :white}]
@@ -112,20 +93,10 @@
           (map-indexed
             (fn [id color-class]
               (h/html
-                [:div.tile
-                 {:class   color-class
-                  ;; TODO: pick :id or :data-id
-                  ;; :id      (str "c" id)
-                  :data-id (str "c" id)}])))
+                [:div.tile {:class color-class :id (str "c" id)}])))
           (partition-all board-size)
           (map vec))
         (:board db)))))
-
-;; north scroll positive shift
-;; west  scroll positive shift
-;; east  scroll negative shift
-;; south scroll negative shift
-;; hide -> move -> show
 
 (def center-view
   "let r = el.getBoundingClientRect();
@@ -164,26 +135,10 @@ el.scrollTop = el.scrollTop + $_y;")
         "🚀"]
        [:p "Source code can be found "
         [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/app/main.clj"} "here"]]
-       [:div#view.view 
+       [:div#view.view
         [:div.board
-         {:data-on-mousedown "@post('/tap?id='+evt.target.dataset.id)"}
-         [:div.north
-          ;; {:data-on-intersect__once
-          ;;  "@post('/scroll?id=north');"}
-          ]
-         [:div.west
-          ;; {:data-on-intersect__once
-          ;;  "@post('/scroll?id=west');"}
-          ]
-         view
-         [:div.east
-          ;; {:data-on-intersect__once
-          ;;  "@post('/scroll?id=east');"}
-          ]
-         [:div.south
-          ;; {:data-on-intersect__once
-          ;;  "@post('/scroll?id=south');"}
-          ]]]])))
+         {:data-on-mousedown "@post('/tap?id='+evt.target.id)"}
+         view]]])))
 
 (defn render-home-small [{:keys [db sid] :as _req}]
   (let [snapshot @db
@@ -193,12 +148,8 @@ el.scrollTop = el.scrollTop + $_y;")
       [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
       [:main#morph.main
        [:div.old-board
-        {:data-on-mousedown "@post('/tap?id='+evt.target.dataset.id)"}
-        [:div.north]
-        [:div.west]
-        view
-        [:div.east]
-        [:div.south]]])))
+        {:data-on-mousedown "@post('/tap?id='+evt.target.id)"}
+        view]])))
 
 (defn fill-cell [board color id]
   (if ;; crude overflow check
@@ -220,14 +171,7 @@ el.scrollTop = el.scrollTop + $_y;")
     (swap! db fill-cross (parse-long (subs id 1)) sid)))
 
 (defn action-scroll [{:keys [sid db] {:strs [id]} :query-params}]
-  (let [shift 5]
-    (swap! db update-in [:users sid]
-      (fn [{:keys [x y] :as user :or {x 0 y 0}}]
-        (case id
-          "north" (assoc user :y (mod (- y shift) board-size))
-          "west"  (assoc user :x (mod (- x shift) board-size))
-          "east"  (assoc user :x (mod (+ x shift) board-size))
-          "south" (assoc user :y (mod (+ y shift) board-size)))))))
+  nil)
 
 (def default-shim-handler
   (h/shim-handler
