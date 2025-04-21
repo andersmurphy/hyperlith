@@ -4,16 +4,17 @@
             [hyperlith.core :as h]
             [app.game :as game]))
 
-;; TODO: tune the algoritm
 (def board-size 100)
-(def view-size 50)
+(def board-size-px 2000)
+(def chunk-size 50)
 
 (def colors
   [:red :blue :green :orange :fuchsia :purple])
 
 (def css
   (let [black           :black
-        cell-transition "background 0.4s ease"]
+        cell-transition "background 0.4s ease"
+        board-size-px (str board-size-px "px")]
     (h/static-css
       [["*, *::before, *::after"
         {:box-sizing :border-box
@@ -35,55 +36,40 @@
          :flex-direction :column}]
 
        [:.view
-        {:overflow        :scroll
+        {:margin-inline   :auto
+         :overflow        :scroll
          :overflow-anchor :none
          :width           "min(100% - 2rem , 30rem)"
          :aspect-ratio    "1/1"}]
 
        [:.board
-        {:background            black
-         :gap                   :1px
-         :width                 :1000px
+        {:background            :white
+         :width                 board-size-px
          :display               :grid
          :aspect-ratio          "1/1"
-         :grid-template-rows    (str "repeat(" view-size ", 1fr)")
-         :grid-template-columns (str "repeat(" view-size ", 1fr)")}]
-
-       [:.old-board
-        {:background   black
-         :gap          :1px
-         :width        "min(100% - 2rem , 30rem)"
-         :display      :grid
-         :aspect-ratio "1/1"
-         :grid-template-rows
-         (str "0.2px " "repeat("view-size", 1fr)" " 0.2px")
-         :grid-template-columns
-         (str "0.2px " "repeat("view-size", 1fr)" " 0.2px")}]
+         :grid-template-rows    (str "repeat(" board-size ", 1fr)")
+         :grid-template-columns (str "repeat(" board-size ", 1fr)")}]
 
        [:.tile
-        {:transition cell-transition}]
+        {:border-bottom "1px solid black"
+         :border-right  "1px solid black"
+         :transition    cell-transition}]
 
        [:.dead
         {:background :white}]
 
        [:.red
-        {:background   :red
-         :accent-color :red}]
+        {:background   :red}]
        [:.blue
-        {:background   :blue
-         :accent-color :blue}]
+        {:background   :blue}]
        [:.green
-        {:background   :green
-         :accent-color :green}]
+        {:background   :green}]
        [:.orange
-        {:background   :orange
-         :accent-color :orange}]
+        {:background   :orange}]
        [:.fuchsia
-        {:background   :fuchsia
-         :accent-color :fuchsia}]
+        {:background   :fuchsia}]
        [:.purple
-        {:background   :purple
-         :accent-color :purple}]])))
+        {:background   :purple}]])))
 
 (def board-state
   (h/cache
@@ -92,38 +78,36 @@
         (comp
           (map-indexed
             (fn [id color-class]
-              (h/html
-                [:div.tile {:class color-class :id (str "c" id)}])))
+              (let [[x y] (game/index->coordinates id board-size)]
+                (h/html
+                  [:div.tile
+                   {:style {:grid-row (inc x) :grid-column (inc y)}
+                    :class color-class :id (str "c" id)}]))))
           (partition-all board-size)
           (map vec))
         (:board db)))))
 
-(def center-view
-  "let r = el.getBoundingClientRect();
-el.scrollLeft = el.scrollLeft + $_x;
-el.scrollTop = el.scrollTop + $_y;")
-
-(defn circular-subvec
-  "Like subvec but loops round. Result can never be larger than the initial
-  vector v."
-  [v start end]
-  (let [size (count v)]
-    (if (>= end size)
-      (let [v1 (subvec v start size)]
-        (into v1 (subvec v 0 (min (- end size) (- size (count v1))))))
-      (subvec v start end))))
-
 (defn user-view [{:keys [x y] :or {x 0 y 0}} board-state]
   (reduce
     (fn [view board-row]
-      (into view (circular-subvec board-row x (+ x view-size))))
+      (into view (subvec board-row x (min (+ x chunk-size) board-size))))
     []
-    (circular-subvec board-state y (+ y view-size))))
+    (subvec board-state y (min (+ y chunk-size) board-size))))
+
+(defn game-view [snapshot sid]
+  (let [user (get-in snapshot [:users sid])
+        view (user-view user (board-state snapshot))]
+    (h/html
+      [:div#view.view
+       {:data-on-scroll__debounce.200ms
+        "@post(`/scroll?x=${el.scrollLeft}&y=${el.scrollTop}`)"}
+       [:div.chunk-grid
+        [:div.board
+         {:data-on-mousedown "@post(`/tap?id=${evt.target.id}`)"}
+         view]]])))
 
 (defn render-home [{:keys [db sid] :as _req}]
-  (let [snapshot @db
-        user     (get-in snapshot [:users sid])
-        view     (user-view user (board-state snapshot))]
+  (let [snapshot @db]
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
       [:main#morph.main
@@ -135,21 +119,14 @@ el.scrollTop = el.scrollTop + $_y;")
         "🚀"]
        [:p "Source code can be found "
         [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/app/main.clj"} "here"]]
-       [:div#view.view
-        [:div.board
-         {:data-on-mousedown "@post('/tap?id='+evt.target.id)"}
-         view]]])))
+       (game-view snapshot sid)])))
 
-(defn render-home-small [{:keys [db sid] :as _req}]
-  (let [snapshot @db
-        user     (get-in snapshot [:users sid])
-        view     (user-view user (board-state snapshot))]
+(defn render-home-star [{:keys [db sid] :as _req}]
+  (let [snapshot @db]
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
       [:main#morph.main
-       [:div.old-board
-        {:data-on-mousedown "@post('/tap?id='+evt.target.id)"}
-        view]])))
+       (game-view snapshot sid)])))
 
 (defn fill-cell [board color id]
   (if ;; crude overflow check
@@ -170,8 +147,20 @@ el.scrollTop = el.scrollTop + $_y;")
   (when id
     (swap! db fill-cross (parse-long (subs id 1)) sid)))
 
-(defn action-scroll [{:keys [sid db] {:strs [id]} :query-params}]
-  nil)
+(defn action-scroll [{:keys [sid db] {:strs [x y]} :query-params}]
+  (swap! db
+    (fn [snapshot]
+      (-> snapshot
+        (assoc-in [:users sid :x]
+          (max (- (int (* (/ (parse-double x) board-size-px) board-size))
+                 10)
+            0))
+        (assoc-in [:users sid :y]
+          (max (- (int (* (/ (parse-double y) board-size-px) board-size))
+                 10)
+            0))))))
+
+;; 9511 9511
 
 (def default-shim-handler
   (h/shim-handler
@@ -204,7 +193,7 @@ el.scrollTop = el.scrollTop + $_y;")
      [:post "/"]        (h/render-handler #'render-home
                           {:br-window-size 18})
      [:get  "/star"]    default-shim-handler
-     [:post "/star"]    (h/render-handler #'render-home-small
+     [:post "/star"]    (h/render-handler #'render-home-star
                           {:br-window-size 18})
      [:post "/scroll"]  (h/action-handler #'action-scroll)
      [:post "/tap"]     (h/action-handler #'action-tap-cell)}))
