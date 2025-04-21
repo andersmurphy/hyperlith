@@ -4,16 +4,16 @@
             [hyperlith.core :as h]
             [app.game :as game]))
 
-(def board-size 100)
-(def board-size-px 2000)
-(def chunk-size 50)
+(def board-size 128)
+(def board-size-px 3000)
+(def chunk-size 64)
 
 (def colors
   [:red :blue :green :orange :fuchsia :purple])
 
 (def css
   (let [black           :black
-        cell-transition "background 0.8s ease"
+        cell-transition "background 0.6s ease"
         board-size-px (str board-size-px "px")]
     (h/static-css
       [["*, *::before, *::after"
@@ -86,11 +86,10 @@
               (let [[x y] (game/index->coordinates id board-size)]
                 (h/html
                   [:div.tile
-                   (cond->
-                       {:style   {:grid-row (inc x) :grid-column (inc y)}
-                        :class   color-class
-                        :data-id (str "c" id)}
-                     (not= :dead color-class) (assoc :id (str "c" id)))]))))
+                   (assoc {:style   {:grid-row (inc x) :grid-column (inc y)}
+                           :class   color-class
+                           :data-id (str "c" id)}
+                     :id (when-not (= :dead color-class) (str "c" id)))]))))
           (partition-all board-size)
           (map vec))
         (:board db)))))
@@ -107,7 +106,7 @@
         view (user-view user (board-state snapshot))]
     (h/html
       [:div#view.view
-       {:data-on-scroll__debounce.200ms
+       {:data-on-scroll__debounce.100ms
         "@post(`/scroll?x=${el.scrollLeft}&y=${el.scrollTop}`)"}
        [:div.board
         {:data-on-mousedown "@post(`/tap?id=${evt.target.dataset.id}`)"}
@@ -159,12 +158,10 @@
     (fn [snapshot]
       (-> snapshot
         (assoc-in [:users sid :x]
-          (max (- (int (* (/ (parse-double x) board-size-px) board-size))
-                 10)
+          (max (- (int (* (/ (parse-double x) board-size-px) board-size)) 30)
             0))
         (assoc-in [:users sid :y]
-          (max (- (int (* (/ (parse-double y) board-size-px) board-size))
-                 10)
+          (max (- (int (* (/ (parse-double y) board-size-px) board-size)) 30)
             0))))))
 
 ;; 9511 9511
