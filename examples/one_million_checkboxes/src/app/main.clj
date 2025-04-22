@@ -10,9 +10,6 @@
 (def colors
   [:r :b :g :o :f :p])
 
-(def class->color
-  {:r :red :b :blue :g :green :o :orange :f :fuchsia :p :purple})
-
 (def css
   (let [black         :black
         board-size-px (str board-size-px "px")]
@@ -76,6 +73,7 @@
       :type    "checkbox"
       :style   {:grid-row    (inc (quot idx board-size))
                 :grid-column (inc (rem idx board-size))}
+      :onclick "return false"
       :checked checked
       :data-id (str "c" idx)}]))
 
@@ -93,7 +91,6 @@
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
       [:main#morph.main
-       {:style {:accent-color (class->color (h/modulo-pick colors sid))}}
        [:div#view.view
         {:data-on-scroll__throttle.400ms.trail.noleading
          "@post(`/scroll?x=${el.scrollLeft}&y=${el.scrollTop}`)"}
@@ -180,7 +177,8 @@
 (h/refresh-all!)
 
 (comment
-  (-main)
+  (do (-main)
+      nil)
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
   ;; stop server
