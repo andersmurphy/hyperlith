@@ -161,11 +161,3 @@
   (def db (-> (h/get-app) :ctx :db))
 
   ,)
-
-(comment
-
-  (h/traces)
-  
-
-  
-  )
