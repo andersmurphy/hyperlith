@@ -162,8 +162,7 @@
       (fn [_ _ old-state new-state]
         ;; Only refresh if state has changed
         (when-not (= old-state new-state)
-          (h/refresh-all!
-            :keep-cache? (= (:board old-state) (:board new-state))))))
+          (h/refresh-all!))))
     {:db db_}))
 
 (defn -main [& _]
