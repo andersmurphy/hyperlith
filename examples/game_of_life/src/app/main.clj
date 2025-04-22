@@ -4,9 +4,9 @@
             [hyperlith.core :as h]
             [app.game :as game]))
 
-(def board-size 128)
-(def board-size-px 3000)
-(def chunk-size 64)
+(def board-size 100)
+(def board-size-px 1800)
+(def chunk-size 50)
 
 (def colors
   [:red :blue :green :orange :fuchsia :purple])
@@ -49,6 +49,14 @@
          :aspect-ratio          "1/1"
          :grid-template-rows    (str "repeat(" board-size ", 1fr)")
          :grid-template-columns (str "repeat(" board-size ", 1fr)")}]
+
+       [:.old-board
+        {:background :white
+         :width                 "min(100% - 2rem , 30rem)"
+         :display               :grid
+         :aspect-ratio          "1/1"
+         :grid-template-rows    (str "repeat(" chunk-size ", 1fr)")
+         :grid-template-columns (str "repeat(" chunk-size ", 1fr)")}]
 
        [:.tile
         {:border-bottom "1px solid black"
@@ -134,6 +142,18 @@
       [:main#morph.main nil
        (game-view snapshot sid)])))
 
+(defn render-home-plissken [{:keys [db sid] :as _req}]
+  (let [snapshot @db]
+    (h/html
+      [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
+      [:main#morph.main nil
+       (let [user (get-in snapshot [:users sid])
+             view (user-view user (board-state snapshot))]
+         (h/html
+           [:div.old-board
+            {:data-on-mousedown "@post(`/tap?id=${evt.target.dataset.id}`)"}
+            view]))])))
+
 (defn fill-cell [board color id]
   (if ;; crude overflow check
       (<= 0 id (dec (* board-size board-size)))
@@ -158,13 +178,11 @@
     (fn [snapshot]
       (-> snapshot
         (assoc-in [:users sid :x]
-          (max (- (int (* (/ (parse-double x) board-size-px) board-size)) 30)
+          (max (- (int (* (/ (parse-double x) board-size-px) board-size)) 18)
             0))
         (assoc-in [:users sid :y]
-          (max (- (int (* (/ (parse-double y) board-size-px) board-size)) 30)
+          (max (- (int (* (/ (parse-double y) board-size-px) board-size)) 18)
             0))))))
-
-;; 9511 9511
 
 (def default-shim-handler
   (h/shim-handler
@@ -192,15 +210,18 @@
 
 (def router
   (h/router
-    {[:get (css :path)] (css :handler)
-     [:get  "/"]        default-shim-handler
-     [:post "/"]        (h/render-handler #'render-home
-                          {:br-window-size 18})
-     [:get  "/star"]    default-shim-handler
-     [:post "/star"]    (h/render-handler #'render-home-star
-                          {:br-window-size 18})
-     [:post "/scroll"]  (h/action-handler #'action-scroll)
-     [:post "/tap"]     (h/action-handler #'action-tap-cell)}))
+    {[:get (css :path)]       (css :handler)
+     [:get  "/"]              default-shim-handler
+     [:post "/"]              (h/render-handler #'render-home
+                                {:br-window-size 18})
+     [:get  "/star"]          default-shim-handler
+     [:post "/star"]          (h/render-handler #'render-home-star
+                                {:br-window-size 18})
+     [:get  "/plissken-mode"] default-shim-handler
+     [:post "/plissken-mode"] (h/render-handler #'render-home-plissken
+                                {:br-window-size 18})
+     [:post "/scroll"]        (h/action-handler #'action-scroll)
+     [:post "/tap"]           (h/action-handler #'action-tap-cell)}))
 
 (defn ctx-start []
   (let [db_ (atom {:board (game/empty-board board-size board-size)
