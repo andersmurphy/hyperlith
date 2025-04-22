@@ -89,9 +89,10 @@
   []
   @app_)
 
-(defn refresh-all! []
+(defn refresh-all! [& {:keys [keep-cache?] :as _opts}]
   (when-let [<refresh-ch @refresh-ch_]
-    (a/>!! <refresh-ch :refresh-event)))
+    (a/>!! <refresh-ch
+      {:invalidate-cache? (not keep-cache?)})))
 
 (defn start-app [{:keys [router port ctx-start ctx-stop csrf-secret
                          max-refresh-ms on-error]
@@ -105,8 +106,13 @@
         _            (reset! er/on-error_ (partial on-error ctx))
         refresh-mult (-> (ds/throttle <refresh-ch max-refresh-ms)
                        (a/pipe
-                         (a/chan 1 ;; Cache is invalidated before refresh.
-                           (map (fn [event] (cache/invalidate-cache!) event))))
+                         (a/chan 1
+                           (map (fn [event]
+                                  ;; Cache is invalidated before refresh.
+                                  ;; unless told otherwise
+                                  (when (:invalidate-cache? event)
+                                    (cache/invalidate-cache!))
+                                  event))))
                        a/mult)
         wrap-ctx     (fn [handler]
                        (fn [req]
