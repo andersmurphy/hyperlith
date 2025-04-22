@@ -132,7 +132,7 @@
         [:a {:href "https://data-star.dev"} "Datastar"]
         "🚀"]
        [:p "Source code can be found "
-        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/app/main.clj"} "here"]]
+        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/app/main.clj"} "here"]]p
        (game-view snapshot sid)])))
 
 (defn render-home-star [{:keys [db sid] :as _req}]
