@@ -9,7 +9,7 @@
 
 (def html->str h/html)
 
-(def raw h/raw)
+(def html-raw-str h/raw-string)
 
 (defmacro html
   "Compiles html."

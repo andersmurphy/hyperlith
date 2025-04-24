@@ -136,7 +136,7 @@
           <ch     (a/tap (:hyperlith.core/refresh-mult req)
                     (a/chan (a/dropping-buffer 1)))
           ;; Ensures at least one render on connect
-          _       (a/>!! <ch :refresh-event)
+          _       (a/>!! <ch :first-render)
           ;; poison pill for work cancelling
           <cancel (a/chan)]
       (hk/as-channel req
@@ -153,18 +153,24 @@
                                :window-size br-window-size)]
                (loop [last-view-hash (get-in req [:headers "last-event-id"])]
                  (a/alt!!
-                   [<cancel] (do (a/close! <ch) (a/close! <cancel))
-                   [<ch]     (when-some ;; stop in case of error
-                                 [new-view (er/try-log req (render-fn req))]
-                               (let [new-view-str (h/html->str new-view)
-                                     new-view-hash (crypto/digest new-view-str)]
-                                 ;; only send an event if the view has changed
-                                 (when (not= last-view-hash new-view-hash)
-                                   (->> (merge-fragments
-                                          new-view-hash new-view-str)
-                                     (br/compress-stream out br)
-                                     (send! ch)))
-                                 (recur new-view-hash)))
+                   [<cancel]
+                   (do (a/close! <ch) (a/close! <cancel))
+                   
+                   [<ch]
+                   ([event]
+                    (when-some ;; stop in case of error
+                        [new-view (er/try-log req
+                                    (render-fn (assoc req :first-render
+                                                 (= event :first-render))))]
+                      (let [new-view-str  (h/html->str new-view)
+                            new-view-hash (crypto/digest new-view-str)]
+                        ;; only send an event if the view has changed
+                        (when (not= last-view-hash new-view-hash)
+                          (->> (merge-fragments
+                                 new-view-hash new-view-str)
+                            (br/compress-stream out br)
+                            (send! ch)))
+                        (recur new-view-hash))))
                    ;; we want work cancelling to have higher priority
                    :priority true))
                ;; Close channel on error or when thread stops

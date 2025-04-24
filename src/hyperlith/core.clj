@@ -37,6 +37,7 @@
   ;; HTML
   [hyperlith.impl.html
    html
+   html-raw-str
    html-resolve-alias]
   ;; CACHE / WORK SHARING
   [hyperlith.impl.cache

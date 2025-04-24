@@ -1,6 +1,7 @@
 (ns app.main
   (:gen-class)
   (:require [clojure.pprint :as pprint]
+            [clojure.edn :as edn]
             [hyperlith.core :as h]))
 
 (def board-size 1000)
@@ -67,15 +68,17 @@
         {:accent-color :fuchsia}]])))
 
 (defn checkbox [idx checked color-class]
-  (h/html
-    [:input
-     {:class   color-class
-      :type    "checkbox"
-      :style   {:grid-row    (inc (quot idx board-size))
-                :grid-column (inc (rem idx board-size))}
-      :onclick "return false"
-      :checked checked
-      :data-id (str "c" idx)}]))
+  (-> (h/html
+        [:input
+         {:class   color-class
+          :type    "checkbox"
+          :style   {:grid-row    (inc (quot idx board-size))
+                    :grid-column (inc (rem idx board-size))}
+          :onclick "return false"
+          :checked checked
+          :data-id (str "c" idx)}])
+    str
+    h/html-raw-str))
 
 (defn user-view [{:keys [x y] :or {x 0 y 0}} board-state]  
   (reduce
@@ -84,28 +87,35 @@
     []
     (subvec board-state y (min (+ y view-size) board-size))))
 
-(defn render-home [{:keys [db sid] :as _req}]
+(defmethod h/html-resolve-alias ::Board
+  [_ attrs content]
+  [:div.board
+   (assoc attrs :data-on-mousedown "evt.target.dataset.id &&
+@post(`/tap?id=${evt.target.dataset.id}`)")
+   content])
+
+(defn render-home [{:keys [db sid first-render] :as _req}]
   (let [snapshot @db
         user     (get-in snapshot [:users sid])
         view     (user-view user (:board snapshot))]
-    (h/html
-      [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
-      [:main#morph.main
-       [:div#view.view
-        {:data-on-scroll__throttle.400ms.trail.noleading
-         "@post(`/scroll?x=${el.scrollLeft}&y=${el.scrollTop}`)"}
-        [:div.board
-         {:data-on-mousedown "evt.target.dataset.id &&
-@post(`/tap?id=${evt.target.dataset.id}`)"}
-         view]]
-       [:h1 "One Million Checkboxes"]
-       [:p "Built with ❤️ using "
-        [:a {:href "https://clojure.org/"} "Clojure"]
-        " and "
-        [:a {:href "https://data-star.dev"} "Datastar"]
-        "🚀"]
-       [:p "Source code can be found "
-        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/one_million_checkboxes/src/app/main.clj" } "here"]]])))
+    (if first-render
+      (h/html
+        [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
+        [:main#morph.main
+         [:div#view.view
+          {:data-on-scroll__throttle.400ms.trail.noleading
+           "@post(`/scroll?x=${el.scrollLeft}&y=${el.scrollTop}`)"}
+          [::Board#board nil view]]
+         [:h1 "One Million Checkboxes"]
+         [:p "Built with ❤️ using "
+          [:a {:href "https://clojure.org/"} "Clojure"]
+          " and "
+          [:a {:href "https://data-star.dev"} "Datastar"]
+          "🚀"]
+         [:p "Source code can be found "
+          [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/one_million_checkboxes/src/app/main.clj" } "here"]]])
+      (h/html
+        [::Board#board nil view]))))
 
 (defn action-tap-cell [{:keys [sid db] {:strs [id]} :query-params}]
   (when id
