@@ -117,7 +117,7 @@
        {:data-on-scroll__debounce.100ms
         "@post(`/scroll?x=${el.scrollLeft}&y=${el.scrollTop}`)"}
        [:div.board
-        {:data-on-mousedown "@post(`/tap?id=${evt.target.dataset.id}`)"}
+        {:data-on-pointerdown "@post(`/tap?id=${evt.target.dataset.id}`)"}
         view]])))
 
 (defn render-home [{:keys [db sid] :as _req}]
@@ -151,7 +151,7 @@
              view (user-view user (board-state snapshot))]
          (h/html
            [:div.old-board
-            {:data-on-mousedown "@post(`/tap?id=${evt.target.dataset.id}`)"}
+            {:data-on-pointerdown "@post(`/tap?id=${evt.target.dataset.id}`)"}
             view]))])))
 
 (defn fill-cell [board color id]
