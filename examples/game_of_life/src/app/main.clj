@@ -34,7 +34,7 @@
 
        [:.board
         {:background            :white
-         :width           "min(100% - 2rem , 30rem)"
+         :width                 "min(100% - 2rem , 30rem)"
          :display               :grid
          :aspect-ratio          "1/1"
          :grid-template-rows    (str "repeat(" board-size ", 1fr)")
@@ -48,23 +48,23 @@
         {:background :white}]
 
        [:.red
-        {:background   :red
-         :transition    cell-transition}]
+        {:background :red
+         :transition cell-transition}]
        [:.blue
-        {:background   :blue
-         :transition    cell-transition}]
+        {:background :blue
+         :transition cell-transition}]
        [:.green
-        {:background   :green
-         :transition    cell-transition}]
+        {:background :green
+         :transition cell-transition}]
        [:.orange
-        {:background   :orange
-         :transition    cell-transition}]
+        {:background :orange
+         :transition cell-transition}]
        [:.fuchsia
-        {:background   :fuchsia
-         :transition    cell-transition}]
+        {:background :fuchsia
+         :transition cell-transition}]
        [:.purple
-        {:background   :purple
-         :transition    cell-transition}]])))
+        {:background :purple
+         :transition cell-transition}]])))
 
 (def board-state
   (h/cache
@@ -73,11 +73,11 @@
         (comp
           (map-indexed
             (fn [id color-class]
-              (h/html
-                [:div.tile
-                 (assoc {:class   color-class
-                         :data-id (str "c" id)}
-                   :id (when-not (= :dead color-class) (str "c" id)))]))))
+              (let [id (when-not (= :dead color-class) (str "c" id))]
+                (h/html [:div.tile
+                         {:class   color-class
+                          :data-id (str "c" id)
+                          :id      id}])))))
         (:board db)))))
 
 (defn board [snapshot]
@@ -154,14 +154,14 @@
 
 (def router
   (h/router
-    {[:get (css :path)]       (css :handler)
-     [:get  "/"]              default-shim-handler
-     [:post "/"]              (h/render-handler #'render-home
-                                {:br-window-size 18})
-     [:get  "/star"]          default-shim-handler
-     [:post "/star"]          (h/render-handler #'render-home-star
-                                {:br-window-size 18})
-     [:post "/tap"]           (h/action-handler #'action-tap-cell)}))
+    {[:get (css :path)] (css :handler)
+     [:get  "/"]        default-shim-handler
+     [:post "/"]        (h/render-handler #'render-home
+                          {:br-window-size 18})
+     [:get  "/star"]    default-shim-handler
+     [:post "/star"]    (h/render-handler #'render-home-star
+                          {:br-window-size 18})
+     [:post "/tap"]     (h/action-handler #'action-tap-cell)}))
 
 (defn ctx-start []
   (let [db_ (atom {:board (game/empty-board board-size board-size)
