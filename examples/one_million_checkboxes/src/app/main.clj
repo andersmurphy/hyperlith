@@ -90,7 +90,7 @@
 (defmethod h/html-resolve-alias ::Board
   [_ attrs content]
   [:div.board
-   (assoc attrs :data-on-pointerdown "evt.target.dataset.id &&
+   (assoc attrs :data-on-mousedown "evt.target.dataset.id &&
 @post(`/tap?id=${evt.target.dataset.id}`)")
    content])
 
@@ -197,3 +197,27 @@
   (def db (-> (h/get-app) :ctx :db))
 
   ,)
+
+(comment
+  (def db (-> (h/get-app) :ctx :db))
+
+  (defn write-backup! []
+    (set! *print-length* nil)
+    (spit "save2.edn"
+      (mapv #(mapv str %) (@db :board))))
+
+  ;; (write-backup!)
+
+  (def read-backup
+    (mapv #(mapv h/html-raw-str %)
+      (edn/read-string (slurp "save2.edn"))))
+
+  (def read-backup nil)
+
+  (count read-backup)
+
+  (do (swap! db assoc :board read-backup)
+      nil)
+
+  (+ 359 220)
+  (count (@db :users)))

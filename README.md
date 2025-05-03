@@ -95,7 +95,7 @@ Some systems don't need manual batching. For example [datalevin](https://github.
 
 If you are using a database like sqlite, don't require fine grained transaction and want better write performance I'd recommend batching as it's trivial to implement in a system that has a resolution window.
 
-#### Use `data-on-pointerdown` over  `data-on-click`
+#### Use `data-on-pointerdown/mousedown` over  `data-on-click`
 
 This is a small one but can make even the slowest of networks feel much snappier.
 
