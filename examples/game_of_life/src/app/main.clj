@@ -4,17 +4,14 @@
             [hyperlith.core :as h]
             [app.game :as game]))
 
-(def board-size 100)
-(def board-size-px 1800)
-(def chunk-size 50)
+(def board-size 50)
 
 (def colors
   [:red :blue :green :orange :fuchsia :purple])
 
 (def css
   (let [black           :black
-        cell-transition "background 0.6s ease"
-        board-size-px (str board-size-px "px")]
+        cell-transition "background 0.6s ease"]
     (h/static-css
       [["*, *::before, *::after"
         {:box-sizing :border-box
@@ -35,28 +32,13 @@
          :gap            :5px
          :flex-direction :column}]
 
-       [:.view
-        {:margin-inline   :auto
-         :overflow        :scroll
-         :overflow-anchor :none
-         :width           "min(100% - 2rem , 30rem)"
-         :aspect-ratio    "1/1"}]
-
        [:.board
         {:background            :white
-         :width                 board-size-px
+         :width           "min(100% - 2rem , 30rem)"
          :display               :grid
          :aspect-ratio          "1/1"
          :grid-template-rows    (str "repeat(" board-size ", 1fr)")
          :grid-template-columns (str "repeat(" board-size ", 1fr)")}]
-
-       [:.old-board
-        {:background :white
-         :width                 "min(100% - 2rem , 30rem)"
-         :display               :grid
-         :aspect-ratio          "1/1"
-         :grid-template-rows    (str "repeat(" chunk-size ", 1fr)")
-         :grid-template-columns (str "repeat(" chunk-size ", 1fr)")}]
 
        [:.tile
         {:border-bottom "1px solid black"
@@ -91,36 +73,21 @@
         (comp
           (map-indexed
             (fn [id color-class]
-              (let [[x y] (game/index->coordinates id board-size)]
-                (h/html
-                  [:div.tile
-                   (assoc {:style   {:grid-row (inc x) :grid-column (inc y)}
-                           :class   color-class
-                           :data-id (str "c" id)}
-                     :id (when-not (= :dead color-class) (str "c" id)))]))))
-          (partition-all board-size)
-          (map vec))
+              (h/html
+                [:div.tile
+                 (assoc {:class   color-class
+                         :data-id (str "c" id)}
+                   :id (when-not (= :dead color-class) (str "c" id)))]))))
         (:board db)))))
 
-(defn user-view [{:keys [x y] :or {x 0 y 0}} board-state]
-  (reduce
-    (fn [view board-row]
-      (into view (subvec board-row x (min (+ x chunk-size) board-size))))
-    []
-    (subvec board-state y (min (+ y chunk-size) board-size))))
-
-(defn game-view [snapshot sid]
-  (let [user (get-in snapshot [:users sid])
-        view (user-view user (board-state snapshot))]
+(defn board [snapshot]
+  (let [view (board-state snapshot)]
     (h/html
-      [:div#view.view
-       {:data-on-scroll__debounce.100ms
-        "@post(`/scroll?x=${el.scrollLeft}&y=${el.scrollTop}`)"}
-       [:div.board
-        {:data-on-pointerdown "@post(`/tap?id=${evt.target.dataset.id}`)"}
-        view]])))
+      [:div.board
+       {:data-on-pointerdown "@post(`/tap?id=${evt.target.dataset.id}`)"}
+       view])))
 
-(defn render-home [{:keys [db sid] :as _req}]
+(defn render-home [{:keys [db _sid] :as _req}]
   (let [snapshot @db]
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
@@ -133,26 +100,14 @@
         "🚀"]
        [:p "Source code can be found "
         [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/app/main.clj"} "here"]]
-       (game-view snapshot sid)])))
+       (board snapshot)])))
 
-(defn render-home-star [{:keys [db sid] :as _req}]
+(defn render-home-star [{:keys [db _sid] :as _req}]
   (let [snapshot @db]
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
       [:main#morph.main nil
-       (game-view snapshot sid)])))
-
-(defn render-home-plissken [{:keys [db sid] :as _req}]
-  (let [snapshot @db]
-    (h/html
-      [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
-      [:main#morph.main nil
-       (let [user (get-in snapshot [:users sid])
-             view (user-view user (board-state snapshot))]
-         (h/html
-           [:div.old-board
-            {:data-on-pointerdown "@post(`/tap?id=${evt.target.dataset.id}`)"}
-            view]))])))
+       (board snapshot)])))
 
 (defn fill-cell [board color id]
   (if ;; crude overflow check
@@ -172,17 +127,6 @@
 (defn action-tap-cell [{:keys [sid db] {:strs [id]} :query-params}]
   (when id
     (swap! db fill-cross (parse-long (subs id 1)) sid)))
-
-(defn action-scroll [{:keys [sid db] {:strs [x y]} :query-params}]
-  (swap! db
-    (fn [snapshot]
-      (-> snapshot
-        (assoc-in [:users sid :x]
-          (max (- (int (* (/ (parse-double x) board-size-px) board-size)) 18)
-            0))
-        (assoc-in [:users sid :y]
-          (max (- (int (* (/ (parse-double y) board-size-px) board-size)) 18)
-            0))))))
 
 (def default-shim-handler
   (h/shim-handler
@@ -217,10 +161,6 @@
      [:get  "/star"]          default-shim-handler
      [:post "/star"]          (h/render-handler #'render-home-star
                                 {:br-window-size 18})
-     [:get  "/plissken-mode"] default-shim-handler
-     [:post "/plissken-mode"] (h/render-handler #'render-home-plissken
-                                {:br-window-size 18})
-     [:post "/scroll"]        (h/action-handler #'action-scroll)
      [:post "/tap"]           (h/action-handler #'action-tap-cell)}))
 
 (defn ctx-start []
