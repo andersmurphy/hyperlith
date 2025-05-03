@@ -90,7 +90,7 @@
 (defmethod h/html-resolve-alias ::Board
   [_ attrs content]
   [:div.board
-   (assoc attrs :data-on-mousedown "evt.target.dataset.id &&
+   (assoc attrs :data-on-pointerdown "evt.target.dataset.id &&
 @post(`/tap?id=${evt.target.dataset.id}`)")
    content])
 
