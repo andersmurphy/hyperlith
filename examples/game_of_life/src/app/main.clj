@@ -1,7 +1,7 @@
 (ns app.main
   (:gen-class)
   (:require [clojure.pprint :as pprint]
-            [hyperlith.core :as h]
+            [hyperlith.core :as h]            
             [app.game :as game]))
 
 (def board-size 50)
@@ -73,11 +73,12 @@
         (comp
           (map-indexed
             (fn [id color-class]
-              (let [id (when-not (= :dead color-class) (str "c" id))]
-                (h/html [:div.tile
-                         {:class   color-class
-                          :data-id (str "c" id)
-                          :id      id}])))))
+              (let [morph-id (when-not (= :dead color-class) id)]
+                (h/html
+                  [:div.tile
+                   {:class   color-class
+                    :data-id id
+                    :id      morph-id}])))))
         (:board db)))))
 
 (defn board [snapshot]
@@ -126,7 +127,7 @@
 
 (defn action-tap-cell [{:keys [sid db] {:strs [id]} :query-params}]
   (when id
-    (swap! db fill-cross (parse-long (subs id 1)) sid)))
+    (swap! db fill-cross (parse-long id) sid)))
 
 (def default-shim-handler
   (h/shim-handler
@@ -197,15 +198,12 @@
   (((h/get-app) :stop))
 
   (def db (-> (h/get-app) :ctx :db))
+
   (reset! db {:board (game/empty-board board-size board-size)
               :users {}})
 
   (->> @db :users)
 
   (->> @db :board (remove false?))
-
-  (->> (h/traces) first :ret (take 10))
-  (h/traces-reset!)
-  (h/traces)
 
   ,)
