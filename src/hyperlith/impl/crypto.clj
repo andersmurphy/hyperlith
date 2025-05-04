@@ -40,4 +40,6 @@
 (defn digest
   "Digest function based on Clojure's hash."
   [data]
-  (bytes->base64 (.getBytes (str (hash data)))))
+  (Integer/toHexString (hash data)))
+
+
