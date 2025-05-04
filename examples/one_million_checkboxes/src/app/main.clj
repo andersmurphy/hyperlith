@@ -1,12 +1,11 @@
 (ns app.main
   (:gen-class)
   (:require [clojure.pprint :as pprint]
-            [clojure.edn :as edn]
             [hyperlith.core :as h]))
 
 (def board-size 1000)
 (def board-size-px 40000)
-(def view-size 50)
+(def view-size 40)
 
 (def colors
   [:r :b :g :o :f :p])
@@ -67,36 +66,39 @@
        [:.f
         {:accent-color :fuchsia}]])))
 
-(defn checkbox [idx checked color-class]
-  (-> (h/html
-        [:input
-         {:class   color-class
-          :type    "checkbox"
-          :style   {:grid-row    (inc (quot idx board-size))
-                    :grid-column (inc (rem idx board-size))}
-          :onclick "return false"
-          :checked checked
-          :data-id (str "c" idx)}])
-    str
-    h/html-raw-str))
+(defn checkbox [[idx color-class]]
+  (let [checked (boolean color-class)]
+    (h/html
+      [:input
+       {:class   color-class
+        :type    "checkbox"
+        :style   {:grid-row    (inc (quot idx board-size))
+                  :grid-column (inc (rem idx board-size))}
+        :onclick "return false"
+        :checked checked
+        :data-id idx}])))
 
 (defn user-view [{:keys [x y] :or {x 0 y 0}} board-state]  
   (reduce
     (fn [view board-row]
-      (into view (subvec board-row x (min (+ x view-size) board-size))))
+      (into view
+        (map checkbox)
+        (subvec board-row x (min (+ x view-size) board-size))))
     []
     (subvec board-state y (min (+ y view-size) board-size))))
 
 (defmethod h/html-resolve-alias ::Board
   [_ attrs content]
-  [:div.board
-   (assoc attrs :data-on-mousedown "evt.target.dataset.id &&
+  (h/html
+    [:div.board
+     (assoc attrs :data-on-mousedown "evt.target.dataset.id &&
 @post(`/tap?id=${evt.target.dataset.id}`)")
-   content])
+     content]))
 
 (defn render-home [{:keys [db sid first-render] :as _req}]
   (let [snapshot @db
         user     (get-in snapshot [:users sid])
+
         view     (user-view user (:board snapshot))]
     (if first-render
       (h/html
@@ -120,23 +122,23 @@
 (defn action-tap-cell [{:keys [sid db] {:strs [id]} :query-params}]
   (when id
     (let [color-class (h/modulo-pick colors sid)
-          idx         (parse-long (subs id 1))
+          idx         (parse-long id)
           y           (int (/ idx board-size))
           x           (int (mod idx board-size))]
       (swap! db update-in [:board y x]
         (fn [box]
-          (checkbox idx (not (re-find #"checked" (str box)))
-            color-class))))))
+          (-> box
+            (update 1 (fn [x] (if (nil? x) color-class nil)))))))))
 
 (defn action-scroll [{:keys [sid db] {:strs [x y]} :query-params}]
   (swap! db
     (fn [snapshot]
       (-> snapshot
         (assoc-in [:users sid :x]
-          (max (- (int (* (/ (parse-double x) board-size-px) board-size)) 18)
+          (max (- (int (* (/ (parse-double x) board-size-px) board-size)) 11)
             0))
         (assoc-in [:users sid :y]
-          (max (- (int (* (/ (parse-double y) board-size-px) board-size)) 18)
+          (max (- (int (* (/ (parse-double y) board-size-px) board-size)) 11)
             0))))))
 
 (def default-shim-handler
@@ -158,7 +160,7 @@
 (defn initial-board-state []
   (mapv
     (fn [y]
-      (mapv (fn [x] (checkbox (+ (* y board-size) x) false nil))
+      (mapv (fn [x] [(int (+ (* y board-size) x)) nil])
         (range board-size)))
     (range board-size)))
 
@@ -187,8 +189,7 @@
 (h/refresh-all!)
 
 (comment
-  (do (-main)
-      nil)
+  (do (-main) nil)
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
   ;; stop server
@@ -201,23 +202,5 @@
 (comment
   (def db (-> (h/get-app) :ctx :db))
 
-  (defn write-backup! []
-    (set! *print-length* nil)
-    (spit "save2.edn"
-      (mapv #(mapv str %) (@db :board))))
-
-  ;; (write-backup!)
-
-  (def read-backup
-    (mapv #(mapv h/html-raw-str %)
-      (edn/read-string (slurp "save2.edn"))))
-
-  (def read-backup nil)
-
-  (count read-backup)
-
-  (do (swap! db assoc :board read-backup)
-      nil)
-
-  (+ 359 220)
-  (count (@db :users)))
+  (user/bench (do (user-view {:x 10 :y 50} (@db :board)) nil))
+  )
