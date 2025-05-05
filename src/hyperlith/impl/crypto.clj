@@ -40,6 +40,9 @@
 (defn digest
   "Digest function based on Clojure's hash."
   [data]
-  (Integer/toHexString (hash data)))
+  ;; Note: hashCode is not guaranteed consistent between JVM
+  ;; executions except in the case for strings. This is why we
+  ;; convert to a string first.
+  (Integer/toHexString (hash (str data))))
 
 
