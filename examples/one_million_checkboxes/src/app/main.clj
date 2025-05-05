@@ -10,6 +10,9 @@
 (def colors
   [:r :b :g :o :f :p])
 
+(def class->color
+  {:r :red :b :blue :g :green :o :orange :f :fuchsia :p :purple})
+
 (def css
   (let [black         :black
         board-size-px (str board-size-px "px")]
@@ -74,7 +77,6 @@
         :type    "checkbox"
         :style   {:grid-row    (inc (quot idx board-size))
                   :grid-column (inc (rem idx board-size))}
-        :onclick "return false"
         :checked checked
         :data-id idx}])))
 
@@ -87,27 +89,27 @@
     []
     (subvec board-state y (min (+ y view-size) board-size))))
 
-(defmethod h/html-resolve-alias ::Board
-  [_ attrs content]
+(defn board [sid content]
   (h/html
-    [:div.board
-     (assoc attrs :data-on-mousedown "evt.target.dataset.id &&
-@post(`/tap?id=${evt.target.dataset.id}`)")
+    [:div#board.board
+     {:style             {:accent-color (class->color (h/modulo-pick colors sid))}
+      :data-on-mousedown "evt.target.dataset.id &&
+@post(`/tap?id=${evt.target.dataset.id}`)"}
      content]))
 
 (defn render-home [{:keys [db sid first-render] :as _req}]
   (let [snapshot @db
         user     (get-in snapshot [:users sid])
 
-        view     (user-view user (:board snapshot))]
+        view (user-view user (:board snapshot))]
     (if first-render
       (h/html
         [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
         [:main#morph.main
          [:div#view.view
-          {:data-on-scroll__throttle.400ms.trail.noleading
+          {:data-on-scroll__debounce.150ms
            "@post(`/scroll?x=${el.scrollLeft}&y=${el.scrollTop}`)"}
-          [::Board#board nil view]]
+          (board sid view)]
          [:h1 "One Million Checkboxes"]
          [:p "Built with ❤️ using "
           [:a {:href "https://clojure.org/"} "Clojure"]
@@ -116,8 +118,7 @@
           "🚀"]
          [:p "Source code can be found "
           [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/one_million_checkboxes/src/app/main.clj" } "here"]]])
-      (h/html
-        [::Board#board nil view]))))
+      (board sid view))))
 
 (defn action-tap-cell [{:keys [sid db] {:strs [id]} :query-params}]
   (when id
@@ -177,7 +178,7 @@
 (defn -main [& _]
   (h/start-app
     {:router         #'router
-     :max-refresh-ms 200
+     :max-refresh-ms 100
      :ctx-start      ctx-start
      :ctx-stop       (fn [{:keys [game-stop]}] (game-stop))
      :csrf-secret    (h/env :csrf-secret)
