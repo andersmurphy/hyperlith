@@ -37,7 +37,7 @@
      ;; We track connected users as this will cause updates out of bounds
      ;; and will show that the popover state is not affected by other users
      [:div
-      [:p nil (str "connected users")]
+      [:p nil "connected users"]
       [:p.counter nil (@db :connected-users)]]
      [:button {:popovertarget "my-popover"} "Open Popover"]
      [:div#my-popover.popover {:popover true} "Greetings, one and all!"]]))
