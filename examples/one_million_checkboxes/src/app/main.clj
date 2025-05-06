@@ -1,11 +1,13 @@
 (ns app.main
   (:gen-class)
   (:require [clojure.pprint :as pprint]
-            [hyperlith.core :as h]))
+            [hyperlith.core :as h]
+            [clojure.string :as str]))
 
-(def board-size 1000)
+(def board-size 100)
+(def chunk-size 10)
 (def board-size-px 40000)
-(def view-size 40)
+(def view-size 4)
 
 (def colors
   [:r :b :g :o :f :p])
@@ -51,6 +53,13 @@
          :grid-template-rows    (str "repeat(" board-size ", 1fr)")
          :grid-template-columns (str "repeat(" board-size ", 1fr)")}]
 
+       [:.chunk
+        {:background            :white
+         :display               :grid
+         :gap                   :10px
+         :grid-template-rows    (str "repeat(" chunk-size ", 1fr)")
+         :grid-template-columns (str "repeat(" chunk-size ", 1fr)")}]
+
        [:.r
         {:accent-color :red}]
 
@@ -69,30 +78,40 @@
        [:.f
         {:accent-color :fuchsia}]])))
 
-(defn checkbox [[idx color-class]]
+(defn Checkbox [[id color-class]]
   (let [checked (boolean color-class)]
     (h/html
       [:input
        {:class   color-class
         :type    "checkbox"
-        :style   {:grid-row    (inc (quot idx board-size))
-                  :grid-column (inc (rem idx board-size))}
         :checked checked
-        :data-id idx}])))
+        :data-id id}])))
 
-(defn user-view [{:keys [x y] :or {x 0 y 0}} board-state]  
-  (reduce
-    (fn [view board-row]
-      (into view
-        (map checkbox)
-        (subvec board-row x (min (+ x view-size) board-size))))
-    []
-    (subvec board-state y (min (+ y view-size) board-size))))
+(defn Chunk [x y chunk]
+  (h/html
+    [:div.chunk
+     {:style {:grid-row y :grid-column x}}
+     (into []
+       (map (fn [box] (Checkbox box)))
+       chunk)]))
 
-(defn board [sid content]
+(defn UserView [{:keys [x y] :or {x 0 y 0}} board-state]
+  (second
+    (reduce
+      (fn [[dy view] board-row]
+        [(inc dy)
+         (into view
+           (map-indexed (fn [dx chunk]
+                          (Chunk (inc (+ x dx)) (inc (+ y dy)) chunk)))
+           (subvec board-row x (min (+ x view-size) board-size)))])
+      [0 []]
+      (subvec board-state y (min (+ y view-size) board-size)))))
+
+(defn Board [sid content]
   (h/html
     [:div#board.board
-     {:style             {:accent-color (class->color (h/modulo-pick colors sid))}
+     {:style
+      {:accent-color (class->color (h/modulo-pick colors sid))}
       :data-on-mousedown "evt.target.dataset.id &&
 @post(`/tap?id=${evt.target.dataset.id}`)"}
      content]))
@@ -101,15 +120,15 @@
   (let [snapshot @db
         user     (get-in snapshot [:users sid])
 
-        view (user-view user (:board snapshot))]
+        board (Board sid (UserView user (:board snapshot)))]
     (if first-render
       (h/html
         [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
         [:main#morph.main
          [:div#view.view
-          {:data-on-scroll__debounce.150ms
+          {:data-on-scroll__throttle.200ms.trail.noleading
            "@post(`/scroll?x=${el.scrollLeft}&y=${el.scrollTop}`)"}
-          (board sid view)]
+          board]
          [:h1 "One Million Checkboxes"]
          [:p "Built with ❤️ using "
           [:a {:href "https://clojure.org/"} "Clojure"]
@@ -118,28 +137,24 @@
           "🚀"]
          [:p "Source code can be found "
           [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/one_million_checkboxes/src/app/main.clj" } "here"]]])
-      (board sid view))))
+      board)))
 
 (defn action-tap-cell [{:keys [sid db] {:strs [id]} :query-params}]
   (when id
     (let [color-class (h/modulo-pick colors sid)
-          idx         (parse-long id)
-          y           (int (/ idx board-size))
-          x           (int (mod idx board-size))]
-      (swap! db update-in [:board y x]
-        (fn [box]
-          (-> box
-            (update 1 (fn [x] (if (nil? x) color-class nil)))))))))
+          [x y c]     (mapv parse-long (str/split id #"-"))]
+      (swap! db update-in [:board y x c 1]
+        (fn [color] (if (nil? color) color-class nil))))))
 
 (defn action-scroll [{:keys [sid db] {:strs [x y]} :query-params}]
   (swap! db
     (fn [snapshot]
       (-> snapshot
         (assoc-in [:users sid :x]
-          (max (- (int (* (/ (parse-double x) board-size-px) board-size)) 11)
+          (max (- (int (* (/ (parse-double x) board-size-px) board-size)) 1)
             0))
         (assoc-in [:users sid :y]
-          (max (- (int (* (/ (parse-double y) board-size-px) board-size)) 11)
+          (max (- (int (* (/ (parse-double y) board-size-px) board-size)) 1)
             0))))))
 
 (def default-shim-handler
@@ -161,7 +176,13 @@
 (defn initial-board-state []
   (mapv
     (fn [y]
-      (mapv (fn [x] [(int (+ (* y board-size) x)) nil])
+      (mapv
+        (fn [x]
+          (mapv (fn [c]
+                  ;; building the id once here leads to a 7x speed up
+                  ;; generating hiccup (building strings is expensive)
+                  [(str x "-" y "-" c) nil])
+            (range (* chunk-size chunk-size))))
         (range board-size)))
     (range board-size)))
 
@@ -198,10 +219,15 @@
 
   (def db (-> (h/get-app) :ctx :db))
 
+  (@db :users)
+
   ,)
+
+;; 1. Database backed checkboxes
+;; retrieving blocks might be faster
 
 (comment
   (def db (-> (h/get-app) :ctx :db))
 
-  (user/bench (do (user-view {:x 10 :y 50} (@db :board)) nil))
+  (user/bench (do (UserView {:x 10 :y 10} (@db :board)) nil))
   )
