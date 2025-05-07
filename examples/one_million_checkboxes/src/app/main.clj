@@ -2,12 +2,13 @@
   (:gen-class)
   (:require [clojure.pprint :as pprint]
             [hyperlith.core :as h]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [clojure.math :as m])) 
 
-(def board-size 100)
-(def chunk-size 10)
+(def board-size 72)
+(def chunk-size 14)
 (def board-size-px 40000)
-(def view-size 4)
+(def view-size 3)
 
 (def colors
   [:r :b :g :o :f :p])
@@ -116,16 +117,16 @@
 @post(`/tap?id=${evt.target.dataset.id}`)"}
      content]))
 
-(defn render-home [{:keys [db sid first-render] :as _req}]
-  (let [snapshot @db
-        user     (get-in snapshot [:users sid])
-
+(defn render-home [{:keys [db sid tabid first-render] :as _req}]
+  (let [snapshot     @db
+        user (get-in snapshot [:users sid tabid])
         board (Board sid (UserView user (:board snapshot)))]
     (if first-render
       (h/html
         [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
         [:main#morph.main
          [:div#view.view
+          ;; TODO: we can send a lot less if we do some maths here
           {:data-on-scroll__throttle.200ms.trail.noleading
            "@post(`/scroll?x=${el.scrollLeft}&y=${el.scrollTop}`)"}
           board]
@@ -146,16 +147,17 @@
       (swap! db update-in [:board y x c 1]
         (fn [color] (if (nil? color) color-class nil))))))
 
-(defn action-scroll [{:keys [sid db] {:strs [x y]} :query-params}]
+(defn scroll-offset [n]
+  (max
+    (int (m/round (- (* (/ (parse-double n) board-size-px) board-size) 1)))
+    0))
+
+(defn action-scroll [{:keys [sid tabid db] {:strs [x y]} :query-params}]
   (swap! db
     (fn [snapshot]
       (-> snapshot
-        (assoc-in [:users sid :x]
-          (max (- (int (* (/ (parse-double x) board-size-px) board-size)) 1)
-            0))
-        (assoc-in [:users sid :y]
-          (max (- (int (* (/ (parse-double y) board-size-px) board-size)) 1)
-            0))))))
+        (assoc-in [:users sid tabid :x] (scroll-offset x))
+        (assoc-in [:users sid tabid :y] (scroll-offset y))))))
 
 (def default-shim-handler
   (h/shim-handler
@@ -222,9 +224,6 @@
   (@db :users)
 
   ,)
-
-;; 1. Database backed checkboxes
-;; retrieving blocks might be faster
 
 (comment
   (def db (-> (h/get-app) :ctx :db))
