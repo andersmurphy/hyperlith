@@ -2,8 +2,7 @@
   (:gen-class)
   (:require [clojure.pprint :as pprint]
             [hyperlith.core :as h]
-            [clojure.string :as str]
-            [clojure.math :as m])) 
+            [clojure.string :as str]))
 
 (def board-size 72)
 (def chunk-size 14)
@@ -117,6 +116,17 @@
 @post(`/tap?id=${evt.target.dataset.id}`)"}
      content]))
 
+(defn scroll-offset-js [n]
+  (str "Math.round((" n "/" board-size-px ")*" board-size "-1)"))
+
+(def on-scroll-js
+  (str
+    "let x = " (scroll-offset-js "el.scrollLeft") ";"
+    "let y = " (scroll-offset-js "el.scrollTop") ";"
+    "let change = x !== $x || y !== $y;"
+    "$x = x; $y = y;"
+    "change && @post(`/scroll`)"))
+
 (defn render-home [{:keys [db sid tabid first-render] :as _req}]
   (let [snapshot     @db
         user (get-in snapshot [:users sid tabid])
@@ -124,11 +134,9 @@
     (if first-render
       (h/html
         [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
-        [:main#morph.main
+        [:main#morph.main {:data-signals-x "0" :data-signals-y "0"}
          [:div#view.view
-          ;; TODO: we can send a lot less if we do some maths here
-          {:data-on-scroll__throttle.200ms.trail.noleading
-           "@post(`/scroll?x=${el.scrollLeft}&y=${el.scrollTop}`)"}
+          {:data-on-scroll__throttle.100ms.trail.noleading on-scroll-js}
           board]
          [:h1 "One Million Checkboxes"]
          [:p "Built with ❤️ using "
@@ -147,17 +155,12 @@
       (swap! db update-in [:board y x c 1]
         (fn [color] (if (nil? color) color-class nil))))))
 
-(defn scroll-offset [n]
-  (max
-    (int (m/round (- (* (/ (parse-double n) board-size-px) board-size) 1)))
-    0))
-
-(defn action-scroll [{:keys [sid tabid db] {:strs [x y]} :query-params}]
+(defn action-scroll [{:keys [sid tabid db] {:keys [x y]} :body}]
   (swap! db
     (fn [snapshot]
       (-> snapshot
-        (assoc-in [:users sid tabid :x] (scroll-offset x))
-        (assoc-in [:users sid tabid :y] (scroll-offset y))))))
+        (assoc-in [:users sid tabid :x] (max (int x) 0))
+        (assoc-in [:users sid tabid :y] (max (int y) 0))))))
 
 (def default-shim-handler
   (h/shim-handler
