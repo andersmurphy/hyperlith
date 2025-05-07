@@ -164,6 +164,8 @@
          [:p "(actually 10,010,896)"]
          [:p "Built with ❤️ using "
           [:a {:href "https://clojure.org/"} "Clojure"]
+          ", "
+          [:a {:href "https://github.com/juji-io/datalevin"} "Datalevin"]
           " and "
           [:a {:href "https://data-star.dev"} "Datastar"]
           "🚀"]
