@@ -5,14 +5,7 @@
             [hyperlith.extras.datalevin :as d]
             [clojure.string :as str]))
 
-;; (* 72 72 14 14) -> 1016064
-;; (* 226 226 14 14) -> 10010896 over 10 million checkboxes?
-;; (* 2259 2259 14 14) -> 1 000 203 876 over 1 billion checkboxes?
-;; (* 2259 2259) 5 million blocks
-
-;; TODO: database
-;; TODO: 1 billion
-
+;; (* 226 226 14 14) -> 10010896 over 10 million checkboxes
 (def board-size 226)
 (def chunk-size 14)
 (def board-size-px 140000)
@@ -168,6 +161,7 @@
           {:data-on-scroll__throttle.100ms.trail.noleading on-scroll-js}
           board]
          [:h1 "Ten Million Checkboxes"]
+         [:p "(actually 10,010,896)"]
          [:p "Built with ❤️ using "
           [:a {:href "https://clojure.org/"} "Clojure"]
           " and "
@@ -202,7 +196,7 @@
   (h/shim-handler
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
-      [:title nil "One Million checkboxes"]
+      [:title nil "Ten Million checkboxes"]
       [:meta {:content "So many checkboxes" :name "description"}])))
 
 (def router
