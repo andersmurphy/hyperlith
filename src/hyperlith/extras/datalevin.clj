@@ -43,14 +43,20 @@
 (def q d/q)
 (def tx! d/transact-async)
 
-(defn ctx-start [name schema & [ctx]]
-  (let [db (d/get-conn name schema
-             {:validate-data?    true
-              :closed-schema?    true
-              :auto-entity-time? true})]
-    (d/listen! db :refresh-on-change
-      (fn [_] (h/refresh-all!)))
-    (merge ctx {:db db})))
+(defn ctx-start
+  ([name schema]
+   (ctx-start name schema {} {}))
+  ([name schema ctx]
+   (ctx-start name schema ctx {}))
+  ([name schema opts ctx]
+   (let [db (d/get-conn name schema
+              (merge
+                {:validate-data?    true
+                 :closed-schema?    true
+                 :auto-entity-time? true} opts))]
+     (d/listen! db :refresh-on-change
+       (fn [_] (h/refresh-all!)))
+     (merge ctx {:db db}))))
 
 (defn ctx-stop [{:keys [db] :as _ctx}]
   (d/close db))
@@ -93,7 +99,5 @@
          (mapcat (fn [i v] (tuples (conj parent i) v)) (range) x)
 
          :else [(conj parent x)])))
-
-
 
 
