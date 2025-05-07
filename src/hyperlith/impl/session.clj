@@ -25,14 +25,15 @@
         (cond
           ;; If user has sid and csrf handle request
           (and sid (= (:csrf body) (sid->csrf sid)))
-          (handler (assoc req :sid sid :csrf (:csrf body)))
+          (handler (assoc req :sid sid :csrf (:csrf body) :tabid (:tabid body)))
 
           ;; :get request and user does not have session we create one
           ;; if they do not have a csrf cookie we give them one
           (= (:request-method req) :get)
           (let [new-sid (or sid (crypto/random-unguessable-uid))
                 csrf    (sid->csrf new-sid)]
-            (-> (handler (assoc req :sid new-sid :csrf csrf))
+            (-> (handler (assoc req :sid new-sid :csrf csrf
+                           :tabid (:tabid body)))
               (assoc-in [:headers "Set-Cookie"]
                 ;; These cookies won't be set on local host on chrome/safari
                 ;; as it's using secure needs to be true and local host

@@ -65,6 +65,8 @@
   ;; is added to the url.
   "@post(window.location.pathname + (window.location.search + '&u=').replace(/^&/,'?'))")
 
+(def tabid-js "self.crypto.randomUUID()")
+
 (defn build-shim-page-resp [head-hiccup]
   (let [body (-> (h/html
                    [h/doctype-html5
@@ -79,7 +81,8 @@
                       [:meta {:name    "viewport"
                               :content "width=device-width, initial-scale=1.0"}]]
                      [:body
-                      [:div {:data-signals-csrf csrf-cookie-js}]
+                      [:div {:data-signals-csrf csrf-cookie-js
+                             :data-signals-tabid tabid-js}]
                       [:div {:data-on-load on-load-js}]
                       [:noscript "Your browser does not support JavaScript!"]
                       [:main {:id "morph"}]]]])
