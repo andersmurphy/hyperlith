@@ -19,7 +19,15 @@
             [clojure.core.async :as a]
             [clojure.pprint :as pprint]
             [org.httpkit.server :as hk]
-            [hyperlith.impl.codec :as codec]))
+            [hyperlith.impl.codec :as codec])
+  (:import (java.util.concurrent Executors)))
+
+;; Make futures use virtual threads
+(set-agent-send-executor!
+  (Executors/newVirtualThreadPerTaskExecutor))
+
+(set-agent-send-off-executor!
+  (Executors/newVirtualThreadPerTaskExecutor))
 
 (import-vars
   ;; ENV
