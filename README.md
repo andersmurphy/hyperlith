@@ -91,11 +91,7 @@ Batching pairs really well with CQRS as you have a resolution window, this defin
 
 However, there is one downsides with batching to keep in mind and that is you don't get atomic transactions. The transaction move to the batch level, not the transact/insert level. Transaction matter when you are dealing with constraints you want to deal with at the database level, classic example is accounting systems or ledgers where you want to be able to fail an atomic transaction that violates a constraint (like user balance going negative). The problem with batching is that that transaction constraint failure, fails the whole batch not only the transact that was culpable.
 
-Some systems don't need manual batching. For example [datalevin](https://github.com/juji-io/datalevin) (my go to database with Hyperlith) recently added it's [own batching mechanism](https://github.com/juji-io/datalevin/tree/master/benchmarks/write-bench) when you use `transact-async` this gives you really good write performance (it does dynamic batching) and atomic transaction failures. This gives you the best of both worlds: fast writes and atomic transactions.
-
-If you are using a database like sqlite, don't require fine grained transaction and want better write performance I'd recommend batching as it's trivial to implement in a system that has a resolution window.
-
-#### Use `data-on-pointerdown/mousedown` over  `data-on-click`
+#### Use `data-on-pointerdown/mous` over  `data-on-click`
 
 This is a small one but can make even the slowest of networks feel much snappier.
 
