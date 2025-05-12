@@ -6,8 +6,6 @@ set -e
 apt-get update
 apt-get upgrade
 apt-get -y install openjdk-21-jre-headless ufw caddy
-# Optional dependency required for datalevin
-# apt-get install libgomp1
 
 # App user (you cannot login as this user)
 useradd -rms /usr/sbin/nologin app
