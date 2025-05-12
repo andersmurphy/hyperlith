@@ -16,6 +16,7 @@
             [hyperlith.impl.assets]
             [hyperlith.impl.trace]
             [hyperlith.impl.env]
+            [hyperlith.impl.batch]
             [clojure.core.async :as a]
             [clojure.pprint :as pprint]
             [org.httpkit.server :as hk]
@@ -88,7 +89,13 @@
   ;; CODEC
   [hyperlith.impl.codec
    url-query-string
-   url-encode])
+   url-encode]
+  ;; JSON
+  [hyperlith.impl.json
+   json->edn]
+  ;; BATCH
+  [hyperlith.impl.batch
+   batch!])
 
 (defonce ^:private refresh-ch_ (atom nil))
 (defonce ^:private app_ (atom nil))

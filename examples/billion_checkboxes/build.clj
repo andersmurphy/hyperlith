@@ -15,10 +15,7 @@
   (b/compile-clj {:basis      @basis
                   :ns-compile '[app.main]
                   :src-dirs   ["src"]
-                  :class-dir  class-dir
-                  :java-opts ;; needed for datalevin
-                  ["--add-opens=java.base/java.nio=ALL-UNNAMED"
-                   "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"]})
+                  :class-dir  class-dir})
   (b/uber {:class-dir class-dir
            :uber-file uber-file
            :basis     @basis
