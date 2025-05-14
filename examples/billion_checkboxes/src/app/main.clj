@@ -288,11 +288,7 @@
 (comment
   (def db (-> (h/get-app) :ctx :db))
 
-  (time (do (UserView {:x 1 :y 1} db) nil))
-
-  (user/bench (do (UserView {:x 1 :y 1} db) nil))
-  
-  (- 331 185)
+  ;; (user/bench (do (UserView {:x 1 :y 1} db) nil))
 
   (d/pragma-check db)
 
