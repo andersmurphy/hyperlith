@@ -121,7 +121,8 @@
         y     (inc y)]
     (h/html
       [:div.chunk
-       {:data-id chunk-id
+       {:id chunk-id
+        :data-id chunk-id
         :style   {:grid-column x :grid-row y}}
        (into []
          (map-indexed (fn [local-id box] (Checkbox local-id box)))
