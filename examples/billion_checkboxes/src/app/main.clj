@@ -177,7 +177,7 @@
           [:a {:href "https://data-star.dev"} "Datastar"]
           "🚀"]
          [:p "Source code can be found "
-          [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/ten_million_checkboxes/src/app/main.clj" } "here"]]])
+          [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes/src/app/main.clj" } "here"]]])
       board)))
 
 (defn action-tap-cell
@@ -237,14 +237,15 @@
 (defn ctx-start []
   (let [tab-state_ (atom {:users {}})
         {:keys [db-write db-read]}
-        (d/init-db! "jdbc:sqlite:db/database.db"
-                     {:pool-size 5})]
+        (d/init-db! "jdbc:sqlite:database.db"
+          {:pool-size 5
+           :pragma {:foreign_keys false}})]
     (add-watch tab-state_ :refresh-on-change
       (fn [_ _ _ _] (h/refresh-all!)))
     {:tab       tab-state_
      :db        db-read
      :db-read   db-read
-     :db-write  db-write   
+     :db-write  db-write
      :tx-batch! (h/batch!
                   (fn [thunks]
                     #_{:clj-kondo/ignore [:unresolved-symbol]}
@@ -286,19 +287,18 @@
 (comment
   (def db (-> (h/get-app) :ctx :db))
 
-  (type db)
-
   (time (do (UserView {:x 1 :y 1} db) nil))
 
   (user/bench (do (UserView {:x 1 :y 1} db) nil))
-
-  ;; Free up space (slow)
-  ;; (time (d/q db "VACUUM"))
+  
   (- 331 185)
 
   (d/pragma-check db)
 
-  (d/q db {:select [:*] :from :session})
+  (d/q db {:select [[[:count :*]]] :from :session})
+  (d/q db {:select [[[:sum :checks]]] :from :session})
+  (d/q db {:select [:checks] :from :session
+           :order-by [[:checks :desc]]})
   
   (d/table-info db :cell)
   (d/table-list db)
@@ -306,9 +306,11 @@
   ,)
 
 (comment
-  ;; db folder needs to exist
-  
 
+  (def tab-state (-> (h/get-app) :ctx :tab))
+
+  (count @tab-state)
+  
   (def db-write (-> (h/get-app) :ctx :db-write))
 
   (d/q db-write
@@ -335,15 +337,9 @@
           board-range)))
     nil)
 
-  (time (initial-board-db-state! db))
+  (time (initial-board-db-state! db-write))
 
-  (d/q db-write
-    {:insert-into :session
-     :values      [{:id "foo" :checks 1}]})
-  
-  (d/q db-write
-    {:update :session
-     :set    {:checks (inc 1)}
-     :where  [:= :id "foo"]})
+  ;; Free up space (slow)
+  ;; (time (d/q db-write "VACUUM"))
   
   ,)
