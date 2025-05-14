@@ -15,7 +15,7 @@ java -Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl}" -jar 
 Move JAR to server (this will trigger a service restart).
 
 ```bash
-scp target/app.jar root@example.andersmurphy.com:/home/app/
+scp target/app.jar root@checkboxes.andersmurphy.com:/home/app/
 ```
 
 ## After deploying first jar
@@ -23,12 +23,12 @@ scp target/app.jar root@example.andersmurphy.com:/home/app/
 Optional: the first time you move the jar onto the server you will need to reboot to trigger/test systemd is working correctly.
 
 ```
-ssh root@example.andersmurphy.com "reboot"
+ssh root@checkboxes.andersmurphy.com "reboot"
 ```
 
 ## SSH into repl
 
 ```bash
-ssh root@example.andersmurphy.com "nc localhost:5555"
+ssh root@checkboxes.andersmurphy.com "nc localhost:5555"
 ```
 
