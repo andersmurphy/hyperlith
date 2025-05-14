@@ -29,15 +29,13 @@
    :journal_mode       "WAL"
    ;; https://www.sqlite.org/pragma.html#pragma_synchronous
    :synchronous        "NORMAL"
-   :temp_store         "memory"
-   ;; Normally on, but lots of checkboxes there be
-   :foreign_keys       false})
+   :temp_store         "memory"})
 
 (def result-set-options
   {:builder-fn rs/as-unqualified-lower-maps})
 
 (defn init-db!
-  [url & [{:keys [pool-size] :or {pool-size 4}}]]
+  [url & [{:keys [pool-size pragma] :or {pool-size 4}}]]
   (let [;; Pool of read connections
         read
         (jdbc/with-options
@@ -49,9 +47,11 @@
              ;; connections = core_count * 2
              :maximumPoolSize      pool-size
              :readOnly             true
-             :dataSourceProperties (assoc data-source-properties
-                                     ;; Needed for read only
-                                     :open_mode 1)})
+             :dataSourceProperties
+             (merge data-source-properties
+               ;; Needed for read only
+               {:open_mode 1}
+               pragma)})
           result-set-options)
         ;; Only one write connection
         write
@@ -62,10 +62,11 @@
              :minimumIdle     1
              :maximumPoolSize 1
              :dataSourceProperties
-             (assoc data-source-properties
-               :jdbcUrl url
-               ;; This is more performant than DEFERRED
-               :transaction_mode "IMMEDIATE")})
+             (merge data-source-properties
+               {:jdbcUrl          url
+                ;; This is more performant than DEFERRED
+                :transaction_mode "IMMEDIATE"}
+               pragma)})
           result-set-options)]
     {:db-read  read
      :db-write write}))
