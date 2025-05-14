@@ -38,14 +38,14 @@
          :margin-inline  :auto
          :padding-block  :2dvh
          :display        :flex
-         :width          "min(100% - 2rem , 40rem)"
+         :width          "min(100% - 2rem , 42rem)"
          :gap            :5px
          :flex-direction :column}]
 
        [:.view
         {:overflow        :scroll
          :overflow-anchor :none
-         :width           "min(100% - 2rem , 40rem)"
+         :width           "min(100% - 2rem , 42rem)"
          :aspect-ratio    "1/1"}]
 
        [:.board
@@ -287,6 +287,14 @@
 
 (comment
   (def db (-> (h/get-app) :ctx :db))
+
+  ;; On server test
+  (time ;; simulate 1000 concurrent renders
+    (->> (mapv
+           (fn [n]
+             (future (UserView {:x n :y n} db)))
+           (range 0 1000))
+      (run! (fn [x] @x))))
 
   ;; (user/bench (do (UserView {:x 1 :y 1} db) nil))
 
