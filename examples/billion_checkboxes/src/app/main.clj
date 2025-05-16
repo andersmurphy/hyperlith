@@ -107,7 +107,7 @@
    (quot chunk-id board-size)])
 
 (defn xy->chunk-id [x y]
-    (+ x (* y board-size)))
+  (+ x (* y board-size)))
 
 (defn xy->chunk-ids [x y]
   (-> (for [x (range x (+ x 3))
@@ -121,7 +121,7 @@
         y     (inc y)]
     (h/html
       [:div.chunk
-       {:id chunk-id
+       {:id      chunk-id
         :data-id chunk-id
         :style   {:grid-column x :grid-row y}}
        (into []
@@ -184,7 +184,7 @@
 (defn action-tap-cell
   [{:keys            [sid tx-batch!]
     {:strs [id pid]} :query-params}]
-   (when (and id pid)
+  (when (and id pid)
     (let [user-color (h/modulo-pick (subvec states 1) sid)
           cell-id    (int (parse-long id))
           chunk-id   (int (parse-long pid))]
@@ -198,7 +198,7 @@
                        :set    {:checks (inc checks)}
                        :where  [:= :id sid]})
               (d/q db {:insert-into :session
-                       :values      [{:id sid :checks 1}]})))          
+                       :values      [{:id sid :checks 1}]})))
           (let [[{:keys [state]}] (d/q db {:select [:state]
                                            :from   :cell
                                            :where
@@ -233,14 +233,49 @@
      [:post "/"]        (h/render-handler #'render-home
                           {:br-window-size 19})
      [:post "/scroll"]  (h/action-handler #'action-scroll)
-     [:post "/tap"] (h/action-handler #'action-tap-cell)}))
+     [:post "/tap"]     (h/action-handler #'action-tap-cell)}))
+
+
+
+(defn build-chunk [x y]
+  (mapv (fn [c]
+          {:chunk_id (xy->chunk-id x y)
+           :cell_id  c
+           :state    0})
+    (range (* chunk-size chunk-size))))
+
+(defn initial-board-db-state! [db]
+  (let [board-range (range board-size)]
+    (d/with-transaction [db db]
+      (run!
+        (fn [y]
+          (run! (fn [x] (d/insert-multi! db :cell (build-chunk x y)))
+            board-range)
+          (print ".") (flush))
+        board-range)))
+  nil)
+
+(defn migrations [db]
+  ;; Note: all this code must be idempotent
+
+  ;; Create tables
+  (d/q db
+    "CREATE TABLE IF NOT EXISTS cell(chunk_id INTEGER, cell_id INTEGER, state INTEGER, PRIMARY KEY (chunk_id, cell_id)) WITHOUT ROWID")
+  (d/q db
+    "CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, checks INTEGER) WITHOUT ROWID")
+  ;; Populate checkboxes
+  (when-not (d/q db {:select [:cell-id] :from :cell :limit 1})
+    (initial-board-db-state! db)))
 
 (defn ctx-start []
   (let [tab-state_ (atom {:users {}})
         {:keys [db-write db-read]}
         (d/init-db! "jdbc:sqlite:database.db"
           {:pool-size 5
-           :pragma {:foreign_keys false}})]
+           :pragma    {:foreign_keys false}})]
+    ;; Run migrations
+    (migrations db-write)
+    ;; Watch tab state
     (add-watch tab-state_ :refresh-on-change
       (fn [_ _ _ _] (h/refresh-all!)))
     {:tab       tab-state_
@@ -302,9 +337,9 @@
 
   (d/q db {:select [[[:count :*]]] :from :session})
   (d/q db {:select [[[:sum :checks]]] :from :session})
-  (d/q db {:select [:checks] :from :session
+  (d/q db {:select   [:checks] :from :session
            :order-by [[:checks :desc]]})
-  
+
   (d/table-info db :cell)
   (d/table-list db)
 
@@ -315,36 +350,10 @@
   (def tab-state (-> (h/get-app) :ctx :tab))
 
   (count @tab-state)
-  
+
   (def db-write (-> (h/get-app) :ctx :db-write))
-
-  (d/q db-write
-    "CREATE TABLE IF NOT EXISTS cell(chunk_id INTEGER, cell_id INTEGER, state INTEGER, PRIMARY KEY (chunk_id, cell_id)) WITHOUT ROWID")
-
-  (d/q db-write
-    "CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, checks INTEGER) WITHOUT ROWID")
-
-  (defn build-chunk [x y]
-    (mapv (fn [c]
-            {:chunk_id (xy->chunk-id x y)
-             :cell_id  c
-             :state    0})
-      (range (* chunk-size chunk-size))))
-
-  (defn initial-board-db-state! [db]
-    (let [board-range (range board-size)]
-      (d/with-transaction [db db]
-        (run!
-          (fn [y]
-            (run! (fn [x] (d/insert-multi! db :cell (build-chunk x y)))
-              board-range)
-            (print ".") (flush))
-          board-range)))
-    nil)
-
-  (time (initial-board-db-state! db-write))
 
   ;; Free up space (slow)
   ;; (time (d/q db-write "VACUUM"))
-  
+
   ,)
