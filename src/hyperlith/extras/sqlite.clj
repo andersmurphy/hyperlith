@@ -82,11 +82,12 @@
 
 (defn q [db query & xfs]
   (let [result (jdbc/execute! db (format-query query)
-                 (assoc result-set-options                   
-                  :return-keys (not (:no-return query))))]
-    (if xfs
-      (into [] (apply comp xfs) result)
-      result)))
+                 (assoc result-set-options
+                   :return-keys (not (:no-return query))))]
+    (when (seq result) ;; return nil if no results
+      (if xfs
+        (into [] (apply comp xfs) result)
+        result))))
 
 ;;; - UTILITY -
 
