@@ -74,7 +74,7 @@
          :display       :grid
          :place-content :center}]
 
-       ["input[type=\"checkbox\"]::before"
+       ["input[type=\"checkbox\"]:checked::before"
         {:content    "\"\""
          :width      "0.80em"
          :height     "0.80em"
