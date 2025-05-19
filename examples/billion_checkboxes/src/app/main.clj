@@ -271,7 +271,7 @@
   (let [tab-state_ (atom {:users {}})
         {:keys [db-write db-read]}
         (d/init-db! "jdbc:sqlite:database.db"
-          {:pool-size 5
+          {:pool-size 4
            :pragma    {:foreign_keys false}})]
     ;; Run migrations
     (migrations db-write)
