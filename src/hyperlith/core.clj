@@ -110,9 +110,10 @@
     (a/>!! <refresh-ch
       {:invalidate-cache? (not keep-cache?)})))
 
-(defn start-app [{:keys [router port ctx-start ctx-stop csrf-secret
+(defn start-app [{:keys [router ip port ctx-start ctx-stop csrf-secret
                          max-refresh-ms on-error]
                   :or   {port           8080
+                         ip             "0.0.0.0"
                          max-refresh-ms 100
                          on-error       (fn [_ctx {:keys [error]}]
                                           (pprint/pprint error))}}]
@@ -148,7 +149,7 @@
                        (wrap-session csrf-secret)
                        wrap-parse-json-body
                        wrap-blocker)
-        stop-server  (hk/run-server middleware {:port port})
+        stop-server  (hk/run-server middleware {:port port, :ip ip})
         app          {:ctx  ctx
                       :stop (fn stop [& [opts]]
                               (stop-server opts)
