@@ -8,9 +8,9 @@
 ;; (* 625 625 16 16) 100 000 000
 ;; (* 1977 1977 16 16) 1 000 583 424
 
-(def board-size 1977)
+(def board-size #_1977 625)
 (def chunk-size 16)
-(def board-size-px (* 3 3 120000))
+(def board-size-px (* 3 #_3 120000))
 (def view-size 3)
 
 (def states
@@ -235,8 +235,6 @@
      [:post "/scroll"]  (h/action-handler #'action-scroll)
      [:post "/tap"]     (h/action-handler #'action-tap-cell)}))
 
-
-
 (defn build-chunk [x y]
   (mapv (fn [c]
           {:chunk_id (xy->chunk-id x y)
@@ -323,6 +321,18 @@
 (comment
   (def db (-> (h/get-app) :ctx :db))
 
+  ;; Execution time mean : 456.719068 ms
+  (user/bench
+    (->> (mapv
+           (fn [n]
+             (future
+               (let [n (mod n board-size)]
+                 (UserView {:x n :y n} db))))
+           (range 0 4000))
+      (run! (fn [x] @x))))
+
+  
+
   ;; On server test
   (time ;; simulate 1000 concurrent renders
     (->> (mapv
@@ -343,9 +353,17 @@
   (d/table-info db :cell)
   (d/table-list db)
 
+  (user/bench ;; Execution time mean : 455.139383 µs
+    (d/q db
+      ["SELECT CAST(chunk_id AS TEXT), CAST(state AS TEXT) FROM cell WHERE chunk_id IN (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+       1978 3955 5932 1979 3956 5933 1980 3957 5934]))
+
   ,)
 
 (comment
+  (user/bench
+    (d/q db
+      ["SELECT chunk_id, JSON_GROUP_ARRAY(state) AS chunk_cells FROM cell WHERE chunk_id IN (?, ?, ?, ?, ?, ?, ?, ?, ?)  GROUP BY chunk_id" 1978 3955 5932 1979 3956 5933 1980 3957 5934]))
 
   (def tab-state (-> (h/get-app) :ctx :tab))
 
