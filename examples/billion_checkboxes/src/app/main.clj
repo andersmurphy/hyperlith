@@ -8,9 +8,9 @@
 ;; (* 625 625 16 16) 100 000 000
 ;; (* 1977 1977 16 16) 1 000 583 424
 
-(def board-size #_1977 625)
+(def board-size #_1977 #_625 198)
 (def chunk-size 16)
-(def board-size-px (* 3 #_3 120000))
+(def board-size-px (* #_3 #_3 120000))
 (def view-size 3)
 
 (def states
@@ -129,13 +129,13 @@
          chunk-cells)])))
 
 (defn UserView [{:keys [x y] :or {x 0 y 0}} db]
-  (d/q db
-    {:select   [:chunk-id [[:json_group_array :state] :chunk-cells]]
-     :from     :cell
-     :where    [:in :chunk-id (xy->chunk-ids x y)]
-     :group-by [:chunk-id]}
-    (map (fn [{:keys [:chunk_id chunk_cells]}]
-           (Chunk chunk_id (h/json->edn chunk_cells))))))
+  (->> (d/q db
+         {:select   [:chunk-id [[:json_group_array :state] :chunk-cells]]
+          :from     :cell
+          :where    [:in :chunk-id (xy->chunk-ids x y)]
+          :group-by [:chunk-id]})
+    (mapv (fn [[chunk-id chunk-cells]]
+            (Chunk (parse-long chunk-id) (h/json->edn chunk-cells))))))
 
 (def mouse-down-js
   (str
@@ -189,23 +189,23 @@
           cell-id    (int (parse-long id))
           chunk-id   (int (parse-long pid))]
       (tx-batch!
-        (fn acton-tap-cell-thunk [db]
-          (let [[{:keys [checks]}] (d/q db {:select [:checks]
-                                            :from   :session
-                                            :where  [:= :id sid]})]
+        (fn action-tap-cell-thunk [db]
+          (let [[[checks]] (d/q db {:select [:checks]
+                                    :from   :session
+                                    :where  [:= :id sid]})]
             (if checks
               (d/q db {:update :session
-                       :set    {:checks (inc checks)}
+                       :set    {:checks (inc (parse-long checks))}
                        :where  [:= :id sid]})
               (d/q db {:insert-into :session
                        :values      [{:id sid :checks 1}]})))
-          (let [[{:keys [state]}] (d/q db {:select [:state]
-                                           :from   :cell
-                                           :where
-                                           [:and
-                                            [:= :chunk-id chunk-id]
-                                            [:= :cell-id cell-id]]})
-                new-state         (if (= 0 state) user-color 0)]
+          (let [[[state]] (d/q db {:select [:state]
+                                   :from   :cell
+                                   :where
+                                   [:and
+                                    [:= :chunk-id chunk-id]
+                                    [:= :cell-id cell-id]]})
+                new-state (if (= 0 (parse-long state)) user-color 0)]
             (d/q db {:update :cell
                      :set    {:state new-state}
                      :where  [:and
@@ -244,10 +244,13 @@
 
 (defn initial-board-db-state! [db]
   (let [board-range (range board-size)]
-    (d/with-transaction [db db]
+    (d/with-write-tx [db db]
       (run!
         (fn [y]
-          (run! (fn [x] (d/insert-multi! db :cell (build-chunk x y)))
+          (run! (fn [x]
+                  (d/q db
+                    {:insert-into :cell
+                     :values      (build-chunk x y)}))
             board-range)
           (print ".") (flush))
         board-range)))
@@ -257,6 +260,7 @@
   ;; Note: all this code must be idempotent
 
   ;; Create tables
+  (println "Running migrations...")
   (d/q db
     "CREATE TABLE IF NOT EXISTS cell(chunk_id INTEGER, cell_id INTEGER, state INTEGER, PRIMARY KEY (chunk_id, cell_id)) WITHOUT ROWID")
   (d/q db
@@ -268,7 +272,7 @@
 (defn ctx-start []
   (let [tab-state_ (atom {:users {}})
         {:keys [db-write db-read]}
-        (d/init-db! "jdbc:sqlite:database.db"
+        (d/init-db! "database.db"
           {:pool-size 4
            :pragma    {:foreign_keys false}})]
     ;; Run migrations
@@ -280,10 +284,10 @@
      :db        db-read
      :db-read   db-read
      :db-write  db-write
-     :tx-batch! (h/batch!
+     :tx-batch! (h/batch! ;; TODO: add error handling to batch
                   (fn [thunks]
                     #_{:clj-kondo/ignore [:unresolved-symbol]}
-                    (d/with-transaction [db db-write]
+                    (d/with-write-tx [db db-write]
                       (run! (fn [thunk] (thunk db)) thunks))
                     (h/refresh-all!))
                   {:run-every-ms 100
@@ -321,7 +325,10 @@
 (comment
   (def db (-> (h/get-app) :ctx :db))
 
+  (UserView {:x 1 :y 1} db)
+
   ;; Execution time mean : 456.719068 ms
+  ;; Execution time mean : 218.760262 ms
   (user/bench
     (->> (mapv
            (fn [n]
@@ -330,8 +337,6 @@
                  (UserView {:x n :y n} db))))
            (range 0 4000))
       (run! (fn [x] @x))))
-
-  
 
   ;; On server test
   (time ;; simulate 1000 concurrent renders
