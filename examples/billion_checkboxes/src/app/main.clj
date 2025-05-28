@@ -135,7 +135,7 @@
           :where    [:in :chunk-id (xy->chunk-ids x y)]
           :group-by [:chunk-id]})
     (mapv (fn [[chunk-id chunk-cells]]
-            (Chunk (parse-long chunk-id) (h/json->edn chunk-cells))))))
+            (Chunk chunk-id (h/json->edn chunk-cells))))))
 
 (def mouse-down-js
   (str
@@ -190,22 +190,22 @@
           chunk-id   (int (parse-long pid))]
       (tx-batch!
         (fn action-tap-cell-thunk [db]
-          (let [[[checks]] (d/q db {:select [:checks]
+          (let [[checks] (d/q db {:select [:checks]
                                     :from   :session
                                     :where  [:= :id sid]})]
             (if checks
               (d/q db {:update :session
-                       :set    {:checks (inc (parse-long checks))}
+                       :set    {:checks (inc checks)}
                        :where  [:= :id sid]})
               (d/q db {:insert-into :session
                        :values      [{:id sid :checks 1}]})))
-          (let [[[state]] (d/q db {:select [:state]
+          (let [[state] (d/q db {:select [:state]
                                    :from   :cell
                                    :where
                                    [:and
                                     [:= :chunk-id chunk-id]
                                     [:= :cell-id cell-id]]})
-                new-state (if (= 0 (parse-long state)) user-color 0)]
+                new-state (if (= 0  state) user-color 0)]
             (d/q db {:update :cell
                      :set    {:state new-state}
                      :where  [:and

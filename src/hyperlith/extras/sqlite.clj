@@ -30,8 +30,7 @@
   (cond
     (vector? query) query
     (string? query) [query]
-    :else           (hsql/format query
-                      {:checking :strict})))
+    :else           (hsql/format query {:checking :strict})))
 
 (defn q [db query]
   (let [result (d/q db (format-query query))]
