@@ -23,7 +23,7 @@ User=app
 Restart=on-failure
 RestartSec=5s
 WorkingDirectory=/home/app
-ExecStart=/usr/bin/java --enable-native-access=ALL-UNNAMED -Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl}" -jar app.jar -m app.main -Duser.timezone=UTC -XX:+UseZGC -XX:+ZGenerational -XX:InitialRAMPercentage 75.0 -XX:MaxRAMPercentage 75.0 -XX:MinRAMPercentage 75.0 
+ExecStart=/usr/bin/java -Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl}" -jar app.jar -m app.main -Duser.timezone=UTC -XX:+UseZGC -XX:+ZGenerational -XX:InitialRAMPercentage 75.0 -XX:MaxRAMPercentage 75.0 -XX:MinRAMPercentage 75.0 
 
 [Install]
 WantedBy=multi-user.target
