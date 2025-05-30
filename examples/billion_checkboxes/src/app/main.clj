@@ -1,7 +1,6 @@
 (ns app.main
   (:gen-class)
-  (:require [clojure.pprint :as pprint]
-            [hyperlith.core :as h]
+  (:require [hyperlith.core :as h]
             [hyperlith.extras.sqlite :as d]))
 
 ;; (* 198 198 16 16)  10 036 224
@@ -11,7 +10,6 @@
 (def board-size #_1977 #_625 198)
 (def chunk-size 16)
 (def board-size-px (* #_3 #_3 120000))
-(def view-size 3)
 
 (def states
   [0 1 2 3 4 5 6])
