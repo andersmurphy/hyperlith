@@ -21,4 +21,5 @@
   (b/uber {:class-dir class-dir
            :uber-file uber-file
            :basis     @basis
-           :main      'app.main}))
+           :main      'app.main
+           :manifest  {"Enable-Native-Access" "ALL-UNNAMED"}}))

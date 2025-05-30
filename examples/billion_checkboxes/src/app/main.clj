@@ -7,9 +7,9 @@
 ;; (* 625 625 16 16) 100 000 000
 ;; (* 1977 1977 16 16) 1 000 583 424
 
-(def board-size #_1977 #_625 198)
+(def board-size 1977 #_625 #_198)
 (def chunk-size 16)
-(def board-size-px (* #_3 #_3 120000))
+(def board-size-px (* 3 3 120000))
 
 (def states
   [0 1 2 3 4 5 6])
