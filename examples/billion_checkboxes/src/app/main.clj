@@ -304,7 +304,12 @@
      :ctx-stop       ctx-stop
      :csrf-secret    (h/env :csrf-secret)
      :on-error       (fn [_ctx {:keys [_req error]}]
-                       (pprint/pprint error)
+                       (let [{:keys [cause trace type]} error]
+                         (println "")
+                         (println type)
+                         (println cause)
+                         (println "")
+                         (run! println trace))
                        (flush))}))
 
 ;; Refresh app when you re-eval file
@@ -379,3 +384,5 @@
   ;; (time (d/q db-write "VACUUM"))
 
   ,)
+
+;; TODO: make scroll bars always visible
