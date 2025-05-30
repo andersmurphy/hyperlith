@@ -290,8 +290,7 @@
                     (d/with-write-tx [db db-write]
                       (run! (fn [thunk] (thunk db)) thunks))
                     (h/refresh-all!))
-                  {:run-every-ms 100
-                   :max-size     1000})}))
+                  {:run-every-ms 100})}))
 
 (defn ctx-stop [ctx]
   (.close (:db-write ctx))

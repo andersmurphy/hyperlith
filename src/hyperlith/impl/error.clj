@@ -1,6 +1,5 @@
 (ns hyperlith.impl.error 
   (:require
-   [hyperlith.impl.crypto :as crypto]
    [hyperlith.impl.util :as u]
    [clojure.main :as main]
    [clojure.string :as str]))
@@ -39,10 +38,6 @@
   ;; trim error trace to users space helps keep trace short
   (take-while (fn [[cls _ _ _]] (not (str/starts-with? cls "hyperlith")))))
 
-(defn add-error-id
-  [error]
-  (assoc error :id (crypto/digest (select-keys error [:trace :type :cause]))))
-
 (defn log-error [req t]
   (@on-error_
    {;; req is under own key as it can contain data you don't want to log.
@@ -62,8 +57,7 @@
                                     ;; max number of lines
                                     (take 15))
                                   trace)))
-               (assoc :type (-> m :via peek :type str))
-               add-error-id))}))
+               (assoc :type (-> m :via peek :type str))))}))
 
 (defmacro try-log [data & body]
   `(try
