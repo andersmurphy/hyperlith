@@ -1,17 +1,15 @@
 (ns app.main
   (:gen-class)
-  (:require [clojure.pprint :as pprint]
-            [hyperlith.core :as h]
+  (:require [hyperlith.core :as h]
             [hyperlith.extras.sqlite :as d]))
 
 ;; (* 198 198 16 16)  10 036 224
 ;; (* 625 625 16 16) 100 000 000
 ;; (* 1977 1977 16 16) 1 000 583 424
 
-(def board-size 1977)
+(def board-size 1977 #_625 #_198)
 (def chunk-size 16)
 (def board-size-px (* 3 3 120000))
-(def view-size 3)
 
 (def states
   [0 1 2 3 4 5 6])
@@ -129,13 +127,13 @@
          chunk-cells)])))
 
 (defn UserView [{:keys [x y] :or {x 0 y 0}} db]
-  (d/q db
-    {:select   [:chunk-id [[:json_group_array :state] :chunk-cells]]
-     :from     :cell
-     :where    [:in :chunk-id (xy->chunk-ids x y)]
-     :group-by [:chunk-id]}
-    (map (fn [{:keys [:chunk_id chunk_cells]}]
-           (Chunk chunk_id (h/json->edn chunk_cells))))))
+  (->> (d/q db
+         {:select   [:chunk-id [[:json_group_array :state] :chunk-cells]]
+          :from     :cell
+          :where    [:in :chunk-id (xy->chunk-ids x y)]
+          :group-by [:chunk-id]})
+    (mapv (fn [[chunk-id chunk-cells]]
+            (Chunk chunk-id (h/json->edn chunk-cells))))))
 
 (def mouse-down-js
   (str
@@ -189,23 +187,23 @@
           cell-id    (int (parse-long id))
           chunk-id   (int (parse-long pid))]
       (tx-batch!
-        (fn acton-tap-cell-thunk [db]
-          (let [[{:keys [checks]}] (d/q db {:select [:checks]
-                                            :from   :session
-                                            :where  [:= :id sid]})]
+        (fn action-tap-cell-thunk [db]
+          (let [[checks] (d/q db {:select [:checks]
+                                    :from   :session
+                                    :where  [:= :id sid]})]
             (if checks
               (d/q db {:update :session
                        :set    {:checks (inc checks)}
                        :where  [:= :id sid]})
               (d/q db {:insert-into :session
                        :values      [{:id sid :checks 1}]})))
-          (let [[{:keys [state]}] (d/q db {:select [:state]
-                                           :from   :cell
-                                           :where
-                                           [:and
-                                            [:= :chunk-id chunk-id]
-                                            [:= :cell-id cell-id]]})
-                new-state         (if (= 0 state) user-color 0)]
+          (let [[state] (d/q db {:select [:state]
+                                   :from   :cell
+                                   :where
+                                   [:and
+                                    [:= :chunk-id chunk-id]
+                                    [:= :cell-id cell-id]]})
+                new-state (if (= 0  state) user-color 0)]
             (d/q db {:update :cell
                      :set    {:state new-state}
                      :where  [:and
@@ -235,8 +233,6 @@
      [:post "/scroll"]  (h/action-handler #'action-scroll)
      [:post "/tap"]     (h/action-handler #'action-tap-cell)}))
 
-
-
 (defn build-chunk [x y]
   (mapv (fn [c]
           {:chunk_id (xy->chunk-id x y)
@@ -246,10 +242,13 @@
 
 (defn initial-board-db-state! [db]
   (let [board-range (range board-size)]
-    (d/with-transaction [db db]
+    (d/with-write-tx [db db]
       (run!
         (fn [y]
-          (run! (fn [x] (d/insert-multi! db :cell (build-chunk x y)))
+          (run! (fn [x]
+                  (d/q db
+                    {:insert-into :cell
+                     :values      (build-chunk x y)}))
             board-range)
           (print ".") (flush))
         board-range)))
@@ -259,6 +258,7 @@
   ;; Note: all this code must be idempotent
 
   ;; Create tables
+  (println "Running migrations...")
   (d/q db
     "CREATE TABLE IF NOT EXISTS cell(chunk_id INTEGER, cell_id INTEGER, state INTEGER, PRIMARY KEY (chunk_id, cell_id)) WITHOUT ROWID")
   (d/q db
@@ -270,7 +270,7 @@
 (defn ctx-start []
   (let [tab-state_ (atom {:users {}})
         {:keys [db-write db-read]}
-        (d/init-db! "jdbc:sqlite:database.db"
+        (d/init-db! "database.db"
           {:pool-size 4
            :pragma    {:foreign_keys false}})]
     ;; Run migrations
@@ -282,14 +282,13 @@
      :db        db-read
      :db-read   db-read
      :db-write  db-write
-     :tx-batch! (h/batch!
+     :tx-batch! (h/batch! ;; TODO: add error handling to batch
                   (fn [thunks]
                     #_{:clj-kondo/ignore [:unresolved-symbol]}
-                    (d/with-transaction [db db-write]
+                    (d/with-write-tx [db db-write]
                       (run! (fn [thunk] (thunk db)) thunks))
                     (h/refresh-all!))
-                  {:run-every-ms 100
-                   :max-size     1000})}))
+                  {:run-every-ms 100})}))
 
 (defn ctx-stop [ctx]
   (.close (:db-write ctx))
@@ -303,7 +302,12 @@
      :ctx-stop       ctx-stop
      :csrf-secret    (h/env :csrf-secret)
      :on-error       (fn [_ctx {:keys [_req error]}]
-                       (pprint/pprint error)
+                       (let [{:keys [cause trace type]} error]
+                         (println "")
+                         (println type)
+                         (println cause)
+                         (println "")
+                         (run! println trace))
                        (flush))}))
 
 ;; Refresh app when you re-eval file
@@ -322,6 +326,19 @@
 
 (comment
   (def db (-> (h/get-app) :ctx :db))
+
+  (UserView {:x 1 :y 1} db)
+
+  ;; Execution time mean : 456.719068 ms
+  ;; Execution time mean : 218.760262 ms
+  (user/bench
+    (->> (mapv
+           (fn [n]
+             (future
+               (let [n (mod n board-size)]
+                 (UserView {:x n :y n} db))))
+           (range 0 4000))
+      (run! (fn [x] @x))))
 
   ;; On server test
   (time ;; simulate 1000 concurrent renders
@@ -343,9 +360,17 @@
   (d/table-info db :cell)
   (d/table-list db)
 
+  (user/bench ;; Execution time mean : 455.139383 µs
+    (d/q db
+      ["SELECT CAST(chunk_id AS TEXT), CAST(state AS TEXT) FROM cell WHERE chunk_id IN (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+       1978 3955 5932 1979 3956 5933 1980 3957 5934]))
+
   ,)
 
 (comment
+  (user/bench
+    (d/q db
+      ["SELECT chunk_id, JSON_GROUP_ARRAY(state) AS chunk_cells FROM cell WHERE chunk_id IN (?, ?, ?, ?, ?, ?, ?, ?, ?)  GROUP BY chunk_id" 1978 3955 5932 1979 3956 5933 1980 3957 5934]))
 
   (def tab-state (-> (h/get-app) :ctx :tab))
 
@@ -357,3 +382,5 @@
   ;; (time (d/q db-write "VACUUM"))
 
   ,)
+
+;; TODO: make scroll bars always visible
