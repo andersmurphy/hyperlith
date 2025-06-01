@@ -13,8 +13,8 @@
   (let [;; Only one write connection
         write
         (d/init-db! url
-          {:pool-size 1}
-          :pragma pragma)
+          {:pool-size 1
+           :pragma    pragma})
         ;; Pool of read connections
         read
         (d/init-db! url
