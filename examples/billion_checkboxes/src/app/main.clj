@@ -325,6 +325,25 @@
   ,)
 
 (comment
+  (def tx-batch! (-> (h/get-app) :ctx :tx-batch!))
+
+  (future
+    (run! 
+      (fn [_]
+        (run!
+          (fn [_]
+            (action-tap-cell
+              {:sid          "test-user"
+               :tx-batch!    tx-batch!
+               :query-params {"pid" "0"
+                              "id"  (str (rand-int 200))}}))
+          ;; 10000r/s
+          (range 10))        
+        (Thread/sleep 1))
+      (range 10000)))
+  )
+
+(comment
   (def db (-> (h/get-app) :ctx :db))
 
   (UserView {:x 1 :y 1} db)
