@@ -4,9 +4,10 @@
             [hyperlith.impl.error :as er]))
 
 (defn batch!
-  "Wraps side-effecting function in a queue and batch mechanism. The batch is run every X ms when not empty. Function must take a vector of items."
-  [effect-fn & {:keys [run-every-ms]
-                :or   {run-every-ms 100}}]
+  "Wraps side-effecting function in a queue and batch mechanism. The batch is run every X ms when not empty and/or if it reaches it's max size. Function must take a vector of items."
+  [effect-fn & {:keys [run-every-ms max-size]
+                :or   {run-every-ms 100
+                       max-size     1000}}]
   (let [<in (a/chan 1000)] ;; potentially pass this channel in
     (util/thread
       (loop [<t    (a/timeout run-every-ms)
@@ -18,7 +19,8 @@
             (recur (a/timeout run-every-ms) batch)
 
             ;; Run batch
-            (= p <t)
+            (or (= p <t)
+              (and (= p <in) (>= (count batch) max-size)))
             (do (er/try-log {} (effect-fn batch))
                 (recur (a/timeout run-every-ms) []))
 
