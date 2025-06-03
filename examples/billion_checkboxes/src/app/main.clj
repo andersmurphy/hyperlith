@@ -282,7 +282,7 @@
      :db        db-read
      :db-read   db-read
      :db-write  db-write
-     :tx-batch! (h/batch! ;; TODO: add error handling to batch
+     :tx-batch! (h/batch!
                   (fn [thunks]
                     #_{:clj-kondo/ignore [:unresolved-symbol]}
                     (d/with-write-tx [db db-write]
