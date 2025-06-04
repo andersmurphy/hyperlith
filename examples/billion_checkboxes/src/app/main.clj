@@ -269,23 +269,23 @@
 
 (defn ctx-start []
   (let [tab-state_ (atom {:users {}})
-        {:keys [db-write db-read]}
+        {:keys [writer reader]}
         (d/init-db! "database.db"
           {:pool-size 4
            :pragma    {:foreign_keys false}})]
     ;; Run migrations
-    (migrations db-write)
+    (migrations writer)
     ;; Watch tab state
     (add-watch tab-state_ :refresh-on-change
       (fn [_ _ _ _] (h/refresh-all!)))
     {:tab       tab-state_
-     :db        db-read
-     :db-read   db-read
-     :db-write  db-write
+     :db        reader
+     :db-read   reader
+     :db-write  writer
      :tx-batch! (h/batch!
                   (fn [thunks]
                     #_{:clj-kondo/ignore [:unresolved-symbol]}
-                    (d/with-write-tx [db db-write]
+                    (d/with-write-tx [db writer]
                       (run! (fn [thunk] (thunk db)) thunks))
                     (h/refresh-all!))
                   {:run-every-ms 100})}))

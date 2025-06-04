@@ -5,24 +5,9 @@
 
 (import-vars
   [sqlite4clj.core
+   init-db!
    with-read-tx
    with-write-tx])
-
-(defn init-db!
-  [url & [{:keys [pool-size pragma] :or {pool-size 4}}]]
-  (let [;; Only one write connection
-        write
-        (d/init-db! url
-          {:pool-size 1
-           :pragma    pragma})
-        ;; Pool of read connections
-        read
-        (d/init-db! url
-          {:read-only true
-           :pool-size pool-size
-           :pragma    pragma})]
-    {:db-read  read
-     :db-write write}))
 
 ;;; - QUERY FUNCTIONS -
 
