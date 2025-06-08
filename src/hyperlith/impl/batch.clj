@@ -4,7 +4,9 @@
             [hyperlith.impl.error :as er]))
 
 (defn batch!
-  "Wraps side-effecting function in a queue and batch mechanism. The batch is run every X ms when not empty and/or if it reaches it's max size. Function must take a vector of items."
+  "Wraps side-effecting function in a queue and batch mechanism. The
+  batch is run every X ms when not empty and/or if it reaches it's max
+  size. Function must take a vector of items. Supports back pressure."
   [effect-fn & {:keys [run-every-ms max-size]
                 :or   {run-every-ms 100
                        max-size     1000}}]
@@ -21,8 +23,11 @@
             ;; Run batch
             (or (= p <t)
               (and (= p <in) (>= (count batch) max-size)))
-            (do (er/try-log {} (effect-fn batch))
-                (recur (a/timeout run-every-ms) []))
+            (let [;; Timer is started before task to prevent task duration
+                  ;; from affecting interval (unless it exceeds interval).
+                  <new-t (a/timeout run-every-ms)]
+              (er/try-log {} (effect-fn batch))
+              (recur <new-t []))
 
             ;; Add to batch
             (= p <in)
