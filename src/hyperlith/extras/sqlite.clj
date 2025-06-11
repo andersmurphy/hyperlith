@@ -28,3 +28,11 @@
 
 (defn table-list [db]
   (q db "PRAGMA table_list;"))
+
+(defn pragma-check [db]
+  (->> [(q db "pragma foreign_keys")
+        (q db "pragma journal_mode")
+        (q db "pragma synchronous")
+        (q db "pragma page_size")
+        (q db "pragma cache_size")
+        (q db "pragma temp_store")]))
