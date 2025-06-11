@@ -37,14 +37,14 @@
          :margin-inline  :auto
          :padding-block  :2dvh
          :display        :flex
-         :width          "min(100% - 2rem , 64rem)"
+         :width          "min(100% - 2rem , 42rem)"
          :gap            :5px
          :flex-direction :column}]
 
        [:.view
         {:overflow        :scroll
          :overflow-anchor :none
-         :width           "min(100% - 2rem , 64rem)"
+         :width           "min(100% - 2rem , 42rem)"
          :aspect-ratio    "1/1"}]
 
        [:.board
@@ -170,7 +170,7 @@
           {:data-on-scroll__throttle.100ms.trail.noleading on-scroll-js}
           board]
          [:h1 "One Billion Checkboxes"]
-         [:p "(actually 1,001,595,904)"]
+         [:p "(actually 1,000,583,424)"]
          [:p "Built with ❤️ using "
           [:a {:href "https://clojure.org/"} "Clojure"]
           " and "
