@@ -4,13 +4,13 @@
             [hyperlith.extras.sqlite :as d]
             [deed.core :as deed]))
 
-;; (* 99 99 32 32)     10 036 224
-;; (* 313 313 32 32)  100 320 256
-;; (* 989 989 32 32) 1001 595 904
+;; (* 198 198 16 16)  10 036 224
+;; (* 625 625 16 16) 100 000 000
+;; (* 1977 1977 16 16) 1 000 583 424
 
-(def board-size 989 #_313 #_99)
-(def chunk-size 32)
-(def board-size-px (* 3 3 110000))
+(def board-size 1977 #_625 #_198)
+(def chunk-size 16)
+(def board-size-px (* 3 3 120000))
 
 (def states
   [0 1 2 3 4 5 6])
@@ -418,35 +418,20 @@
               y (range y (+ y 2))]
           (xy->chunk-id x y))
       vec))
-
-  (let [[x y] (chunk-id->xy 0)
-        [a b c d] (->> (d/q old-db
-                         {:select   [[[:json_group_array :state] :chunk-cells]]
-                          :from     :cell
-                          :where    [:in :chunk-id (xy->chunk-ids-old (* x 2) (* y 2))]
-                          :group-by [:chunk-id]})
-                    (mapv #(->> % h/json->edn (partition-all 16) (mapv vec))))]
-    [a b c d]
-    )
   
   (run!
     (fn [id]
-      (let [[x y]     (chunk-id->xy id)
-            [a b c d] (->> (d/q old-db
-                             {:select   [[[:json_group_array :state] :chunk-cells]]
-                              :from     :cell
-                              :where    [:in :chunk-id (xy->chunk-ids-old (* x 2) (* y 2))]
-                              :group-by [:chunk-id]})
-                        (mapv #(->> % h/json->edn (partition-all 16) (mapv vec))))
-            chunk     (-> (into (vec (mapcat into a b)) (vec (mapcat into c d))))]
+      (let [[chunk] (->> (d/q old-db
+                           {:select   [[[:json_group_array :state] :chunk-cells]]
+                            :from     :cell
+                            :where    [:= :chunk-id id]
+                            :group-by [:chunk-id]})
+                      (mapv #(->> % h/json->edn)))]
         (when (not= chunk blank-encoded-chunk)
           (d/q new-db
             {:update :chunk
              :set    {:chunk (deed/encode-to-bytes chunk)}
              :where  [:= :id id]}))))
-    (range (* board-size board-size)))
-
-  
-  )
+    (range (* board-size board-size))))
 
 ;; TODO: make scroll bars always visible
