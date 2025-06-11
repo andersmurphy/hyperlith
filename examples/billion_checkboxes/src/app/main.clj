@@ -119,7 +119,8 @@
         y     (inc y)]
     (h/html
       [:div.chunk
-       {:id      chunk-id
+       {:data-ignore true
+        :id      chunk-id
         :data-id chunk-id
         :style   {:grid-column x :grid-row y}}
        (into []
@@ -325,32 +326,17 @@
   ,)
 
 (comment
-  (def tx-batch! (-> (h/get-app) :ctx :tx-batch!))
-
-  (future
-    (time
-      (run!
-        (fn [_]
-          (run!
-            (fn [_]
-              (action-tap-cell
-                {:sid          "test-user"
-                 :tx-batch!    tx-batch!
-                 :query-params {"pid" "0"
-                                "id"  (str (rand-int 200))}}))
-            ;; 10000r/s
-            (range 10))
-          (Thread/sleep 1))
-        (range 10000))))
-  )
-
-(comment
   (def db (-> (h/get-app) :ctx :db))
 
   (UserView {:x 1 :y 1} db)
 
-  ;; Execution time mean : 456.719068 ms
-  ;; Execution time mean : 218.760262 ms
+  (def foo (d/q db
+             {:select   [:chunk-id [[:json_group_array :state] :chunk-cells]]
+              :from     :cell
+              :where    [:in :chunk-id (xy->chunk-ids 1 1)]
+              :group-by [:chunk-id]}))
+  
+  ;; Execution time mean : 297.342999 ms
   (user/bench
     (->> (mapv
            (fn [n]
@@ -367,8 +353,9 @@
              (future (UserView {:x n :y n} db)))
            (range 0 1000))
       (run! (fn [x] @x))))
-
-  ;; (user/bench (do (UserView {:x 1 :y 1} db) nil))
+  
+  ;; Execution time mean : 321.764621 µs
+  (user/bench (do (UserView {:x 1 :y 1} db) nil))
 
   (d/pragma-check db)
 
@@ -403,4 +390,25 @@
 
   ,)
 
+(comment
+  (def tx-batch! (-> (h/get-app) :ctx :tx-batch!))
+
+  (future
+    (time
+      (run!
+        (fn [_]
+          (run!
+            (fn [_]
+              (action-tap-cell
+                {:sid          "test-user"
+                 :tx-batch!    tx-batch!
+                 :query-params {"pid" "0"
+                                "id"  (str (rand-int 200))}}))
+            ;; 10000r/s
+            (range 10))
+          (Thread/sleep 1))
+        (range 10000))))
+  )
+
 ;; TODO: make scroll bars always visible
+
