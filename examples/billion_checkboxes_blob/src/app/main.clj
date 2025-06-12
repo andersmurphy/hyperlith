@@ -266,36 +266,31 @@
         {:keys [writer reader]}
         (d/init-db! "database-new.db"
           {:pool-size 4
-           :pragma    {:foreign_keys false}})
-        {old-reader :reader}
-        (d/init-db! "database.db"
-          {:pool-size 4
            :pragma    {:foreign_keys false}})]
     ;; Run migrations
     (migrations writer)
     ;; Watch tab state
     (add-watch tab-state_ :refresh-on-change
       (fn [_ _ _ _] (h/refresh-all!)))
-    {:tab           tab-state_
-     :db            reader
-     :db-read       reader
-     :db-write      writer
-     :db-old-reader old-reader
-     :tx-batch!     (h/batch!
-                  (fn [thunks]
-                    #_{:clj-kondo/ignore [:unresolved-symbol]}
-                    (let [chunk-cache (atom {})]
-                      (d/with-write-tx [db writer]
-                        (run! (fn [thunk] (thunk db chunk-cache)) thunks)
-                        (run! (fn [[chunk-id new-chunk]]
-                                (d/q db
-                                  {:update :chunk
-                                   :set    {:chunk
-                                            (deed/encode-to-bytes new-chunk)}
-                                   :where  [:= :id chunk-id]}))
-                          @chunk-cache)))
-                    (h/refresh-all!))
-                  {:run-every-ms 100})}))
+    {:tab       tab-state_
+     :db        reader
+     :db-read   reader
+     :db-write  writer
+     :tx-batch! (h/batch!
+                      (fn [thunks]
+                        #_{:clj-kondo/ignore [:unresolved-symbol]}
+                        (let [chunk-cache (atom {})]
+                          (d/with-write-tx [db writer]
+                            (run! (fn [thunk] (thunk db chunk-cache)) thunks)
+                            (run! (fn [[chunk-id new-chunk]]
+                                    (d/q db
+                                      {:update :chunk
+                                       :set    {:chunk
+                                                (deed/encode-to-bytes new-chunk)}
+                                       :where  [:= :id chunk-id]}))
+                              @chunk-cache)))
+                        (h/refresh-all!))
+                      {:run-every-ms 100})}))
 
 (defn ctx-stop [ctx]
   (.close (:db-write ctx))
@@ -386,6 +381,9 @@
 
   ;; Free up space (slow)
   ;; (time (d/q db-write "VACUUM"))
+  ;; Checkpoint the WAL
+  (d/q db-write "PRAGMA wal_checkpoint(PASSIVE)")
+  (d/q db-write "PRAGMA wal_checkpoint(TRUNCATE)")
 
   ,)
 
@@ -408,30 +406,5 @@
           (Thread/sleep 1))
         (range 10000))))
   )
-
-(comment ;; migration
-  (def old-db (-> (h/get-app) :ctx :db-old-reader))
-  (def new-db (-> (h/get-app) :ctx :db-write))
-
-  (defn xy->chunk-ids-old [x y]
-    (-> (for [x (range x (+ x 2))
-              y (range y (+ y 2))]
-          (xy->chunk-id x y))
-      vec))
-  
-  (run!
-    (fn [id]
-      (let [[chunk] (->> (d/q old-db
-                           {:select   [[[:json_group_array :state] :chunk-cells]]
-                            :from     :cell
-                            :where    [:= :chunk-id id]
-                            :group-by [:chunk-id]})
-                      (mapv #(->> % h/json->edn)))]
-        (when (not= chunk blank-encoded-chunk)
-          (d/q new-db
-            {:update :chunk
-             :set    {:chunk (deed/encode-to-bytes chunk)}
-             :where  [:= :id id]}))))
-    (range (* board-size board-size))))
 
 ;; TODO: make scroll bars always visible
