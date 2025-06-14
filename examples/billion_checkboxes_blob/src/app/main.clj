@@ -406,5 +406,3 @@
           (Thread/sleep 1))
         (range 10000))))
   )
-
-;; TODO: make scroll bars always visible
