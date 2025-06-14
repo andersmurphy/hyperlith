@@ -58,7 +58,8 @@
          :aspect-ratio          "1/1"
          :gap                   :10px
          :grid-template-rows    (str "repeat(" board-size ", 1fr)")
-         :grid-template-columns (str "repeat(" board-size ", 1fr)")}]
+         :grid-template-columns (str "repeat(" board-size ", 1fr)")
+         :pointer-events        :none}]
 
        [:.chunk
         {:background            white
@@ -68,14 +69,15 @@
          :grid-template-columns (str "repeat(" chunk-size ", 1fr)")}]
 
        ["input[type=\"checkbox\"]"
-        {:appearance    :none
-         :margin        0
-         :font          :inherit
-         :color         :currentColor
-         :border        "0.15em solid currentColor"
-         :border-radius :0.15em
-         :display       :grid
-         :place-content :center}]
+        {:appearance     :none
+         :margin         0
+         :font           :inherit
+         :color          :currentColor
+         :border         "0.15em solid currentColor"
+         :border-radius  :0.15em
+         :display        :grid
+         :place-content  :center
+         :pointer-events :all}]
 
        ["input[type=\"checkbox\"]:checked::before"
         {:content    "\"\""
@@ -108,14 +110,16 @@
          :width                 "min(100% - 2rem , 42rem)"
          :display               :grid
          :gap                   :10px
-         :grid-template-columns (str "repeat(" palette-count", 1fr)")}]
+         :grid-template-columns (str "repeat(" palette-count", 1fr)")
+         :pointer-events        :none}]
 
        [:.palette-item
-        {:aspect-ratio "1/1"
-         :border-radius :0.15em}]
+        {:aspect-ratio   "1/1"
+         :border-radius  :0.15em
+         :pointer-events :all}]
 
        [:.palette-selected
-        {:border "0.15em solid currentColor"}]])))
+        {:outline "0.15em solid currentColor"}]])))
 
 (defn Checkbox [local-id state]
   (let [state       (or state 0)
@@ -163,16 +167,12 @@
     (mapv (fn [[id chunk]]
             (Chunk id (deed/decode-from chunk))))))
 
-(def mouse-down-js
-  (str
-    "evt.target.parentElement.dataset.id &&"
-    "(evt.target.classList.add('pop'),"
-    "@post(`/tap?id=${evt.target.dataset.id}&pid=${evt.target.parentElement.dataset.id}`))"))
-
 (defn Board [content]
   (h/html
     [:div#board.board
-     {:data-on-mousedown mouse-down-js}
+     {:data-on-mousedown
+      (str
+    "evt.target.classList.add('pop');" "@post(`/tap?id=${evt.target.dataset.id}&pid=${evt.target.parentElement.dataset.id}`)")}
      content]))
 
 (defn scroll-offset-js [n]
