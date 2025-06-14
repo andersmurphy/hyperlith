@@ -103,11 +103,13 @@
         [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/app/main.clj"} "here"]]
        (board snapshot)])))
 
-(defn render-home-star [{:keys [db _sid] :as _req}]
+(defn render-home-embed [{:keys [db _sid] :as _req}]
   (let [snapshot @db]
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
-      [:main#morph.main nil
+      [:main#morph.main
+       [:h1 "Game of Life (multiplayer)"]
+       [:p "Built with ❤️ using Clojure and Datastar 🚀"]
        (board snapshot)])))
 
 (defn fill-cell [board color id]
@@ -159,8 +161,8 @@
      [:get  "/"]        default-shim-handler
      [:post "/"]        (h/render-handler #'render-home
                           {:br-window-size 18})
-     [:get  "/star"]    default-shim-handler
-     [:post "/star"]    (h/render-handler #'render-home-star
+     [:get  "/embed"]   default-shim-handler
+     [:post "/embed"]   (h/render-handler #'render-home-embed
                           {:br-window-size 18})
      [:post "/tap"]     (h/action-handler #'action-tap-cell)}))
 

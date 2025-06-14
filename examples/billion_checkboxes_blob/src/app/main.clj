@@ -177,7 +177,7 @@
           [:a {:href "https://data-star.dev"} "Datastar"]
           "🚀"]
          [:p "Source code can be found "
-          [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes/src/app/main.clj" } "here"]]])
+          [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "here"]]])
       board)))
 
 (defn action-tap-cell
@@ -226,7 +226,7 @@
     {[:get (css :path)] (css :handler)
      [:get  "/"]        default-shim-handler
      [:post "/"]        (h/render-handler #'render-home
-                          {:br-window-size 19})
+                          {:br-window-size 18})
      [:post "/scroll"]  (h/action-handler #'action-scroll)
      [:post "/tap"]     (h/action-handler #'action-tap-cell)}))
 
