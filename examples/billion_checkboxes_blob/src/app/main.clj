@@ -13,14 +13,16 @@
 (def board-size-px (* 3 3 120000))
 
 (def states
-  [0 1 2 3 4 5 6])
+  [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14])
 
 (def state->class
-  ["none" "r" "b" "g" "o" "f" "p"])
+  (mapv #(str "_" %) states))
 
 (def css
-  (let [black         :black
-        board-size-px (str board-size-px "px")]
+  (let [black         "#000000"
+        white         "#FFF1E8"
+        board-size-px (str board-size-px "px")
+        palette-count (count states)]
     (h/static-css
       [["*, *::before, *::after"
         {:box-sizing :border-box
@@ -30,7 +32,8 @@
        [:html
         {:font-family "Arial, Helvetica, sans-serif"
          :font-size   :18px
-         :color       black}]
+         :color       black
+         :background  white}]
 
        [:.main
         {:height         :100dvh
@@ -43,12 +46,13 @@
 
        [:.view
         {:overflow        :scroll
+         :scrollbar-color (str black " transparent")
          :overflow-anchor :none
          :width           "min(100% - 2rem , 42rem)"
          :aspect-ratio    "1/1"}]
 
        [:.board
-        {:background            :white
+        {:background            white
          :width                 board-size-px
          :display               :grid
          :aspect-ratio          "1/1"
@@ -57,7 +61,7 @@
          :grid-template-columns (str "repeat(" board-size ", 1fr)")}]
 
        [:.chunk
-        {:background            :white
+        {:background            white
          :display               :grid
          :gap                   :10px
          :grid-template-rows    (str "repeat(" chunk-size ", 1fr)")
@@ -78,21 +82,44 @@
          :width      "0.80em"
          :height     "0.80em"
          :clip-path  "polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%)"
-         :box-shadow "inset 1em 1em white"}]
+         :box-shadow (str "inset 1em 1em " white)}]
 
        [:.pop
         {:transform  "scale(0.8)"
          :transition "scale 0.6s ease"}]
-       
-       [:.r {:background-color :red}]
-       [:.b {:background-color :blue}]
-       [:.g {:background-color :green}]
-       [:.o {:background-color :orange}]
-       [:.f {:background-color :fuchsia}]
-       [:.p {:background-color :purple}]])))
+
+       [:._1  {:background-color "#FF004D"}]
+       [:._2  {:background-color "#29ADFF"}]
+       [:._3  {:background-color "#00E436"}]
+       [:._4  {:background-color "#FFA300"}]
+       [:._5  {:background-color "#FF77A8"}]
+       [:._6  {:background-color "#7E2553"}]
+       [:._7  {:background-color "#FFCCAA"}]
+       [:._8  {:background-color "#1D2B53"}]
+       [:._9  {:background-color "#AB5236"}]
+       [:._10 {:background-color "#FFEC27"}]
+       [:._11 {:background-color "#008751"}]
+       [:._12 {:background-color "#C2C3C7"}]
+       [:._13 {:background-color "#83769C"}]
+       [:._14 {:background-color "#5F574F"}]
+
+       [:.palette
+        {:background            white
+         :width                 "min(100% - 2rem , 42rem)"
+         :display               :grid
+         :gap                   :10px
+         :grid-template-columns (str "repeat(" palette-count", 1fr)")}]
+
+       [:.palette-item
+        {:aspect-ratio "1/1"
+         :border-radius :0.15em}]
+
+       [:.palette-selected
+        {:border "0.15em solid currentColor"}]])))
 
 (defn Checkbox [local-id state]
-  (let [checked     (not= state 0)
+  (let [state       (or state 0)
+        checked     (not= state 0)
         color-class (state->class state)]
     (h/html
       [:input
@@ -159,32 +186,51 @@
     "$x = x; $y = y;"
     "change && @post(`/scroll`)"))
 
-(defn render-home [{:keys [db sid tab tabid first-render] :as _req}]
-  (let [user  (get-in @tab [sid tabid] tab)
-        board (Board (UserView user db))]
-    (if first-render
-      (h/html
-        [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
-        [:main#morph.main {:data-signals-x "0" :data-signals-y "0"}
-         [:div#view.view
-          {:data-on-scroll__throttle.100ms.trail.noleading on-scroll-js}
-          board]
-         [:h1 "One Billion Checkboxes"]
-         [:p "(actually 1,000,583,424)"]
-         [:p "Built with ❤️ using "
-          [:a {:href "https://clojure.org/"} "Clojure"]
-          " and "
-          [:a {:href "https://data-star.dev"} "Datastar"]
-          "🚀"]
-         [:p "Source code can be found "
-          [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "here"]]])
-      board)))
+(defn Palette [current-selected]
+  (h/html
+    [:div.palette
+     {:data-signals-color "1"
+      :data-on-mousedown
+      (str
+        "(evt.target.dataset.id !== $color) &&"
+        "(evt.target.classList.add('pop'),"
+        "$color = evt.target.dataset.id,"
+        "@post(`/palette`))")}
+     (mapv (fn [state]
+             (h/html [:div.palette-item
+                      {:data-id state
+                       :class
+                       (str (state->class state)
+                         (when (= current-selected state)
+                           " palette-selected"))}]))
+       (subvec states 1))]))
+
+(defn render-home [{:keys [db sid tab tabid] :as _req}]
+  (let [user    (get-in @tab [sid tabid] tab)
+        board   (Board (UserView user db))
+        palette (Palette (or (:color user) 1))]
+    (h/html
+      [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
+      [:main#morph.main {:data-signals-x "0" :data-signals-y "0"}
+       [:div#view.view
+        {:data-on-scroll__throttle.100ms.trail.noleading on-scroll-js}
+        board]
+       palette
+       [:h1 "One Billion Checkboxes"]
+       [:p "(actually 1,000,583,424)"]
+       [:p "Built with ❤️ using "
+        [:a {:href "https://clojure.org/"} "Clojure"]
+        " and "
+        [:a {:href "https://data-star.dev"} "Datastar"]
+        "🚀"]
+       [:p "Source code can be found "
+        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "here"]]])))
 
 (defn action-tap-cell
-  [{:keys            [sid tx-batch!]
+  [{:keys            [sid tx-batch! tab tabid]
     {:strs [id pid]} :query-params}]
   (when (and id pid)
-    (let [user-color (h/modulo-pick (subvec states 1) sid)
+    (let [user-color (or (:color (get-in @tab [sid tabid] tab)) 1)
           cell-id    (int (parse-long id))
           chunk-id   (int (parse-long pid))]
       (tx-batch!
@@ -214,6 +260,12 @@
         (assoc-in [sid tabid :x] (max (int x) 0))
         (assoc-in [sid tabid :y] (max (int y) 0))))))
 
+(defn action-tap-palette
+  [{:keys [sid tab tabid] {:keys [color]} :body}]
+  (let [color (parse-long color)]
+    (when (< 0 color (count states))
+      (swap! tab assoc-in [sid tabid :color] color))))
+
 (def default-shim-handler
   (h/shim-handler
     (h/html
@@ -228,7 +280,8 @@
      [:post "/"]        (h/render-handler #'render-home
                           {:br-window-size 18})
      [:post "/scroll"]  (h/action-handler #'action-scroll)
-     [:post "/tap"]     (h/action-handler #'action-tap-cell)}))
+     [:post "/tap"]     (h/action-handler #'action-tap-cell)
+     [:post "/palette"] (h/action-handler #'action-tap-palette)}))
 
 (def blank-encoded-chunk
   (-> (repeat (* chunk-size chunk-size) 0)
