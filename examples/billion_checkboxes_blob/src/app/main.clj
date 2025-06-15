@@ -21,6 +21,7 @@
 (def css
   (let [black         "#000000"
         white         "#FFF1E8"
+        accent        "#FFA300"
         board-size-px (str board-size-px "px")]
     (h/static-css
       [["*, *::before, *::after"
@@ -128,7 +129,28 @@
          :pointer-events :all}]
 
        [:.palette-selected
-        {:outline    "0.15em solid currentColor"}]])))
+        {:outline "0.15em solid currentColor"}]
+
+       [:.jump
+        {:display        :flex
+         :gap            :5px
+         :flex-direction :row
+         :align-items    :center}]
+
+       ["input:focus"
+        {:outline       :none
+         :border-radius :0.15em
+         :border        (str "0.15em solid " accent)}]
+
+       [:a {:color accent}]
+
+       [:.jump-input
+        {:background    white
+         :width         :6rem
+         :font-size     :1.2rem
+         :border-radius :0.15em
+         :border        "0.15em solid currentColor"
+         :padding       :5px}]])))
 
 (defn Checkbox [local-id state]
   (let [state       (or state 0)
@@ -187,8 +209,20 @@
 (defn scroll-offset-js [n]
   (str "Math.round((" n "/" board-size-px ")*" board-size "-1)"))
 
+(defn scroll->cell-xy-js [n]
+  (let [size (* board-size chunk-size)]
+    (str "Math.round((" n "/" board-size-px ")*" size ")")))
+
+(def scroll-jump-js
+  (let [size (* board-size chunk-size)]
+    (str
+      "$view.scrollLeft= $jumpx/" size "*" board-size-px ";"
+      "$view.scrollTop=  $jumpy/" size "*" board-size-px ";")))
+
 (def on-scroll-js
-  (str
+  (str    
+    "$jumpx = " (scroll->cell-xy-js "el.scrollLeft") ";"
+    "$jumpy = " (scroll->cell-xy-js "el.scrollTop") ";"
     "let x = " (scroll-offset-js "el.scrollLeft") ";"
     "let y = " (scroll-offset-js "el.scrollTop") ";"
     "let change = x !== $x || y !== $y;"
@@ -222,8 +256,18 @@
       [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
       [:main#morph.main {:data-signals-x "0" :data-signals-y "0"}
        [:div#view.view
-        {:data-on-scroll__throttle.100ms.trail.noleading on-scroll-js}
+        {:data-ref                                       "view"
+         :data-on-scroll__throttle.100ms.trail.noleading on-scroll-js}
         board]
+       [:div.jump
+        [:h2 "X:"]
+        [:input.jump-input
+         {:type                          "number" :data-bind "jumpx"
+          :data-on-input__debounce.500ms scroll-jump-js}]
+        [:h2 "Y:"]
+        [:input.jump-input
+         {:type                          "number" :data-bind "jumpy"
+          :data-on-input__debounce.500ms scroll-jump-js}]]
        palette
        [:h1 "One Billion Checkboxes"]
        [:p "Built using "
@@ -231,7 +275,9 @@
         " and "
         [:a {:href "https://data-star.dev"} "Datastar"]
         " - "
-        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "source"]]])))
+        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "source"]
+        " - "
+        [:a {:href "https://lospec.com/palette-list/pico-8"} "palette"]]])))
 
 (defn action-tap-cell
   [{:keys            [sid tx-batch! tab tabid]
