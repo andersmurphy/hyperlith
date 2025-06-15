@@ -21,8 +21,7 @@
 (def css
   (let [black         "#000000"
         white         "#FFF1E8"
-        board-size-px (str board-size-px "px")
-        palette-count (count states)]
+        board-size-px (str board-size-px "px")]
     (h/static-css
       [["*, *::before, *::after"
         {:box-sizing :border-box
@@ -31,9 +30,17 @@
 
        [:html
         {:font-family "Arial, Helvetica, sans-serif"
-         :font-size   :18px
+         :font-size   :1.0rem
          :color       black
          :background  white}]
+
+       ["::-webkit-scrollbar"
+        {:background white :width :10px :height :10px}]
+       ["::-webkit-scrollbar-corner" {:background white}]
+       ["::-webkit-scrollbar-track" {:background white}]
+       ["::-webkit-scrollbar-thumb"
+        {:background    black
+         :border-radius :0.15em}]
 
        [:.main
         {:height         :100dvh
@@ -49,7 +56,7 @@
          :scrollbar-color (str black " transparent")
          :overflow-anchor :none
          :width           "min(100% - 2rem , 42rem)"
-         :aspect-ratio    "1/1"}]
+         :height          "min(100% - 2rem , 42rem)"}]
 
        [:.board
         {:background            white
@@ -70,8 +77,8 @@
 
        ["input[type=\"checkbox\"]"
         {:appearance     :none
-         :margin         0
          :font           :inherit
+         :font-size      :1.2rem
          :color          :currentColor
          :border         "0.15em solid currentColor"
          :border-radius  :0.15em
@@ -81,8 +88,8 @@
 
        ["input[type=\"checkbox\"]:checked::before"
         {:content    "\"\""
-         :width      "0.80em"
-         :height     "0.80em"
+         :width      "0.50em"
+         :height     "0.50em"
          :clip-path  "polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%)"
          :box-shadow (str "inset 1em 1em " white)}]
 
@@ -106,11 +113,13 @@
        [:._14 {:background-color "#5F574F"}]
 
        [:.palette
-        {:background            white
+        {:margin-block          :5px
+         :font-size             :1.2rem
+         :background            white
          :width                 "min(100% - 2rem , 42rem)"
          :display               :grid
          :gap                   :10px
-         :grid-template-columns (str "repeat(" palette-count", 1fr)")
+         :grid-template-columns "repeat(auto-fill, 2rem)"
          :pointer-events        :none}]
 
        [:.palette-item
@@ -119,7 +128,7 @@
          :pointer-events :all}]
 
        [:.palette-selected
-        {:outline "0.15em solid currentColor"}]])))
+        {:outline    "0.15em solid currentColor"}]])))
 
 (defn Checkbox [local-id state]
   (let [state       (or state 0)
@@ -217,14 +226,12 @@
         board]
        palette
        [:h1 "One Billion Checkboxes"]
-       [:p "(actually 1,000,583,424)"]
-       [:p "Built with ❤️ using "
+       [:p "Built using "
         [:a {:href "https://clojure.org/"} "Clojure"]
         " and "
         [:a {:href "https://data-star.dev"} "Datastar"]
-        "🚀"]
-       [:p "Source code can be found "
-        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "here"]]])))
+        " - "
+        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "source"]]])))
 
 (defn action-tap-cell
   [{:keys            [sid tx-batch! tab tabid]
