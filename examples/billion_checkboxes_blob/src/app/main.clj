@@ -11,6 +11,7 @@
 (def board-size 1977 #_625 #_198)
 (def chunk-size 16)
 (def board-size-px (* 3 3 120000))
+(def size (* board-size chunk-size))
 
 (def states
   [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14])
@@ -30,10 +31,15 @@
          :padding    0}]
 
        [:html
-        {:font-family "Arial, Helvetica, sans-serif"
-         :font-size   :1.0rem
-         :color       black
-         :background  white}]
+        {:font-family  "Arial, Helvetica, sans-serif"
+         :font-size    :1.0rem
+         :color        black
+         :background   white}]
+
+       ["input[type=\"number\"]::-webkit-outer-spin-button,
+         input[type=\"number\"]::-webkit-inner-spin-button"
+        {:-webkit-appearance :none :margin 0}]
+       ["input[type=\"number\"]" { :-moz-appearance :textfield}]
 
        ["::-webkit-scrollbar"
         {:background white :width :10px :height :10px}]
@@ -137,7 +143,7 @@
          :flex-direction :row
          :align-items    :center}]
 
-       ["input:focus"
+       ["input:not([type=\"checkbox\"]):focus"
         {:outline       :none
          :border-radius :0.15em
          :border        (str "0.15em solid " accent)}]
@@ -210,14 +216,13 @@
   (str "Math.round((" n "/" board-size-px ")*" board-size "-1)"))
 
 (defn scroll->cell-xy-js [n]
-  (let [size (* board-size chunk-size)]
-    (str "Math.round((" n "/" board-size-px ")*" size ")")))
+  (str "Math.round((" n "/" board-size-px ")*" size ")"))
 
-(def scroll-jump-js
-  (let [size (* board-size chunk-size)]
-    (str
-      "$view.scrollLeft= $jumpx/" size "*" board-size-px ";"
-      "$view.scrollTop=  $jumpy/" size "*" board-size-px ";")))
+(def scroll-jumpx-js
+  (str "$view.scrollLeft= $jumpx/" size "*" board-size-px ";"))
+
+(def scroll-jumpyx-js
+  (str "$view.scrollTop=  $jumpy/" size "*" board-size-px ";"))
 
 (def on-scroll-js
   (str    
