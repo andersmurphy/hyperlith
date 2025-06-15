@@ -221,7 +221,7 @@
 (def scroll-jumpx-js
   (str "$view.scrollLeft= $jumpx/" size "*" board-size-px ";"))
 
-(def scroll-jumpyx-js
+(def scroll-jumpy-js
   (str "$view.scrollTop=  $jumpy/" size "*" board-size-px ";"))
 
 (def on-scroll-js
@@ -268,11 +268,11 @@
         [:h2 "X:"]
         [:input.jump-input
          {:type                          "number" :data-bind "jumpx"
-          :data-on-input__debounce.500ms scroll-jump-js}]
+          :data-on-input__debounce.500ms scroll-jumpx-js}]
         [:h2 "Y:"]
         [:input.jump-input
          {:type                          "number" :data-bind "jumpy"
-          :data-on-input__debounce.500ms scroll-jump-js}]]
+          :data-on-input__debounce.500ms scroll-jumpy-js}]]
        palette
        [:h1 "One Billion Checkboxes"]
        [:p "Built using "
