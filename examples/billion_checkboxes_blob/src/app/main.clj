@@ -2,7 +2,8 @@
   (:gen-class)
   (:require [hyperlith.core :as h]
             [hyperlith.extras.sqlite :as d]
-            [deed.core :as deed]))
+            [deed.core :as deed]
+            [clj-async-profiler.core :as prof]))
 
 ;; (* 198 198 16 16)  10 036 224
 ;; (* 625 625 16 16) 100 000 000
@@ -436,6 +437,10 @@
   (def db (-> (h/get-app) :ctx :db))
 
   ,)
+
+(comment ;; Profiling
+  (prof/start)
+  (prof/stop))
 
 (comment
   (def db (-> (h/get-app) :ctx :db))
