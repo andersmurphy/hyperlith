@@ -61,6 +61,7 @@
 
        [:.view
         {:overflow        :scroll
+         :scroll-behavior :smooth
          :scrollbar-color (str black " transparent")
          :overflow-anchor :none
          :width           "min(100% - 2rem , 42rem)"
@@ -262,18 +263,20 @@
       [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
       [:main#morph.main {:data-signals-x "0" :data-signals-y "0"}
        [:div#view.view
-        {:data-ref                                       "view"
+        {;; firefox sometimes preserves scroll on refresh and we don't want that
+         :data-on-load__once                             "el.scrollTo(0,0)"
+         :data-ref                                       "view"
          :data-on-scroll__throttle.100ms.trail.noleading on-scroll-js}
         board]
        [:div.jump
         [:h2 "X:"]
         [:input.jump-input
          {:type                          "number" :data-bind "jumpx"
-          :data-on-input__debounce.500ms scroll-jumpx-js}]
+          :data-on-input__debounce.600ms scroll-jumpx-js}]
         [:h2 "Y:"]
         [:input.jump-input
          {:type                          "number" :data-bind "jumpy"
-          :data-on-input__debounce.500ms scroll-jumpy-js}]]
+          :data-on-input__debounce.600ms scroll-jumpy-js}]]
        palette
        [:h1 "One Billion Checkboxes"]
        [:p "Built using "
