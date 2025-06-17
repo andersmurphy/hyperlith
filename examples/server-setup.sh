@@ -5,7 +5,7 @@ set -e
 # Dependencies
 apt-get update
 apt-get upgrade
-apt-get -y install openjdk-21-jre-headless ufw caddy
+apt-get -y install openjdk-24-jre-headless ufw caddy
 
 # App user (you cannot login as this user)
 useradd -rms /usr/sbin/nologin app
@@ -23,7 +23,7 @@ User=app
 Restart=on-failure
 RestartSec=5s
 WorkingDirectory=/home/app
-ExecStart=/usr/bin/java -Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl}" -jar app.jar -m app.main -Duser.timezone=UTC -XX:+UseZGC -XX:+ZGenerational -XX:InitialRAMPercentage 75.0 -XX:MaxRAMPercentage 75.0 -XX:MinRAMPercentage 75.0 -Djdk.attach.allowAttachSelf
+ExecStart=/usr/bin/java -Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl}" -jar app.jar -m app.main -Duser.timezone=UTC -XX:+UseZGC -XX:InitialRAMPercentage 75.0 -XX:MaxRAMPercentage 75.0 -XX:MinRAMPercentage 75.0 -Djdk.attach.allowAttachSelf
 
 [Install]
 WantedBy=multi-user.target
