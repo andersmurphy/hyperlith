@@ -2,7 +2,6 @@
   (:gen-class)
   (:require [hyperlith.core :as h]
             [hyperlith.extras.sqlite :as d]
-            [deed.core :as deed]
             [clj-async-profiler.core :as prof]))
 
 ;; (* 198 198 16 16)  10 036 224
@@ -204,7 +203,7 @@
           :from   :chunk
           :where  [:in :id (xy->chunk-ids x y)]})
     (mapv (fn [[id chunk]]
-            (Chunk id (deed/decode-from chunk))))))
+            (Chunk id (d/decode chunk))))))
 
 (defn Board [content]
   (h/html
@@ -311,7 +310,7 @@
                                      :from   :chunk
                                      :where  [:= :id chunk-id]})
                           first
-                          deed/decode-from))]
+                          d/decode))]
             (swap! chunk-cache assoc chunk-id
               (update chunk cell-id #(if (= 0 %) user-color 0)))))))))
 
@@ -348,7 +347,7 @@
 (def blank-encoded-chunk
   (-> (repeat (* chunk-size chunk-size) 0)
     vec
-    deed/encode-to-bytes))
+    d/encode))
 
 (defn initial-board-db-state! [db]
   (let [board-range (range board-size)]
@@ -401,7 +400,7 @@
                                     (d/q db
                                       {:update :chunk
                                        :set    {:chunk
-                                                (deed/encode-to-bytes new-chunk)}
+                                                (d/encode new-chunk)}
                                        :where  [:= :id chunk-id]}))
                               @chunk-cache)))
                         (h/refresh-all!))
