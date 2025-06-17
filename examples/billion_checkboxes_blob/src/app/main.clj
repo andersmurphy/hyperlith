@@ -445,14 +445,17 @@
   (d/pragma-check db)
 
   (UserView {:x 1 :y 1} db)
-
-  ;; Execution time mean : 120.871429 ms
+  
+  ;; Execution time mean : 747.741444 ms
   (user/bench
     (->> (mapv
            (fn [n]
              (future
                (let [n (mod n board-size)]
-                 (UserView {:x n :y n} db))))
+                 (UserView {:x n :y n} db)
+                 ;; we don't want to hold onto the object
+                 ;; not realistic
+                 nil)))
            (range 0 4000))
       (run! (fn [x] @x))))
 
