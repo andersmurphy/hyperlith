@@ -440,10 +440,6 @@
 
   ,)
 
-(comment ;; Profiling
-  (prof/start)
-  (prof/stop))
-
 (comment
   (def db (-> (h/get-app) :ctx :db))
   (d/pragma-check db)
@@ -505,8 +501,16 @@
 
   ,)
 
+(comment ;; Profiling
+  (prof/start)
+  (prof/stop)
+  (prof/serve-ui 7777)
+  ;; (clojure.java.browse/browse-url "http://localhost:7777/")
+  )
+
 (comment
   (def tx-batch! (-> (h/get-app) :ctx :tx-batch!))
+  (def tab (-> (h/get-app) :ctx :tab))
 
   (future
     (time
@@ -517,6 +521,7 @@
               (action-tap-cell
                 {:sid          "test-user"
                  :tx-batch!    tx-batch!
+                 :tab          tab
                  :query-params {"pid" "0"
                                 "id"  (str (rand-int 200))}}))
             ;; 10000r/s
