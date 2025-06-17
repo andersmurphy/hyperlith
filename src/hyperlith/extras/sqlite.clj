@@ -7,7 +7,9 @@
   [sqlite4clj.core
    init-db!
    with-read-tx
-   with-write-tx])
+   with-write-tx
+   encode
+   decode])
 
 ;;; - QUERY FUNCTIONS -
 
