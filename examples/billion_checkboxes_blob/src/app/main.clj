@@ -203,7 +203,7 @@
           :from   :chunk
           :where  [:in :id (xy->chunk-ids x y)]})
     (mapv (fn [[id chunk]]
-            (Chunk id (d/decode chunk))))))
+            (Chunk id chunk)))))
 
 (defn Board [content]
   (h/html
@@ -220,15 +220,15 @@
   (str "Math.round((" n "/" board-size-px ")*" size ")"))
 
 (def scroll-jumpx-js
-  (str "$view.scrollLeft= $jumpx/" size "*" board-size-px ";"))
+  (str "$_view.scrollLeft= $_jumpx/" size "*" board-size-px ";"))
 
 (def scroll-jumpy-js
-  (str "$view.scrollTop=  $jumpy/" size "*" board-size-px ";"))
+  (str "$_view.scrollTop=  $_jumpy/" size "*" board-size-px ";"))
 
 (def on-scroll-js
   (str    
-    "$jumpx = " (scroll->cell-xy-js "el.scrollLeft") ";"
-    "$jumpy = " (scroll->cell-xy-js "el.scrollTop") ";"
+    "$_jumpx = " (scroll->cell-xy-js "el.scrollLeft") ";"
+    "$_jumpy = " (scroll->cell-xy-js "el.scrollTop") ";"
     "let x = " (scroll-offset-js "el.scrollLeft") ";"
     "let y = " (scroll-offset-js "el.scrollTop") ";"
     "let change = x !== $x || y !== $y;"
@@ -264,17 +264,17 @@
        [:div#view.view
         {;; firefox sometimes preserves scroll on refresh and we don't want that
          :data-on-load__once                             "el.scrollTo(0,0)"
-         :data-ref                                       "view"
+         :data-ref                                       "_view"
          :data-on-scroll__throttle.100ms.trail.noleading on-scroll-js}
         board]
        [:div.jump
         [:h2 "X:"]
         [:input.jump-input
-         {:type                          "number" :data-bind "jumpx"
+         {:type                          "number" :data-bind "_jumpx"
           :data-on-input__debounce.600ms scroll-jumpx-js}]
         [:h2 "Y:"]
         [:input.jump-input
-         {:type                          "number" :data-bind "jumpy"
+         {:type                          "number" :data-bind "_jumpy"
           :data-on-input__debounce.600ms scroll-jumpy-js}]]
        palette
        [:h1 "One Billion Checkboxes"]
@@ -309,8 +309,7 @@
                         (-> (d/q db {:select [:chunk]
                                      :from   :chunk
                                      :where  [:= :id chunk-id]})
-                          first
-                          d/decode))]
+                          first))]
             (swap! chunk-cache assoc chunk-id
               (update chunk cell-id #(if (= 0 %) user-color 0)))))))))
 
@@ -344,10 +343,9 @@
      [:post "/tap"]     (h/action-handler #'action-tap-cell)
      [:post "/palette"] (h/action-handler #'action-tap-palette)}))
 
-(def blank-encoded-chunk
+(def blank-chunk
   (-> (repeat (* chunk-size chunk-size) 0)
-    vec
-    d/encode))
+    vec))
 
 (defn initial-board-db-state! [db]
   (let [board-range (range board-size)]
@@ -358,7 +356,7 @@
                   (d/q db
                     {:insert-into :chunk
                      :values      [{:id    (xy->chunk-id x y)
-                                    :chunk blank-encoded-chunk}]}))
+                                    :chunk [:lift blank-chunk]}]}))
             board-range)
           (print ".") (flush))
         board-range)))
@@ -399,8 +397,7 @@
                             (run! (fn [[chunk-id new-chunk]]
                                     (d/q db
                                       {:update :chunk
-                                       :set    {:chunk
-                                                (d/encode new-chunk)}
+                                       :set    {:chunk [:lift new-chunk]}
                                        :where  [:= :id chunk-id]}))
                               @chunk-cache)))
                         (h/refresh-all!))
@@ -447,7 +444,7 @@
 
   (UserView {:x 1 :y 1} db)
   
-  ;; Execution time mean : 134.262151 ms
+  ;; Execution time mean : 148.516131 ms
   (user/bench
     (->> (mapv
            (fn [n]
@@ -460,7 +457,7 @@
            (range 0 4000))
       (run! (fn [x] @x))))
   
-  ;; Execution time mean : 158.210678 µs
+  ;; Execution time mean : 151.256280 µs
   (user/bench (do (UserView {:x 1 :y 1} db) nil))
 
   (d/q db {:select [[[:count :*]]] :from :session})
@@ -520,3 +517,5 @@
           (Thread/sleep 1))
         (range 10000))))
   )
+
+;; TODO: migrate production to compressed blobs
