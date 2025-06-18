@@ -432,6 +432,7 @@
 (comment
   (do (-main) nil)
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
+  
 
   ;; stop server
   (((h/get-app) :stop))
@@ -445,8 +446,8 @@
   (d/pragma-check db)
 
   (UserView {:x 1 :y 1} db)
-  
-  ;; Execution time mean : 747.741444 ms
+
+  ;; Execution time mean : 727.174457 ms
   (user/bench
     (->> (mapv
            (fn [n]
@@ -458,16 +459,8 @@
                  nil)))
            (range 0 4000))
       (run! (fn [x] @x))))
-
-  ;; On server test
-  (time ;; simulate 1000 concurrent renders
-    (->> (mapv
-           (fn [n]
-             (future (UserView {:x n :y n} db)))
-           (range 0 1000))
-      (run! (fn [x] @x))))
   
-  ;; Execution time mean : 127.688298 µs
+  ;; Execution time mean : 469.332115 µs
   (user/bench (do (UserView {:x 1 :y 1} db) nil))
 
   (d/q db {:select [[[:count :*]]] :from :session})
