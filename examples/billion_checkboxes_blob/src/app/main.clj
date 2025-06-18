@@ -446,8 +446,8 @@
   (d/pragma-check db)
 
   (UserView {:x 1 :y 1} db)
-
-  ;; Execution time mean : 727.174457 ms
+  
+  ;; Execution time mean : 134.262151 ms
   (user/bench
     (->> (mapv
            (fn [n]
@@ -460,7 +460,7 @@
            (range 0 4000))
       (run! (fn [x] @x))))
   
-  ;; Execution time mean : 469.332115 µs
+  ;; Execution time mean : 158.210678 µs
   (user/bench (do (UserView {:x 1 :y 1} db) nil))
 
   (d/q db {:select [[[:count :*]]] :from :session})
@@ -470,11 +470,6 @@
 
   (d/table-info db :chunks)
   (d/table-list db)
-
-  (user/bench ;; Execution time mean : 455.139383 µs
-    (d/q db
-      ["SELECT CAST(chunk_id AS TEXT), CAST(state AS TEXT) FROM cell WHERE chunk_id IN (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-       1978 3955 5932 1979 3956 5933 1980 3957 5934]))
 
   ,)
 
