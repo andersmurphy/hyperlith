@@ -11,7 +11,7 @@
                   math/sqrt
                   math/ceil
                   int))
-(def board-size-px (* 30 chunk-size board-size))
+(def board-size-px (* 32 chunk-size board-size))
 (def size (* board-size chunk-size))
 (def states
   [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14])
@@ -519,5 +519,3 @@
           (Thread/sleep 1))
         (range 10000))))
   )
-
-;; TODO: migrate production to compressed blobs
