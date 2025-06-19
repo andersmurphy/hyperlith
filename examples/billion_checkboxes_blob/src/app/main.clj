@@ -2,17 +2,17 @@
   (:gen-class)
   (:require [hyperlith.core :as h]
             [hyperlith.extras.sqlite :as d]
-            [clj-async-profiler.core :as prof]))
+            [clj-async-profiler.core :as prof]
+            [clojure.math :as math]))
 
-;; (* 198 198 16 16)  10 036 224
-;; (* 625 625 16 16) 100 000 000
-;; (* 1977 1977 16 16) 1 000 583 424
-
-(def board-size 1977 #_625 #_198)
 (def chunk-size 16)
-(def board-size-px (* 3 3 120000))
+(def board-size (->> (math/pow chunk-size 2)
+                  (/ 1000000000)
+                  math/sqrt
+                  math/ceil
+                  int))
+(def board-size-px (* 30 chunk-size board-size))
 (def size (* board-size chunk-size))
-
 (def states
   [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14])
 
@@ -367,9 +367,9 @@
   ;; Create tables
   (println "Running migrations...")
   (d/q db
-    "CREATE TABLE IF NOT EXISTS chunk(id INT PRIMARY KEY, chunk BLOB)")
+    ["CREATE TABLE IF NOT EXISTS chunk(id INT PRIMARY KEY, chunk BLOB)"])
   (d/q db
-    "CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, checks INTEGER) WITHOUT ROWID")
+    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, checks INTEGER) WITHOUT ROWID"])
   (when-not (d/q db {:select [:id] :from :chunk :limit 1})
     (initial-board-db-state! db)))
 
@@ -429,6 +429,8 @@
 (comment
   (do (-main) nil)
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
+  (count "5a0a47e7-fad2-4111-9996-2d2539405d16")
+  (random-uuid)
   
 
   ;; stop server
@@ -482,10 +484,10 @@
   (def db-write (-> (h/get-app) :ctx :db-write))
 
   ;; Free up space (slow)
-  ;; (time (d/q db-write "VACUUM"))
+  ;; (time (d/q db-write ["VACUUM"]))
   ;; Checkpoint the WAL
-  (d/q db-write "PRAGMA wal_checkpoint(PASSIVE)")
-  (d/q db-write "PRAGMA wal_checkpoint(TRUNCATE)")
+  (d/q db-write ["PRAGMA wal_checkpoint(PASSIVE)"])
+  (d/q db-write ["PRAGMA wal_checkpoint(TRUNCATE)"])
 
   ,)
 
