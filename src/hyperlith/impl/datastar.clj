@@ -65,7 +65,10 @@
   ;; is added to the url.
   "@post(window.location.pathname + (window.location.search + '&u=').replace(/^&/,'?'))")
 
-(def tabid-js "self.crypto.randomUUID()")
+(def tabid-js
+  ;; Higher collision risk is acceptable here as it only needs to be
+  ;; unique against a given users other tabs.
+  "self.crypto.randomUUID().substring(0,8)")
 
 (defn build-shim-page-resp [head-hiccup]
   (let [body (-> (h/html
