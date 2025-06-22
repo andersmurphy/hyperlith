@@ -92,7 +92,8 @@
    url-encode]
   ;; JSON
   [hyperlith.impl.json
-   json->edn]
+   json->edn
+   edn->json]
   ;; BATCH
   [hyperlith.impl.batch
    batch!])

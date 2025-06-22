@@ -234,7 +234,7 @@
 
 (defn Palette [current-selected]
   (h/html
-    [:div.palette {:data-signals-color "1"}
+    [:div.palette
      (mapv (fn [state]
              (h/html [:div.palette-item
                       {:data-id state
@@ -245,6 +245,10 @@
                            " palette-selected"))}]))
        (subvec states 1))]))
 
+(def signals
+  (h/edn->json
+    {:x 0 :y 0 :targetid nil :parentid nil}))
+
 (defn render-home [{:keys [db sid tab tabid] :as _req}]
   (let [user    (get-in @tab [sid tabid] tab)
         content (UserView user db)
@@ -252,10 +256,7 @@
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
       [:main#morph.main
-       {:data-signals-x__ifmissing        "0"
-        :data-signals-y__ifmissing        "0"
-        :data-signals-targetid__ifmissing ""
-        :data-signals-parentid__ifmissing ""
+       {:data-signals__ifmissing signals
         :data-on-mousedown
         (str
           "if (evt.target.dataset.action) {"
