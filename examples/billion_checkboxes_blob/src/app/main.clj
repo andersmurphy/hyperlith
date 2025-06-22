@@ -210,9 +210,6 @@
     (mapv (fn [[id chunk]]
             (Chunk id chunk)))))
 
-(defn Board [content]
-  (h/html [:div#board.board content]))
-
 (defn scroll-offset-js [n]
   (str "Math.round((" n "/" board-size-px ")*" board-size "-1)"))
 
@@ -250,7 +247,7 @@
 
 (defn render-home [{:keys [db sid tab tabid] :as _req}]
   (let [user    (get-in @tab [sid tabid] tab)
-        board   (Board (UserView user db))
+        content (UserView user db)
         palette (Palette (or (:color user) 1))]
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
@@ -272,7 +269,7 @@
          :data-on-load__once                             "el.scrollTo(0,0)"
          :data-ref                                       "_view"
          :data-on-scroll__throttle.100ms.trail.noleading on-scroll-js}
-        board]
+        [:div#board.board nil content]]
        [:div.jump
         [:h2 "X:"]
         [:input.jump-input
