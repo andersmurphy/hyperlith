@@ -234,7 +234,7 @@
 
 (defn Palette [current-selected]
   (h/html
-    [:div.palette
+    [:div.palette nil
      (mapv (fn [state]
              (h/html [:div.palette-item
                       {:data-id state
@@ -275,11 +275,11 @@
         [:h2 "X:"]
         [:input.jump-input
          {:type                          "number" :data-bind "_jumpx"
-          :data-on-input__debounce.600ms scroll-jumpx-js}]
+          :data-on-input__debounce.1s scroll-jumpx-js}]
         [:h2 "Y:"]
         [:input.jump-input
          {:type                          "number" :data-bind "_jumpy"
-          :data-on-input__debounce.600ms scroll-jumpy-js}]]
+          :data-on-input__debounce.1s scroll-jumpy-js}]]
        palette
        [:h1 "One Billion Checkboxes"]
        [:p "Built using "
@@ -432,10 +432,7 @@
 
 (comment
   (do (-main) nil)
-  ;; (clojure.java.browse/browse-url "http://localhost:8080/")
-  (count "5a0a47e7-fad2-4111-9996-2d2539405d16")
-  (random-uuid)
-  
+  ;; (clojure.java.browse/browse-url "http://localhost:8080/")  
 
   ;; stop server
   (((h/get-app) :stop))
@@ -447,8 +444,6 @@
 (comment
   (def db (-> (h/get-app) :ctx :db))
   (d/pragma-check db)
-
-  (UserView {:x 1 :y 1} db)
   
   ;; Execution time mean : 148.516131 ms
   (user/bench
