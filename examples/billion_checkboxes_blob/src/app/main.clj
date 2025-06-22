@@ -102,8 +102,11 @@
          :box-shadow (str "inset 1em 1em " white)}]
 
        [:.pop
-        {:transform  "scale(0.8)"
-         :transition "scale 0.6s ease"}]
+        {;; Animation that depresses the element
+         :transform      "scale(0.8)"
+         :transition     "scale 0.6s ease"
+         ;; Disable element until next frame/morph
+         :pointer-events :none}]
 
        [:._1  {:background-color "#FF004D"}]
        [:._2  {:background-color "#29ADFF"}]
@@ -136,7 +139,8 @@
          :pointer-events :all}]
 
        [:.palette-selected
-        {:outline "0.15em solid currentColor"}]
+        {:outline        "0.15em solid currentColor"
+         :pointer-events :none}]
 
        [:.jump
         {:display        :flex
@@ -168,7 +172,8 @@
        {:class   (when checked color-class)
         :type    "checkbox"
         :checked checked
-        :data-id local-id}])))
+        :data-id local-id
+        :data-action "check"}])))
 
 (defn chunk-id->xy [chunk-id]
   [(rem chunk-id board-size)
@@ -206,12 +211,7 @@
             (Chunk id chunk)))))
 
 (defn Board [content]
-  (h/html
-    [:div#board.board
-     {:data-on-mousedown
-      (str
-    "evt.target.classList.add('pop');" "@post(`/tap?id=${evt.target.dataset.id}&pid=${evt.target.parentElement.dataset.id}`)")}
-     content]))
+  (h/html [:div#board.board content]))
 
 (defn scroll-offset-js [n]
   (str "Math.round((" n "/" board-size-px ")*" board-size "-1)"))
@@ -237,17 +237,11 @@
 
 (defn Palette [current-selected]
   (h/html
-    [:div.palette
-     {:data-signals-color "1"
-      :data-on-mousedown
-      (str
-        "(evt.target.dataset.id !== $color) &&"
-        "(evt.target.classList.add('pop'),"
-        "$color = evt.target.dataset.id,"
-        "@post(`/palette`))")}
+    [:div.palette {:data-signals-color "1"}
      (mapv (fn [state]
              (h/html [:div.palette-item
                       {:data-id state
+                       :data-action "palette"
                        :class
                        (str (state->class state)
                          (when (= current-selected state)
@@ -260,7 +254,19 @@
         palette (Palette (or (:color user) 1))]
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
-      [:main#morph.main {:data-signals-x "0" :data-signals-y "0"}
+      [:main#morph.main
+       {:data-signals-x__ifmissing        "0"
+        :data-signals-y__ifmissing        "0"
+        :data-signals-targetid__ifmissing ""
+        :data-signals-parentid__ifmissing ""
+        :data-on-mousedown
+        (str
+          "if (evt.target.dataset.action) {"
+          "evt.target.classList.add('pop');"
+          "$targetid = evt.target.dataset.id;"
+          "$parentid = evt.target.parentElement.dataset.id;"
+          "@post(`/${evt.target.dataset.action}`);"
+          "}")}
        [:div#view.view
         {;; firefox sometimes preserves scroll on refresh and we don't want that
          :data-on-load__once                             "el.scrollTo(0,0)"
@@ -287,13 +293,13 @@
         " - "
         [:a {:href "https://lospec.com/palette-list/pico-8"} "palette"]]])))
 
-(defn action-tap-cell
-  [{:keys            [sid tx-batch! tab tabid]
-    {:strs [id pid]} :query-params}]
-  (when (and id pid)
+(defn action-check
+  [{:keys                       [sid tx-batch! tab tabid]
+    {:keys [targetid parentid]} :body}]
+  (when (and targetid parentid)
     (let [user-color (or (:color (get-in @tab [sid tabid] tab)) 1)
-          cell-id    (int (parse-long id))
-          chunk-id   (int (parse-long pid))]
+          cell-id    (int (parse-long targetid))
+          chunk-id   (int (parse-long parentid))]
       (tx-batch!
         (fn action-tap-cell-thunk [db chunk-cache]
           (let [[checks] (d/q db {:select [:checks]
@@ -320,9 +326,9 @@
         (assoc-in [sid tabid :x] (max (int x) 0))
         (assoc-in [sid tabid :y] (max (int y) 0))))))
 
-(defn action-tap-palette
-  [{:keys [sid tab tabid] {:keys [color]} :body}]
-  (let [color (parse-long color)]
+(defn action-palette
+  [{:keys [sid tab tabid] {:keys [targetid]} :body}]
+  (let [color (parse-long targetid)]
     (when (< 0 color (count states))
       (swap! tab assoc-in [sid tabid :color] color))))
 
@@ -340,8 +346,8 @@
      [:post "/"]        (h/render-handler #'render-home
                           {:br-window-size 18})
      [:post "/scroll"]  (h/action-handler #'action-scroll)
-     [:post "/tap"]     (h/action-handler #'action-tap-cell)
-     [:post "/palette"] (h/action-handler #'action-tap-palette)}))
+     [:post "/check"]   (h/action-handler #'action-check)
+     [:post "/palette"] (h/action-handler #'action-palette)}))
 
 (def blank-chunk
   (-> (repeat (* chunk-size chunk-size) 0)
@@ -508,12 +514,12 @@
         (fn [_]
           (run!
             (fn [_]
-              (action-tap-cell
-                {:sid          "test-user"
-                 :tx-batch!    tx-batch!
-                 :tab          tab
-                 :query-params {"pid" "0"
-                                "id"  (str (rand-int 200))}}))
+              (action-check
+                {:sid       "test-user"
+                 :tx-batch! tx-batch!
+                 :tab       tab
+                 :body      {:parentid "0"
+                             :targetid (str (rand-int 200))}}))
             ;; 10000r/s
             (range 10))
           (Thread/sleep 1))
