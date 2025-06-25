@@ -24,7 +24,7 @@
     (.setQuality (or quality 5))))
 
 (defn compress [data & {:as opts}]
-  (-> (if (string? data) (String/.getBytes data) ^byte/1 data)
+  (-> (if (string? data) (String/.getBytes data "UTF-8") ^byte/1 data)
     (Encoder/compress (encoder-params opts))))
 
 (defn byte-array-out-stream ^ByteArrayOutputStream []
@@ -38,7 +38,7 @@
 
 (defn compress-stream [^ByteArrayOutputStream out ^BrotliOutputStream br chunk]
   (doto br
-    (.write  (String/.getBytes chunk))
+    (.write  (String/.getBytes chunk "UTF-8"))
     (.flush))
   (let [result (.toByteArray out)]
     (.reset out)
@@ -49,7 +49,7 @@
     (String/new (.getDecompressedData decompressed))))
 
 (defn decompress-stream [data]
-  (with-open [in  (-> (if (string? data) (String/.getBytes data) data)
+  (with-open [in  (-> (if (string? data) (String/.getBytes data "UTF-8") data)
                     io/input-stream
                     (BrotliInputStream/new))
               out (ByteArrayOutputStream/new)]
