@@ -73,14 +73,14 @@
         (comp
           (map-indexed
             (fn [id color-class]
-              (h/html [:div.tile {:class color-class :data-id id}]))))
+                (h/html [:div.tile {:class   color-class :data-id id}]))))
         (:board db)))))
 
 (defn board [snapshot]
   (let [view (board-state snapshot)]
     (h/html
-      [:div#board.board {:data-on-pointerdown "@post(`/tap?id=${evt.target.dataset.id}`)"}
-       view])))
+      [:div {:data-on-pointerdown "@post(`/tap?id=${evt.target.dataset.id}`)"}
+       [:div.board nil view]])))
 
 (defn render-home [{:keys [db _sid] :as _req}]
   (let [snapshot @db]

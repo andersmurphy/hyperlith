@@ -296,24 +296,25 @@
     (let [user-color (or (:color (get-in @tab [sid tabid] tab)) 1)
           cell-id    (int (parse-long targetid))
           chunk-id   (int (parse-long parentid))]
-      (tx-batch!
-        (fn action-tap-cell-thunk [db chunk-cache]
-          (let [[checks] (d/q db {:select [:checks]
-                                  :from   :session
-                                  :where  [:= :id sid]})]
-            (if checks
-              (d/q db {:update :session
-                       :set    {:checks (inc checks)}
-                       :where  [:= :id sid]})
-              (d/q db {:insert-into :session
-                       :values      [{:id sid :checks 1}]})))
-          (let [chunk (or (@chunk-cache chunk-id)
-                        (-> (d/q db {:select [:chunk]
-                                     :from   :chunk
-                                     :where  [:= :id chunk-id]})
-                          first))]
-            (swap! chunk-cache assoc chunk-id
-              (update chunk cell-id #(if (= 0 %) user-color 0)))))))))
+      (when (>= (* board-size board-size) cell-id 0)
+        (tx-batch!
+          (fn action-tap-cell-thunk [db chunk-cache]
+            (let [[checks] (d/q db {:select [:checks]
+                                    :from   :session
+                                    :where  [:= :id sid]})]
+              (if checks
+                (d/q db {:update :session
+                         :set    {:checks (inc checks)}
+                         :where  [:= :id sid]})
+                (d/q db {:insert-into :session
+                         :values      [{:id sid :checks 1}]})))
+            (let [chunk (or (@chunk-cache chunk-id)
+                          (-> (d/q db {:select [:chunk]
+                                       :from   :chunk
+                                       :where  [:= :id chunk-id]})
+                            first))]
+              (swap! chunk-cache assoc chunk-id
+                (update chunk cell-id #(if (= 0 %) user-color 0))))))))))
 
 (defn action-scroll [{:keys [sid tabid tab] {:keys [x y]} :body}]
   (swap! tab
