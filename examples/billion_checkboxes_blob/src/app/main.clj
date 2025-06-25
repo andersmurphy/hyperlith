@@ -148,7 +148,7 @@
          :flex-direction :row
          :align-items    :center}]
 
-       ["input:not([type=\"checkbox\"]):focus"
+       ["input[type=\"number\"]:focus"
         {:outline       :none
          :border-radius :0.15em
          :border        (str "0.15em solid " accent)}]
