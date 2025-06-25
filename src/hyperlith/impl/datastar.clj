@@ -28,14 +28,14 @@
      :content-type "text/javascript"
      :compress?        true}))
 
-(defn merge-fragments [event-id fragments]
+(defn patch-elements [event-id elements]
   (str "event: datastar-patch-elements"
     "\nid: " event-id
-    "\ndata: elements " (str/replace fragments "\n" "\ndata: elements ")
+    "\ndata: elements " (str/replace elements "\n" "\ndata: elements ")
     "\n\n\n"))
 
-(defn merge-signals [signals]
-  (str "event: datastar-merge-signals"
+(defn patch-signals [signals]
+  (str "event: datastar-patch-signals"
     "\ndata: onlyIfMissing false"
     "\ndata: signals " (j/edn->json signals)
     "\n\n\n"))
@@ -120,7 +120,7 @@
                  "Cache-Control"             "no-store"
                  "Content-Encoding"          "br"
                  "Strict-Transport-Security" strict-transport}
-       :body    (br/compress (merge-signals signals))}
+       :body    (br/compress (patch-signals signals))}
       ;; 204 needs even less
       {:headers {"Strict-Transport-Security" strict-transport
                  "Cache-Control"             "no-store"}
@@ -172,7 +172,7 @@
                             new-view-hash (crypto/digest new-view-str)]
                         ;; only send an event if the view has changed
                         (when (not= last-view-hash new-view-hash)
-                          (->> (merge-fragments
+                          (->> (patch-elements
                                  new-view-hash new-view-str)
                             (br/compress-stream out br)
                             (send! ch)))
