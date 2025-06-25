@@ -296,7 +296,7 @@
     (let [user-color (or (:color (get-in @tab [sid tabid] tab)) 1)
           cell-id    (int (parse-long targetid))
           chunk-id   (int (parse-long parentid))]
-      (when (>= (* board-size board-size) cell-id 0)
+      (when (>= (dec (* chunk-size chunk-size)) cell-id 0)
         (tx-batch!
           (fn action-tap-cell-thunk [db chunk-cache]
             (let [[checks] (d/q db {:select [:checks]
@@ -481,11 +481,18 @@
 
   (def db-write (-> (h/get-app) :ctx :db-write))
 
+  (d/q db-write
+    {:update :chunk
+     :set    {:chunk [:lift blank-chunk]}
+     :where  [:= :id 0]})
+
   ;; Free up space (slow)
   ;; (time (d/q db-write ["VACUUM"]))
   ;; Checkpoint the WAL
   (d/q db-write ["PRAGMA wal_checkpoint(PASSIVE)"])
   (d/q db-write ["PRAGMA wal_checkpoint(TRUNCATE)"])
+
+  
 
   ,)
 
