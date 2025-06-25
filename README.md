@@ -26,7 +26,7 @@ Hyperlith only uses a subset of Datastar's feartures. If you want a production r
 
 #### Why large/fat/main morphs (immediate mode)?
 
-By only using `data: mergeMode morph` and always targeting the `main` element of the document the API can be massively simplified. This avoids having the explosion of endpoints you get with HTMX and makes reasoning about your app much simpler.
+By only using `data: mode morph` and always targeting the `main` element of the document the API can be massively simplified. This avoids having the explosion of endpoints you get with HTMX and makes reasoning about your app much simpler.
 
 #### Why have single render function per page?
 
@@ -54,11 +54,11 @@ My suspicion is websocket approaches in this space like Phoenix Liveview haven't
 
 #### Signals are only for ephemeral client side state
 
-Signals should only be used for ephemeral client side state. Things like: the current value of a text input, whether a popover is visible, current csrf token, input validation errors. Signals can be controlled on the client via expressions, or from the backend via `merge-signals`.
+Signals should only be used for ephemeral client side state. Things like: the current value of a text input, whether a popover is visible, current csrf token, input validation errors. Signals can be controlled on the client via expressions, or from the backend via `patch-signals`.
 
-#### Signals in fragments should be declared __ifmissing
+#### Signals in elements should be declared __ifmissing
 
-Because signals are only being used to represent ephemeral client state that means they can only be initialised by fragments and they can only be changed via expressions on the client or from the server via `merge-signals` in an action. Signals in fragments should be declared `__ifmissing` unless they are "view only".
+Because signals are only being used to represent ephemeral client state that means they can only be initialised by elements and they can only be changed via expressions on the client or from the server via `patch-signals` in an action. Signals in elements should be declared `__ifmissing` unless they are "view only".
 
 #### View only signals
 
@@ -66,7 +66,7 @@ View only signals, are signals that can only be changed by the server. These sho
 
 #### Actions should not update the view themselves directly
 
-Actions should not update the view via merge fragments. This is because the changes they make would get overwritten on the next `render-fn` that pushes a new view down the updates SSE connection. However, they can still be used to update signals as those won't be changed by fragment merges. This allows you to do things like validation on the server.
+Actions should not update the view via patch elements. This is because the changes they make would get overwritten on the next `render-fn` that pushes a new view down the updates SSE connection. However, they can still be used to update signals as those won't be changed by elements patch. This allows you to do things like validation on the server.
 
 #### Stateless
 
@@ -74,7 +74,7 @@ The only way for actions to affect the view returned by the `render-fn` running 
 
 #### CQRS
 
-- Actions modify the database and return a 204 or a 200 if they `merge-signals`.
+- Actions modify the database and return a 204 or a 200 if they `patch-signals`.
 - Render functions re-render when the database changes and send an update down the updates SSE connection.
 
 #### Work sharing (caching)

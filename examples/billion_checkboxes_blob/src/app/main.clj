@@ -244,10 +244,6 @@
                            " palette-selected"))}]))
        (subvec states 1))]))
 
-(def signals
-  (h/edn->json
-    {:x 0 :y 0 :targetid nil :parentid nil}))
-
 (defn render-home [{:keys [db sid tab tabid] :as _req}]
   (let [user    (get-in @tab [sid tabid] tab)
         content (UserView user db)
