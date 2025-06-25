@@ -14,6 +14,9 @@
   (->> (if (vector? query) query (hsql/format query))
     (d/q db)))
 
+;; (defmacro q [db query & [opts]]
+;;   `(d/q ~db ~(hsql/format query {:params opts})))
+
 ;;; - UTILITY -
 
 (defn table-info [db table-name]

@@ -194,8 +194,7 @@
         y     (inc y)]
     (h/html
       [:div.chunk
-       {:data-ignore true
-        :id      chunk-id
+       {:id      chunk-id
         :data-id chunk-id
         :style   {:grid-column x :grid-row y}}
        (into []
@@ -256,8 +255,7 @@
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
       [:main#morph.main
-       {:data-signals__ifmissing signals
-        :data-on-mousedown
+       {:data-on-mousedown
         (str
           "if (evt.target.dataset.action) {"
           "evt.target.classList.add('pop');"
@@ -267,7 +265,7 @@
           "}")}
        [:div#view.view
         {;; firefox sometimes preserves scroll on refresh and we don't want that
-         :data-on-load__once                             "el.scrollTo(0,0)"
+         :data-on-load                                   "el.scrollTo(0,0)"
          :data-ref                                       "_view"
          :data-on-scroll__throttle.100ms.trail.noleading on-scroll-js}
         [:div#board.board nil content]]

@@ -29,9 +29,9 @@
      :compress?        true}))
 
 (defn merge-fragments [event-id fragments]
-  (str "event: datastar-merge-fragments"
-    "\nid: " event-id 
-    "\ndata: fragments " (str/replace fragments "\n" "\ndata: fragments ")
+  (str "event: datastar-patch-elements"
+    "\nid: " event-id
+    "\ndata: elements " (str/replace fragments "\n" "\ndata: elements ")
     "\n\n\n"))
 
 (defn merge-signals [signals]

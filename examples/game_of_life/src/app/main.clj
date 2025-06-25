@@ -85,7 +85,7 @@
   (let [view (board-state snapshot)]
     (h/html
       [:div {:data-on-pointerdown "@post(`/tap?id=${evt.target.dataset.id}`)"}
-       [:div.board {:data-ignore true}
+       [:div.board
         view]])))
 
 (defn render-home [{:keys [db _sid] :as _req}]
