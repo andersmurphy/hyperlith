@@ -6,7 +6,7 @@
   (fn [req]
     (cond
       ;; If you don't support Brotli you get nothing (bots).
-      (not (->> (get-in req [:headers "accept-encoding"])
+      (not (some->> ((:headers req) "accept-encoding")
              (re-find #"(?:^| )br(?:$|,)")))
       {:status 406}
 

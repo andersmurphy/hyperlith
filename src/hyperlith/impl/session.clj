@@ -3,7 +3,7 @@
 
 (defn get-sid [req]
   (try ;; In case we get garbage
-    (some->> (get-in req [:headers "cookie"])
+    (some->> ((:headers req) "cookie")
       (re-find #"__Host-sid=([^;^ ]+)")
       second)
     (catch Throwable _)))

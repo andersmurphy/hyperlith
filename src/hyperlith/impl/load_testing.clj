@@ -63,7 +63,7 @@
 
 (defn parse-captured-response [capture]
   (cond-> capture
-    (= (get-in capture [:headers "content-encoding"]) "br")
+    (= ((:headers capture) "content-encoding") "br")
     (update :events (comp br/decompress-stream byte-array))
     :always (update :events parse-sse-events)))
 
