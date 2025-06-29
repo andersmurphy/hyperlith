@@ -117,11 +117,11 @@
                          max-refresh-ms 100
                          on-error       (fn [_ctx {:keys [error]}]
                                           (pprint/pprint error))}}]
-  (let [<refresh-ch  (a/chan (a/dropping-buffer 1))
-        _            (reset! refresh-ch_ <refresh-ch)        
-        ctx          (ctx-start)
-        _            (reset! er/on-error_ (partial on-error ctx))
-        refresh-mult (-> (ds/throttle <refresh-ch max-refresh-ms)
+  (let [<refresh-ch   (a/chan (a/dropping-buffer 1))
+        _             (reset! refresh-ch_ <refresh-ch)
+        ctx           (ctx-start)
+        _             (reset! er/on-error_ (partial on-error ctx))
+        refresh-mult  (-> (ds/throttle <refresh-ch max-refresh-ms)
                        (a/pipe
                          (a/chan 1
                            (map (fn [event]
@@ -131,30 +131,31 @@
                                     (cache/invalidate-cache!))
                                   event))))
                        a/mult)
-        wrap-ctx     (fn [handler]
+        wrap-ctx      (fn [handler]
                        (fn [req]
                          (handler
                            (-> (assoc req
                                  :hyperlith.core/refresh-mult refresh-mult)
                              (u/merge ctx)))))
         ;; Middleware make for messy error stacks.
-        middleware   (-> router
-                       wrap-ctx
-                       ;; Wrap error here because req params/body/session
-                       ;; have been handled (and provide useful context).
-                       er/wrap-error
-                       ;; The handlers after this point do not throw errors
-                       ;; are robust/lenient.
-                       wrap-query-params
-                       (wrap-session csrf-secret)
-                       wrap-parse-json-body
-                       wrap-blocker)
-        stop-server  (hk/run-server middleware {:port port})
-        app          {:ctx  ctx
-                      :stop (fn stop [& [opts]]
-                              (stop-server opts)
-                              (ctx-stop ctx)
-                              (a/close! <refresh-ch))}]
+        wraped-router (-> router
+                          wrap-ctx
+                          ;; Wrap error here because req params/body/session
+                          ;; have been handled (and provide useful context).
+                          er/wrap-error
+                          ;; The handlers after this point do not throw errors
+                          ;; are robust/lenient.
+                          wrap-query-params
+                          (wrap-session csrf-secret)
+                          wrap-parse-json-body
+                          wrap-blocker)
+        stop-server   (hk/run-server wraped-router {:port port})
+        app           {:wraped-router wraped-router
+                       :ctx           ctx
+                       :stop          (fn stop [& [opts]]
+                                 (stop-server opts)
+                                 (ctx-stop ctx)
+                                 (a/close! <refresh-ch))}]
     (reset! app_ app)
     app))
 

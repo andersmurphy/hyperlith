@@ -173,7 +173,7 @@
         :type    "checkbox"
         :checked checked
         :data-id local-id
-        :data-action "check"}])))
+        :data-action "/check"}])))
 
 (defn chunk-id->xy [chunk-id]
   [(rem chunk-id board-size)
@@ -237,7 +237,7 @@
      (mapv (fn [state]
              (h/html [:div.palette-item
                       {:data-id state
-                       :data-action "palette"
+                       :data-action "/palette"
                        :class
                        (str (state->class state)
                          (when (= current-selected state)
@@ -257,7 +257,7 @@
           "evt.target.classList.add('pop');"
           "$targetid = evt.target.dataset.id;"
           "$parentid = evt.target.parentElement.dataset.id;"
-          "@post(`/${evt.target.dataset.action}`);"
+          "@post(`${evt.target.dataset.action}`);"
           "}")}
        [:div#view.view
         {;; firefox sometimes preserves scroll on refresh and we don't want that
@@ -500,23 +500,40 @@
   )
 
 (comment
-  (def tx-batch! (-> (h/get-app) :ctx :tx-batch!))
-  (def tab (-> (h/get-app) :ctx :tab))
+  (def wraped-router (-> (h/get-app) :wraped-router))
 
+  (user/bench
+    (wraped-router
+      {:headers
+       {"accept-encoding" "br"
+        "cookie"          "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY; __Host-csrf=3UsG62ic9wLsg9EVQhGupw"
+        "content-type"    "application/json"}
+       :request-method :post
+       :uri            "/check"
+       :body           {:csrf     "3UsG62ic9wLsg9EVQhGupw"
+                        :parentid "0"
+                        :targetid (str (rand-int 200))}}))
+  
   (future
     (time
       (run!
         (fn [_]
           (run!
             (fn [_]
-              (action-check
-                {:sid       "test-user"
-                 :tx-batch! tx-batch!
-                 :tab       tab
-                 :body      {:parentid "0"
-                             :targetid (str (rand-int 200))}}))
+              (wraped-router
+                {:headers
+                 {"accept-encoding" "br"
+                  "cookie"          "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY; __Host-csrf=3UsG62ic9wLsg9EVQhGupw"
+                  "content-type"    "application/json"}
+                 :request-method :post
+                 :uri            "/check"
+                 :body           {:csrf     "3UsG62ic9wLsg9EVQhGupw"
+                                  :parentid "0"
+                                  :targetid (str (rand-int 200))}}))
             ;; 10000r/s
             (range 10))
           (Thread/sleep 1))
         (range 10000))))
+
+  
   )
