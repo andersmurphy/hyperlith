@@ -337,7 +337,7 @@
     {[:get (css :path)] (css :handler)
      [:get  "/"]        default-shim-handler
      [:post "/"]        (h/render-handler #'render-home
-                          {:br-window-size 18})
+                          {:br-window-size 19})
      [:post "/scroll"]  (h/action-handler #'action-scroll)
      [:post "/check"]   (h/action-handler #'action-check)
      [:post "/palette"] (h/action-handler #'action-palette)}))
