@@ -95,7 +95,7 @@
 (defmacro defaction
   {:clj-kondo/lint-as 'clojure.core/defn}
   [sym args & body]
-  (let [path   (str "/" (crypto/digest (str sym)))
+  (let [path   (str "/" (crypto/digest (str *ns* "/" sym)))
         sym-fn (symbol (str sym "-fn"))]
     `(do (defn ~sym-fn ~args ~@body)
          (ds/action-handler ~path (var ~sym-fn))
