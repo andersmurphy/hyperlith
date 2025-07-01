@@ -2,6 +2,7 @@
   (:import [javax.crypto Mac]
            [javax.crypto.spec SecretKeySpec]
            [java.security SecureRandom]
+           [java.security MessageDigest]
            [java.util Base64 Base64$Encoder]))
 
 (def ^SecureRandom secure-random
@@ -37,12 +38,10 @@
     (.doFinal (String/.getBytes data))
     bytes->base64))
 
-(defn digest
-  "Digest function based on Clojure's hash."
-  [data]
-  ;; Note: hashCode is not guaranteed consistent between JVM
-  ;; executions except in the case for strings. This is why we
-  ;; convert to a string first.
-  (Integer/toHexString (hash (str data))))
+(defn digest [data]
+  (-> (doto (MessageDigest/getInstance "MD5")
+        (.update (String/.getBytes (str data))))
+    (.digest)
+    bytes->base64))
 
 

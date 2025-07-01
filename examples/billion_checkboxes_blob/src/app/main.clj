@@ -493,18 +493,6 @@
 
 (comment
   (def wraped-router (-> (h/get-app) :wraped-router))
-
-  (user/bench
-    (wraped-router
-      {:headers
-       {"accept-encoding" "br"
-        "cookie"          "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY; __Host-csrf=3UsG62ic9wLsg9EVQhGupw"
-        "content-type"    "application/json"}
-       :request-method :post
-       :uri            handler-check
-       :body           {:csrf     "3UsG62ic9wLsg9EVQhGupw"
-                        :parentid "0"
-                        :targetid (str (rand-int 200))}}))
   
   (future
     (time
