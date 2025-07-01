@@ -1,6 +1,6 @@
 (ns app.main
   (:gen-class)
-  (:require [hyperlith.core :as h]))
+  (:require [hyperlith.core :as h :refer [defview]]))
 
 (def css
   (h/static-css
@@ -24,30 +24,26 @@
       {:text-align :center
        :font-size :50px}]]))
 
-(defn render-home [{:keys [connected-counter] :as _req}]
+(def shim-headers
   (h/html
-    [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
+    [:link#css {:rel "stylesheet" :type "text/css" :href css}]))
+
+(defview handler-home
+  {:path         "/"
+   :shim-headers shim-headers
+   :on-open
+   (fn [{:keys [connected-counter]}]
+     (dosync (commute connected-counter inc)))
+   :on-close
+   (fn [{:keys [connected-counter]}]
+     (dosync (commute connected-counter dec)))}
+  [{:keys [connected-counter] :as _req}]
+  (h/html
+    [:link#css {:rel "stylesheet" :type "text/css" :href css}]
     [:main#morph.main
      [:div
-      [:p nil (str "connected users")]
+      [:p nil "connected users"]
       [:p.counter nil @connected-counter]]]))
-
-(def default-shim-handler
-  (h/shim-handler
-    (h/html
-      [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}])))
-
-(def router
-  (h/router
-    {[:get (css :path)] (css :handler)
-     [:get  "/"]        default-shim-handler
-     [:post "/"]        (h/render-handler #'render-home
-                          :on-open
-                          (fn [{:keys [connected-counter]}]
-                            (dosync (commute connected-counter inc)))
-                          :on-close
-                          (fn [{:keys [connected-counter]}]
-                            (dosync (commute connected-counter dec))))}))
 
 (defn ctx-start []
   ;; By using ref and commute to track user count allows for higher
@@ -59,8 +55,7 @@
 
 (defn -main [& _]
   (h/start-app
-    {:router         #'router
-     :max-refresh-ms 100
+    {:max-refresh-ms 100
      :ctx-start       ctx-start
      :ctx-stop        (fn [_db] nil)
      :csrf-secret    (h/env :csrf-secret)}))

@@ -7,11 +7,11 @@
             [hyperlith.impl.datastar :as ds]
             [hyperlith.impl.util :as u]
             [hyperlith.impl.error :as er]
-            [hyperlith.impl.crypto]
+            [hyperlith.impl.crypto :as crypto]
             [hyperlith.impl.css]
             [hyperlith.impl.http]
-            [hyperlith.impl.html]
-            [hyperlith.impl.router]
+            [hyperlith.impl.html :as h]
+            [hyperlith.impl.router :as router]
             [hyperlith.impl.cache :as cache]
             [hyperlith.impl.assets]
             [hyperlith.impl.trace]
@@ -41,8 +41,7 @@
    assoc-in-if-missing
    qualify-keys
    modulo-pick
-   thread
-   circular-subvec]
+   thread]
   ;; HTML
   [hyperlith.impl.html
    html
@@ -55,17 +54,9 @@
   [hyperlith.impl.crypto
    new-uid
    digest]
-  ;; ROUTER
-  [hyperlith.impl.router
-   router
-   wrap-routes]
   ;; DATASTAR
   [hyperlith.impl.datastar
-   shim-handler
-   signals
-   action-handler
-   render-handler
-   debug-signals-el]
+   signals]
   ;; HTTP
   [hyperlith.impl.http
    get!
@@ -101,6 +92,24 @@
 (defonce ^:private refresh-ch_ (atom nil))
 (defonce ^:private app_ (atom nil))
 
+(defmacro defaction
+  {:clj-kondo/lint-as 'clojure.core/defn}
+  [sym args & body]
+  (let [path   (str "/" (crypto/digest (str sym)))
+        sym-fn (symbol (str sym "-fn"))]
+    `(do (defn ~sym-fn ~args ~@body)
+         (ds/action-handler ~path (var ~sym-fn))
+         (def ~sym ~path))))
+
+(defmacro defview
+  {:clj-kondo/lint-as 'clojure.core/defn}
+  [sym {:keys [path shim-headers] :as opts} args & body]
+  (let [sym-fn (symbol (str sym "-fn"))]
+    `(do (defn ~sym-fn ~args ~@body)
+         (ds/shim-handler ~path ~shim-headers)
+         (ds/render-handler ~path (var ~sym-fn) ~opts)
+         (def ~sym ~path))))
+
 (defn get-app
   "Return app for debugging at the repl."
   []
@@ -111,7 +120,7 @@
     (a/>!! <refresh-ch
       {:invalidate-cache? (not keep-cache?)})))
 
-(defn start-app [{:keys [router port ctx-start ctx-stop csrf-secret
+(defn start-app [{:keys [port ctx-start ctx-stop csrf-secret
                          max-refresh-ms on-error]
                   :or   {port           8080
                          max-refresh-ms 100
@@ -122,40 +131,39 @@
         ctx           (ctx-start)
         _             (reset! er/on-error_ (partial on-error ctx))
         refresh-mult  (-> (ds/throttle <refresh-ch max-refresh-ms)
-                       (a/pipe
-                         (a/chan 1
-                           (map (fn [event]
-                                  ;; Cache is invalidated before refresh.
-                                  ;; unless told otherwise
-                                  (when (:invalidate-cache? event)
-                                    (cache/invalidate-cache!))
-                                  event))))
-                       a/mult)
+                        (a/pipe
+                          (a/chan 1
+                            (map (fn [event]
+                                   ;; Cache is invalidated before refresh.
+                                   ;; unless told otherwise
+                                   (when (:invalidate-cache? event)
+                                     (cache/invalidate-cache!))
+                                   event))))
+                        a/mult)
         wrap-ctx      (fn [handler]
-                       (fn [req]
-                         (handler
-                           (-> (assoc req
-                                 :hyperlith.core/refresh-mult refresh-mult)
-                             (u/merge ctx)))))
+                        (fn [req]
+                          (handler
+                            (-> (assoc req
+                                  :hyperlith.core/refresh-mult refresh-mult)
+                              (u/merge ctx)))))
         ;; Middleware make for messy error stacks.
-        wraped-router (-> router
-                          wrap-ctx
-                          ;; Wrap error here because req params/body/session
-                          ;; have been handled (and provide useful context).
-                          er/wrap-error
-                          ;; The handlers after this point do not throw errors
-                          ;; are robust/lenient.
-                          wrap-query-params
-                          (wrap-session csrf-secret)
-                          wrap-parse-json-body
-                          wrap-blocker)
+        wraped-router (-> router/router
+                        wrap-ctx
+                        ;; Wrap error here because req params/body/session
+                        ;; have been handled (and provide useful context).
+                        er/wrap-error
+                        ;; The handlers after this point do not throw errors
+                        ;; are robust/lenient.
+                        wrap-query-params
+                        (wrap-session csrf-secret)
+                        wrap-parse-json-body
+                        wrap-blocker)
         stop-server   (hk/run-server wraped-router {:port port})
         app           {:wraped-router wraped-router
                        :ctx           ctx
                        :stop          (fn stop [& [opts]]
-                                 (stop-server opts)
-                                 (ctx-stop ctx)
-                                 (a/close! <refresh-ch))}]
+                                        (stop-server opts)
+                                        (ctx-stop ctx)
+                                        (a/close! <refresh-ch))}]
     (reset! app_ app)
     app))
-

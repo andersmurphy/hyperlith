@@ -1,6 +1,6 @@
 (ns app.main
   (:gen-class)
-  (:require [hyperlith.core :as h]
+  (:require [hyperlith.core :as h :refer [defaction defview]]
             [hyperlith.extras.sqlite :as d]
             [clj-async-profiler.core :as prof]
             [clojure.math :as math]))
@@ -163,17 +163,58 @@
          :border        "0.15em solid currentColor"
          :padding       :5px}]])))
 
+(defaction handler-scroll
+  [{:keys [sid tabid tab] {:keys [x y]} :body}]
+  (swap! tab
+    (fn [snapshot]
+      (-> snapshot
+        (assoc-in [sid tabid :x] (max (int x) 0))
+        (assoc-in [sid tabid :y] (max (int y) 0))))))
+
+(defaction handler-palette
+  [{:keys [sid tab tabid] {:keys [targetid]} :body}]
+  (let [color (parse-long targetid)]
+    (when (< 0 color (count states))
+      (swap! tab assoc-in [sid tabid :color] color))))
+
+(defaction handler-check
+  [{:keys                       [sid tx-batch! tab tabid]
+    {:keys [targetid parentid]} :body}]
+  (when (and targetid parentid)
+    (let [user-color (or (:color (get-in @tab [sid tabid] tab)) 1)
+          cell-id    (int (parse-long targetid))
+          chunk-id   (int (parse-long parentid))]
+      (when (>= (dec (* chunk-size chunk-size)) cell-id 0)
+        (tx-batch!
+          (fn action-tap-cell-thunk [db chunk-cache]
+            (let [[checks] (d/q db {:select [:checks]
+                                    :from   :session
+                                    :where  [:= :id sid]})]
+              (if checks
+                (d/q db {:update :session
+                         :set    {:checks (inc checks)}
+                         :where  [:= :id sid]})
+                (d/q db {:insert-into :session
+                         :values      [{:id sid :checks 1}]})))
+            (let [chunk (or (@chunk-cache chunk-id)
+                          (-> (d/q db {:select [:chunk]
+                                       :from   :chunk
+                                       :where  [:= :id chunk-id]})
+                            first))]
+              (swap! chunk-cache assoc chunk-id
+                (update chunk cell-id #(if (= 0 %) user-color 0))))))))))
+
 (defn Checkbox [local-id state]
   (let [state       (or state 0)
         checked     (not= state 0)
         color-class (state->class state)]
     (h/html
       [:input
-       {:class   (when checked color-class)
-        :type    "checkbox"
-        :checked checked
-        :data-id local-id
-        :data-action "/check"}])))
+       {:class       (when checked color-class)
+        :type        "checkbox"
+        :checked     checked
+        :data-id     local-id
+        :data-action handler-check}])))
 
 (defn chunk-id->xy [chunk-id]
   [(rem chunk-id board-size)
@@ -229,7 +270,7 @@
     "let y = " (scroll-offset-js "el.scrollTop") ";"
     "let change = x !== $x || y !== $y;"
     "$x = x; $y = y;"
-    "change && @post(`/scroll`)"))
+    "change && @post(`" handler-scroll "`)"))
 
 (defn Palette [current-selected]
   (h/html
@@ -237,19 +278,27 @@
      (mapv (fn [state]
              (h/html [:div.palette-item
                       {:data-id state
-                       :data-action "/palette"
+                       :data-action handler-palette
                        :class
                        (str (state->class state)
                          (when (= current-selected state)
                            " palette-selected"))}]))
        (subvec states 1))]))
 
-(defn render-home [{:keys [db sid tab tabid] :as _req}]
+(def shim-headers
+  (h/html
+    [:link#css {:rel "stylesheet" :type "text/css" :href css}]
+    [:title nil "One billion checkboxes"]
+    [:meta {:content "So many checkboxes" :name "description"}]))
+
+(defview handler-root
+  {:path "/" :shim-headers shim-headers :br-window-size 19}
+  [{:keys [db sid tab tabid] :as _req}]
   (let [user    (get-in @tab [sid tabid] tab)
         content (UserView user db)
         palette (Palette (or (:color user) 1))]
     (h/html
-      [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
+      [:link#css {:rel "stylesheet" :type "text/css" :href css}]
       [:main#morph.main
        {:data-on-mousedown
         (str
@@ -268,11 +317,11 @@
        [:div.jump
         [:h2 "X:"]
         [:input.jump-input
-         {:type                          "number" :data-bind "_jumpx"
+         {:type                       "number" :data-bind "_jumpx"
           :data-on-input__debounce.1s scroll-jumpx-js}]
         [:h2 "Y:"]
         [:input.jump-input
-         {:type                          "number" :data-bind "_jumpy"
+         {:type                       "number" :data-bind "_jumpy"
           :data-on-input__debounce.1s scroll-jumpy-js}]]
        palette
        [:h1 "One Billion Checkboxes"]
@@ -284,63 +333,6 @@
         [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "source"]
         " - "
         [:a {:href "https://lospec.com/palette-list/pico-8"} "palette"]]])))
-
-(defn action-check
-  [{:keys                       [sid tx-batch! tab tabid]
-    {:keys [targetid parentid]} :body}]
-  (when (and targetid parentid)
-    (let [user-color (or (:color (get-in @tab [sid tabid] tab)) 1)
-          cell-id    (int (parse-long targetid))
-          chunk-id   (int (parse-long parentid))]
-      (when (>= (dec (* chunk-size chunk-size)) cell-id 0)
-        (tx-batch!
-          (fn action-tap-cell-thunk [db chunk-cache]
-            (let [[checks] (d/q db {:select [:checks]
-                                    :from   :session
-                                    :where  [:= :id sid]})]
-              (if checks
-                (d/q db {:update :session
-                         :set    {:checks (inc checks)}
-                         :where  [:= :id sid]})
-                (d/q db {:insert-into :session
-                         :values      [{:id sid :checks 1}]})))
-            (let [chunk (or (@chunk-cache chunk-id)
-                          (-> (d/q db {:select [:chunk]
-                                       :from   :chunk
-                                       :where  [:= :id chunk-id]})
-                            first))]
-              (swap! chunk-cache assoc chunk-id
-                (update chunk cell-id #(if (= 0 %) user-color 0))))))))))
-
-(defn action-scroll [{:keys [sid tabid tab] {:keys [x y]} :body}]
-  (swap! tab
-    (fn [snapshot]
-      (-> snapshot
-        (assoc-in [sid tabid :x] (max (int x) 0))
-        (assoc-in [sid tabid :y] (max (int y) 0))))))
-
-(defn action-palette
-  [{:keys [sid tab tabid] {:keys [targetid]} :body}]
-  (let [color (parse-long targetid)]
-    (when (< 0 color (count states))
-      (swap! tab assoc-in [sid tabid :color] color))))
-
-(def default-shim-handler
-  (h/shim-handler
-    (h/html
-      [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
-      [:title nil "One billion checkboxes"]
-      [:meta {:content "So many checkboxes" :name "description"}])))
-
-(def router
-  (h/router
-    {[:get (css :path)] (css :handler)
-     [:get  "/"]        default-shim-handler
-     [:post "/"]        (h/render-handler #'render-home
-                          {:br-window-size 19})
-     [:post "/scroll"]  (h/action-handler #'action-scroll)
-     [:post "/check"]   (h/action-handler #'action-check)
-     [:post "/palette"] (h/action-handler #'action-palette)}))
 
 (def blank-chunk
   (-> (repeat (* chunk-size chunk-size) 0)
@@ -408,8 +400,7 @@
 
 (defn -main [& _]
   (h/start-app
-    {:router         #'router
-     :max-refresh-ms 100
+    {:max-refresh-ms 100
      :ctx-start      ctx-start
      :ctx-stop       ctx-stop
      :csrf-secret    (h/env :csrf-secret)
@@ -427,7 +418,8 @@
 
 (comment
   (do (-main) nil)
-  ;; (clojure.java.browse/browse-url "http://localhost:8080/")  
+  ;; (clojure.java.browse/browse-url "http://localhost:8080/")
+  
 
   ;; stop server
   (((h/get-app) :stop))
@@ -509,7 +501,7 @@
         "cookie"          "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY; __Host-csrf=3UsG62ic9wLsg9EVQhGupw"
         "content-type"    "application/json"}
        :request-method :post
-       :uri            "/check"
+       :uri            handler-check
        :body           {:csrf     "3UsG62ic9wLsg9EVQhGupw"
                         :parentid "0"
                         :targetid (str (rand-int 200))}}))
@@ -526,7 +518,7 @@
                   "cookie"          "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY; __Host-csrf=3UsG62ic9wLsg9EVQhGupw"
                   "content-type"    "application/json"}
                  :request-method :post
-                 :uri            "/check"
+                 :uri            handler-check
                  :body           {:csrf     "3UsG62ic9wLsg9EVQhGupw"
                                   :parentid "0"
                                   :targetid (str (rand-int 200))}}))

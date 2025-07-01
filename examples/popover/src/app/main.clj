@@ -1,6 +1,6 @@
 (ns app.main
   (:gen-class)
-  (:require [hyperlith.core :as h]))
+  (:require [hyperlith.core :as h :refer [defview]]))
 
 (def css
   (h/static-css
@@ -30,9 +30,22 @@
        :left      :50%
        :transform "translate(-50%, -50%)"}]]))
 
-(defn render-home [{:keys [db] :as _req}]
+(def shim-headers
   (h/html
-    [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
+    [:link#css {:rel "stylesheet" :type "text/css" :href css}]))
+
+(defview render-home
+  {:path "/"
+   :shim-headers shim-headers
+   :on-open
+   (fn [{:keys [_ db]}]
+     (swap! db update :connected-users inc))
+   :on-close
+   (fn [{:keys [_ db]}]
+     (swap! db update :connected-users dec))}
+  [{:keys [db] :as _req}]
+  (h/html
+    [:link#css {:rel "stylesheet" :type "text/css" :href css}]
     [:main#morph.main
      ;; We track connected users as this will cause updates out of bounds
      ;; and will show that the popover state is not affected by other users
@@ -42,26 +55,6 @@
      [:button {:popovertarget "my-popover"} "Open Popover"]
      [:div#my-popover.popover {:popover true} "Greetings, one and all!"]]))
 
-(def default-shim-handler
-  (h/shim-handler
-    (h/html
-      [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}])))
-
-(def router
-  (h/router
-    {[:get (css :path)] (css :handler)
-     [:get  "/"]        default-shim-handler
-     [:post "/"]        (h/render-handler #'render-home
-                          ;; Example of tracking connected users
-                          ;; This could use a separate atom or a
-                          ;; commute and ref
-                          :on-open
-                          (fn [{:keys [_ db]}]
-                            (swap! db update :connected-users inc))
-                          :on-close
-                          (fn [{:keys [_ db]}]
-                            (swap! db update :connected-users dec)))}))
-
 (defn ctx-start []
   (let [db_ (atom {:connected-users 0})]
     (add-watch db_ :refresh-on-change (fn [& _] (h/refresh-all!)))
@@ -69,8 +62,7 @@
 
 (defn -main [& _]
   (h/start-app
-    {:router         #'router
-     :max-refresh-ms 100
+    {:max-refresh-ms 100
      :ctx-start       ctx-start
      :ctx-stop        (fn [_state] nil)
      :csrf-secret    (h/env :csrf-secret)}))
@@ -79,7 +71,6 @@
 (h/refresh-all!)
 
 (comment
-
   (-main)
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 

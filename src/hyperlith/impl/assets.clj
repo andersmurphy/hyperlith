@@ -1,6 +1,7 @@
 (ns hyperlith.impl.assets
   (:require [hyperlith.impl.headers :refer [default-headers]]
             [hyperlith.impl.crypto :as crypto]
+            [hyperlith.impl.router :as router]
             [hyperlith.impl.brotli :as br]))
 
 (defn static-asset
@@ -12,8 +13,8 @@
                         "Content-Type"  content-type)
                       :body    body}
                compress? (update :body br/compress :quality 11)
-               compress? (assoc-in [:headers "Content-Encoding"] "br"))]
-    {:handler (fn [_] resp)
-     :path    (str "/" (crypto/digest body))}))
+               compress? (assoc-in [:headers "Content-Encoding"] "br"))
+        path (str "/" (crypto/digest body))]
+    (router/add-route! [:get path] (fn [_] resp))))
 
 
