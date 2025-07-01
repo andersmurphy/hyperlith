@@ -71,7 +71,7 @@
   ;; unique against a given users other tabs.
   "self.crypto.randomUUID().substring(0,8)")
 
-(defn build-shim-page-resp [head-hiccup]
+(defn build-shim-page-resp [datastar head-hiccup]
   (let [body (-> (h/html
                    [h/doctype-html5
                     [:html  {:lang "en"}
@@ -99,7 +99,7 @@
 
 (defn shim-handler [path head-hiccup]
   (router/add-route! [:get path]
-    (let [resp (build-shim-page-resp head-hiccup)
+    (let [resp (build-shim-page-resp datastar head-hiccup)
           etag ((:headers resp) "ETag")]
       (fn handler [req]
         (if (= ((:headers req) "if-none-match") etag)
@@ -183,3 +183,4 @@
            :on-close (fn hk-on-close [_ _]
                        (a/>!! <cancel :cancel)
                        (when on-close (on-close req)))})))))
+
