@@ -1,7 +1,7 @@
 (ns app.main
   (:gen-class)
   (:require [clojure.pprint :as pprint]
-            [hyperlith.core :as h]            
+            [hyperlith.core :as h :refer [defaction defview]]
             [app.game :as game]))
 
 (def board-size 50)
@@ -76,36 +76,6 @@
                 (h/html [:div.tile {:class   color-class :data-id id}]))))
         (:board db)))))
 
-(defn board [snapshot]
-  (let [view (board-state snapshot)]
-    (h/html
-      [:div {:data-on-pointerdown "@post(`/tap?id=${evt.target.dataset.id}`)"}
-       [:div.board nil view]])))
-
-(defn render-home [{:keys [db _sid] :as _req}]
-  (let [snapshot @db]
-    (h/html
-      [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
-      [:main#morph.main
-       [:h1 "Game of Life (multiplayer)"]
-       [:p "Built with ❤️ using "
-        [:a {:href "https://clojure.org/"} "Clojure"]
-        " and "
-        [:a {:href "https://data-star.dev"} "Datastar"]
-        "🚀"]
-       [:p "Source code can be found "
-        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/app/main.clj"} "here"]]
-       (board snapshot)])))
-
-(defn render-home-embed [{:keys [db _sid] :as _req}]
-  (let [snapshot @db]
-    (h/html
-      [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
-      [:main#morph.main
-       [:h1 "Game of Life (multiplayer)"]
-       [:p "Built with ❤️ using Clojure and Datastar 🚀"]
-       (board snapshot)])))
-
 (defn fill-cell [board color id]
   (if ;; crude overflow check
       (<= 0 id (dec (* board-size board-size)))
@@ -121,16 +91,48 @@
       (update :board fill-cell user-color (+ id 1))
       (update :board fill-cell user-color (+ id board-size)))))
 
-(defn action-tap-cell [{:keys [sid db] {:strs [id]} :query-params}]
+(defaction handler-tap-cell [{:keys [sid db] {:strs [id]} :query-params}]
   (when id
     (swap! db fill-cross (parse-long id) sid)))
 
-(def default-shim-handler
-  (h/shim-handler
+(def shim-headers
+  (h/html
+    [:link#css {:rel "stylesheet" :type "text/css" :href css}]
+    [:title nil "Game of Life"]
+    [:meta {:content "Conway's Game of Life" :name "description"}]))
+
+(defn board [snapshot]
+  (let [view (board-state snapshot)]
     (h/html
-      [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
-      [:title nil "Game of Life"]
-      [:meta {:content "Conway's Game of Life" :name "description"}])))
+      [:div {:data-on-pointerdown
+             (str "@post(`" handler-tap-cell "?id=${evt.target.dataset.id}`)")}
+       [:div.board nil view]])))
+
+(defview render-home {:path "/" :shim-headers shim-headers}
+  [{:keys [db _sid] :as _req}]
+  (let [snapshot @db]
+    (h/html
+      [:link#css {:rel "stylesheet" :type "text/css" :href css}]
+      [:main#morph.main
+       [:h1 "Game of Life (multiplayer)"]
+       [:p "Built with ❤️ using "
+        [:a {:href "https://clojure.org/"} "Clojure"]
+        " and "
+        [:a {:href "https://data-star.dev"} "Datastar"]
+        "🚀"]
+       [:p "Source code can be found "
+        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/app/main.clj"} "here"]]
+       (board snapshot)])))
+
+(defview render-home-embed {:path "/embed" :shim-headers shim-headers}
+  [{:keys [db _sid] :as _req}]
+  (let [snapshot @db]
+    (h/html
+      [:link#css {:rel "stylesheet" :type "text/css" :href css}]
+      [:main#morph.main
+       [:h1 "Game of Life (multiplayer)"]
+       [:p "Built with ❤️ using Clojure and Datastar 🚀"]
+       (board snapshot)])))
 
 (defn next-gen-board [current-board]
   (game/next-gen-board
@@ -149,17 +151,6 @@
         (next-generation! db)))
     (fn stop-game! [] (reset! running_ false))))
 
-(def router
-  (h/router
-    {[:get (css :path)] (css :handler)
-     [:get  "/"]        default-shim-handler
-     [:post "/"]        (h/render-handler #'render-home
-                          {:br-window-size 18})
-     [:get  "/embed"]   default-shim-handler
-     [:post "/embed"]   (h/render-handler #'render-home-embed
-                          {:br-window-size 18})
-     [:post "/tap"]     (h/action-handler #'action-tap-cell)}))
-
 (defn ctx-start []
   (let [db_ (atom {:board (game/empty-board board-size board-size)
                    :users {}})]
@@ -173,12 +164,11 @@
 
 (defn -main [& _]
   (h/start-app
-    {:router         #'router
-     :max-refresh-ms 200
+    {:max-refresh-ms 200
      :ctx-start      ctx-start
      :ctx-stop       (fn [{:keys [game-stop]}] (game-stop))
      :csrf-secret    (h/env :csrf-secret)
-     :on-error       (fn [_ctx {:keys [req error]}]
+     :on-error       (fn [_ctx {:keys [_req error]}]
                        ;; (pprint/pprint req)
                        (pprint/pprint error)
                        (flush))}))
@@ -189,7 +179,7 @@
 (comment
   (-main)
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
-
+  
   ;; stop server
   (((h/get-app) :stop))
 

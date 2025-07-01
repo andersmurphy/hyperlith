@@ -1,6 +1,6 @@
 (ns app.main
   (:gen-class)
-  (:require [hyperlith.core :as h]))
+  (:require [hyperlith.core :as h :refer [defaction defview]]))
 
 (def css
   (h/static-css
@@ -27,33 +27,30 @@
           :style {:left (str x "px") :top (str y "px")}}
          "🚀"]))))
 
-(defn render-home [{:keys [db] :as _req}]
+(defaction handle-user-cursor-position
+  [{:keys [sid db] {:keys [x y]} :body}]
+  (when (and x y)
+    (swap! db assoc sid [x y])))
+
+(def shim-headers
   (h/html
-    [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
+    [:link#css {:rel "stylesheet" :type "text/css" :href css}]))
+
+(defview handler-home {:path         "/"
+                       :shim-headers shim-headers
+                       :on-close
+                       (fn [{:keys [sid db]}] (swap! db dissoc sid))}
+  [{:keys [db] :as _req}]
+  (h/html
+    [:link#css {:rel "stylesheet" :type "text/css" :href css}]
     [:main#morph.main {:data-signals-x__ifmissing 0
                        :data-signals-y__ifmissing 0}
      [:div.cursor-area
       {:data-on-mousemove__debounce.100ms
-       "$x = evt.clientX; $y = evt.clientY; @post('/position')"}
+       (str "$x = evt.clientX; $y = evt.clientY; @post('"
+         handle-user-cursor-position
+         "')")}
       (cursors db)]]))
-
-(defn action-user-cursor-position [{:keys [sid db] {:keys [x y]} :body}]
-  (when (and x y)
-    (swap! db assoc sid [x y])))
-
-(def default-shim-handler
-  (h/shim-handler
-    (h/html
-      [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}])))
-
-(def router
-  (h/router
-    {[:get (css :path)]  (css :handler)
-     [:get  "/"]         default-shim-handler
-     [:post "/"]         (h/render-handler #'render-home
-                           :on-close
-                           (fn [{:keys [sid db]}] (swap! db dissoc sid)))
-     [:post "/position"] (h/action-handler action-user-cursor-position)}))
 
 (defn ctx-start []
   (let [db_ (atom {})]
@@ -62,8 +59,7 @@
 
 (defn -main [& _]
   (h/start-app
-    {:router         #'router
-     :max-refresh-ms 100
+    {:max-refresh-ms 100
      :ctx-start       ctx-start
      :ctx-stop        (fn [_db] nil)
      :csrf-secret    (h/env :csrf-secret)}))
@@ -83,12 +79,19 @@
   (reset! (-> (h/get-app) :ctx :db) {})
 
   ;; Example backend driven cursor test
+  (def wraped-router (-> (h/get-app) :wraped-router))
+  
   (doseq [_x (range 10000)]
     (Thread/sleep 1)
-    (action-user-cursor-position
-      {:db   (-> (h/get-app) :ctx :db)
-       :sid  (rand-nth (range 1000))
-       :body {:x (rand-nth (range 1 400 20))
-              :y (rand-nth (range 1 400 20))}}))
+    (wraped-router
+      {:headers
+       {"accept-encoding" "br"
+        "cookie"          "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY; __Host-csrf=3UsG62ic9wLsg9EVQhGupw"
+        "content-type"    "application/json"}
+       :request-method :post
+       :uri            handle-user-cursor-position
+       :body           {:csrf "3UsG62ic9wLsg9EVQhGupw"
+                        :x    (rand-nth (range 1 400 20))
+                        :y    (rand-nth (range 1 400 20))}}))
 
   ,)

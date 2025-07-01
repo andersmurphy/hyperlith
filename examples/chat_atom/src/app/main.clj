@@ -2,7 +2,7 @@
   (:gen-class)
   (:require [clojure.pprint :as pprint]
             [clojure.string :as str]
-            [hyperlith.core :as h]))
+            [hyperlith.core :as h :refer [defaction defview]]))
 
 (def css
   (h/static-css
@@ -35,35 +35,27 @@
       (for [[id content] (get-messages db)]
         [:p {:id id} content]))))
 
-(defn render-home [{:keys [db] :as _req}]
-  (h/html
-    [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
-    [:main#morph.main
-     [:div.chat
-      [:input {:type "text" :data-bind "message"}]
-      [:button
-       {:data-on-click "@post('/send')"} "send"]]
-     (messages db)]))
-
-(defn action-send-message [{:keys [_sid db] {:keys [message]} :body}]
+(defaction handler-send-message [{:keys [_sid db] {:keys [message]} :body}]
   (when-not (str/blank? message)
     (swap! db update :messages conj [(h/new-uid) message])
     (h/signals {:message ""})))
 
-;; Allows for shim handler to be reused across shim routes
-(def default-shim-handler
-  (h/shim-handler
-    (h/html
-      [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
-      [:title nil "Chat"]
-      [:meta {:content "Chat app" :name "description"}])))
+(def shim-headers
+  (h/html
+    [:link#css {:rel "stylesheet" :type "text/css" :href css}]
+    [:title nil "Chat"]
+    [:meta {:content "Chat app" :name "description"}]))
 
-(def router
-  (h/router
-    {[:get (css :path)] (css :handler)
-     [:get  "/"]        default-shim-handler
-     [:post "/"]        (h/render-handler #'render-home)
-     [:post "/send"]    (h/action-handler #'action-send-message)}))
+(defview handler-home {:path "/" :shim-headers shim-headers}
+  [{:keys [db] :as _req}]
+  (h/html
+    [:link#css {:rel "stylesheet" :type "text/css" :href css}]
+    [:main#morph.main
+     [:div.chat
+      [:input {:type "text" :data-bind "message"}]
+      [:button
+       {:data-on-click (str "@post('" handler-send-message "')")} "send"]]
+     (messages db)]))
 
 (defn ctx-start []
   (let [db_ (atom {:messages []})]
@@ -72,8 +64,7 @@
 
 (defn -main [& _]
   (h/start-app
-    {:router         #'router
-     :max-refresh-ms 100
+    {:max-refresh-ms 100
      :ctx-start      ctx-start
      :ctx-stop       (fn [_state] nil)
      :csrf-secret    (h/env :csrf-secret)

@@ -1,6 +1,6 @@
 (ns app.main
   (:gen-class)
-  (:require [hyperlith.core :as h]))
+  (:require [hyperlith.core :as h :refer [defaction defview]]))
 
 (def css
   (h/static-css
@@ -64,9 +64,30 @@
           "evt.dataTransfer.setData('text/plain', evt.target.id)"}
          "⭐"]))))
 
-(defn render-home [{:keys [db] :as _req}]
+(defn remove-star [db id]
+  (-> (update db :stars dissoc id)
+    (update :stars-collected inc)))
+
+(defn  move-star [db id]
+  (swap! db assoc-in [:stars id] {:x 55 :y 55})
+  (Thread/sleep 250)
+  (swap! db remove-star id))
+
+(defaction handler-user-move-star-to-dropzone
+  [{:keys [db] {:strs [id]} :query-params}]
+  (when id
+    (move-star db id)))
+
+(def shim-headers
   (h/html
-    [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}]
+    ;; Setting the colour here prevents flash on remote stylesheet update
+    [:style "html {background: #212529}"]
+    [:link#css {:rel "stylesheet" :type "text/css" :href css}]))
+
+(defview handler-home {:path "/" :shim-headers shim-headers}
+  [{:keys [db] :as _req}]
+  (h/html
+    [:link#css {:rel "stylesheet" :type "text/css" :href css}]
     [:main#morph.main
      [:p.counter "DRAG THE STARS TO THE SHIP"]
      [:p "(multiplayer co-op)"]
@@ -75,7 +96,8 @@
        {:style            {:left :55% :top :55%}
         :data-on-dragover "evt.preventDefault()"
         :data-on-drop
-        "evt.preventDefault(); @post(`/dropzone?id=${evt.dataTransfer.getData('text/plain')}`)"}
+        (str "evt.preventDefault(); @post(`"
+          handler-user-move-star-to-dropzone "?id=${evt.dataTransfer.getData('text/plain')}`)")}
        "🚀"]]
      [:p.counter nil
       (str "STARS COLLECTED: "  (@db :stars-collected))]
@@ -83,37 +105,6 @@
       "Built with ❤️ using Datastar"]
      [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/drag_drop/src/app/main.clj"}
       "show me the code"]]))
-
-(defn remove-star [db id]
-  (-> (update db :stars dissoc id)
-    (update :stars-collected inc)))
-
-(defn move-star [db id]
-  (swap! db assoc-in [:stars id] {:x 55 :y 55})
-  (Thread/sleep 250)
-  (swap! db remove-star id))
-
-(defn action-user-move-star-to-dropzone
-  [{:keys [db] {:strs [id]} :query-params}]
-  (when id
-    (move-star db id)))
-
-(def default-shim-handler
-  (h/shim-handler
-    (h/html
-      ;; Setting the colour here prevents flash on remote stylesheet update
-      [:style "html {background: #212529}"]
-      [:link#css {:rel "stylesheet" :type "text/css" :href (css :path)}])))
-
-(def router
-  (h/router
-    {[:get (css :path)]  (css :handler)
-     [:get  "/"]         default-shim-handler
-     [:post "/"]         (h/render-handler #'render-home
-                           :on-close
-                           (fn [{:keys [sid db]}]
-                             (swap! db update :cursors dissoc sid)))
-     [:post "/dropzone"] (h/action-handler #'action-user-move-star-to-dropzone)}))
 
 (defn ctx-start []
   (let [db_ (atom {:stars-collected 0})]
@@ -127,8 +118,7 @@
 
 (defn -main [& _]
   (h/start-app
-    {:router         #'router
-     :max-refresh-ms 100
+    {:max-refresh-ms 100
      :ctx-start    ctx-start
      :ctx-stop     (fn [_] nil)
      :csrf-secret    (h/env :csrf-secret)}))
@@ -148,17 +138,3 @@
   (place-stars (:db ((h/get-app) :ctx)) 10)
 
   ,)
-
-(comment
-  (def db (:db ((h/get-app) :ctx)))
-  
-  (place-stars (:db ((h/get-app) :ctx)) 60)
-  
-  (do (mapv
-        (fn [[k _]]
-          (action-user-move-star-to-dropzone
-            {:db           db
-             :query-params {"id" k}}))
-        (:stars @db))
-      nil)
-  )
