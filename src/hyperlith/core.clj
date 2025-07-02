@@ -18,7 +18,6 @@
             [hyperlith.impl.env]
             [hyperlith.impl.batch]
             [clojure.core.async :as a]
-            [clojure.pprint :as pprint]
             [org.httpkit.server :as hk]
             [hyperlith.impl.codec :as codec])
   (:import (java.util.concurrent Executors)))
@@ -120,12 +119,12 @@
     (a/>!! <refresh-ch
       {:invalidate-cache? (not keep-cache?)})))
 
-(defn start-app [{:keys [port ctx-start ctx-stop csrf-secret
-                         max-refresh-ms on-error]
-                  :or   {port           8080
-                         max-refresh-ms 100
-                         on-error       (fn [_ctx {:keys [error]}]
-                                          (pprint/pprint error))}}]
+(defn start-app
+  [{:keys [port ctx-start ctx-stop csrf-secret
+           max-refresh-ms on-error]
+    :or   {port           8080
+           max-refresh-ms 100
+           on-error       er/default-on-error}}]
   (let [<refresh-ch   (a/chan (a/dropping-buffer 1))
         _             (reset! refresh-ch_ <refresh-ch)
         ctx           (ctx-start)
