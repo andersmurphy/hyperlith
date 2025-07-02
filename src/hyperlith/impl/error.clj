@@ -55,7 +55,7 @@
                                     ;; relevant line
                                     (u/dedupe-with first)
                                     ;; max number of lines
-                                    (take 15))
+                                    (take 20))
                                   trace)))
                (assoc :type (-> m :via peek :type str))))}))
 
@@ -70,3 +70,12 @@
 (defn wrap-error [handler]
   (fn [req]
     (or (try-log req (handler req)) {:status 400})))
+
+(defn default-on-error [_ctx {:keys [error]}]
+  (let [{:keys [cause trace type]} error]
+    (println "")
+    (println type)
+    (println cause)
+    (println "")
+    (run! println trace))
+  (flush))
