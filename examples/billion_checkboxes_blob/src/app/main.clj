@@ -163,30 +163,51 @@
          :border        "0.15em solid currentColor"
          :padding       :5px}]])))
 
+(defn get-tab-state [db sid tabid]
+  (-> (d/q db {:select [:state]
+               :from   :tab
+               :where  [:and [:= :sid sid] [:= :tabid tabid]]})
+    first))
+
+(defn upsert-tab-state! [db sid tabid update-fn]
+  (let [old-state (get-tab-state db sid tabid)
+        new-state (update-fn old-state)]
+    (if old-state
+      (d/q db {:update :tab
+               :set    {:state [:lift new-state]}
+               :where  [:and [:= :sid sid] [:= :tabid tabid]]})
+      (d/q db {:insert-into :tab
+               :values      [{:sid   sid
+                              :tabid tabid
+                              :state [:lift new-state]}]}))))
+
 (defaction handler-scroll
-  [{:keys [sid tabid tab] {:keys [x y]} :body}]
-  (swap! tab
-    (fn [snapshot]
-      (-> snapshot
-        (assoc-in [sid tabid :x] (max (int x) 0))
-        (assoc-in [sid tabid :y] (max (int y) 0))))))
+  [{:keys [sid tabid tx-batch!] {:keys [x y]} :body}]
+  (tx-batch!
+    (fn [db _]
+      (upsert-tab-state! db sid tabid
+        #(assoc %
+           :x (max (int x) 0)
+           :y (max (int y) 0))))))
 
 (defaction handler-palette
-  [{:keys [sid tab tabid] {:keys [targetid]} :body}]
+  [{:keys [sid tabid tx-batch!] {:keys [targetid]} :body}]
   (let [color (parse-long targetid)]
     (when (< 0 color (count states))
-      (swap! tab assoc-in [sid tabid :color] color))))
+      (tx-batch!
+        (fn [db _]
+          (upsert-tab-state! db sid tabid #(assoc % :color color)))))))
 
 (defaction handler-check
-  [{:keys                       [sid tx-batch! tab tabid]
+  [{:keys                       [sid tx-batch! db tabid]
     {:keys [targetid parentid]} :body}]
   (when (and targetid parentid)
-    (let [user-color (or (:color (get-in @tab [sid tabid] tab)) 1)
+    (let [user-color (or (:color (get-tab-state db sid tabid)) 1)
           cell-id    (int (parse-long targetid))
           chunk-id   (int (parse-long parentid))]
       (when (>= (dec (* chunk-size chunk-size)) cell-id 0)
         (tx-batch!
-          (fn action-tap-cell-thunk [db chunk-cache]
+          (fn [db chunk-cache]
             (let [[checks] (d/q db {:select [:checks]
                                     :from   :session
                                     :where  [:= :id sid]})]
@@ -293,8 +314,8 @@
 
 (defview handler-root
   {:path "/" :shim-headers shim-headers :br-window-size 19}
-  [{:keys [db sid tab tabid] :as _req}]
-  (let [user    (get-in @tab [sid tabid] tab)
+  [{:keys [db sid tabid] :as _req}]
+  (let [user    (get-tab-state db sid tabid)
         content (UserView user db)
         palette (Palette (or (:color user) 1))]
     (h/html
@@ -360,39 +381,36 @@
   (d/q db
     ["CREATE TABLE IF NOT EXISTS chunk(id INT PRIMARY KEY, chunk BLOB)"])
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, checks INTEGER) WITHOUT ROWID"])
+    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data INTEGER) WITHOUT ROWID"])
+  (d/q db
+    ["CREATE TABLE IF NOT EXISTS tab(sid TEXT, tabid TEXT, state BLOB, PRIMARY KEY (sid, tabid)) WITHOUT ROWID"])
   (when-not (d/q db {:select [:id] :from :chunk :limit 1})
     (initial-board-db-state! db)))
 
 (defn ctx-start []
-  (let [tab-state_ (atom {:users {}})
-        {:keys [writer reader]}
+  (let [{:keys [writer reader]}
         (d/init-db! "database-new.db"
           {:pool-size 4
            :pragma    {:foreign_keys false}})]
     ;; Run migrations
     (migrations writer)
-    ;; Watch tab state
-    (add-watch tab-state_ :refresh-on-change
-      (fn [_ _ _ _] (h/refresh-all!)))
-    {:tab       tab-state_
-     :db        reader
+    {:db        reader
      :db-read   reader
      :db-write  writer
      :tx-batch! (h/batch!
-                      (fn [thunks]
-                        #_{:clj-kondo/ignore [:unresolved-symbol]}
-                        (let [chunk-cache (atom {})]
-                          (d/with-write-tx [db writer]
-                            (run! (fn [thunk] (thunk db chunk-cache)) thunks)
-                            (run! (fn [[chunk-id new-chunk]]
-                                    (d/q db
-                                      {:update :chunk
-                                       :set    {:chunk [:lift new-chunk]}
-                                       :where  [:= :id chunk-id]}))
-                              @chunk-cache)))
-                        (h/refresh-all!))
-                      {:run-every-ms 100})}))
+                  (fn [thunks]
+                    #_{:clj-kondo/ignore [:unresolved-symbol]}
+                    (let [chunk-cache (atom {})]
+                      (d/with-write-tx [db writer]
+                        (run! (fn [thunk] (thunk db chunk-cache)) thunks)
+                        (run! (fn [[chunk-id new-chunk]]
+                                (d/q db
+                                  {:update :chunk
+                                   :set    {:chunk [:lift new-chunk]}
+                                   :where  [:= :id chunk-id]}))
+                          @chunk-cache)))
+                    (h/refresh-all!))
+                  {:run-every-ms 100})}))
 
 (defn ctx-stop [ctx]
   (.close (:db-write ctx))
@@ -403,15 +421,7 @@
     {:max-refresh-ms 100
      :ctx-start      ctx-start
      :ctx-stop       ctx-stop
-     :csrf-secret    (h/env :csrf-secret)
-     :on-error       (fn [_ctx {:keys [_req error]}]
-                       (let [{:keys [cause trace type]} error]
-                         (println "")
-                         (println type)
-                         (println cause)
-                         (println "")
-                         (run! println trace))
-                       (flush))}))
+     :csrf-secret    (h/env :csrf-secret)}))
 
 ;; Refresh app when you re-eval file
 (h/refresh-all!)
