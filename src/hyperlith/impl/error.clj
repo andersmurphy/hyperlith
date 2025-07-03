@@ -38,13 +38,16 @@
   ;; trim error trace to users space helps keep trace short
   (take-while (fn [[cls _ _ _]] (not (str/starts-with? cls "hyperlith")))))
 
+(defn double-quote->single-quote [s]
+  (when s (str/replace s #"\"" "'")))
+
 (defn log-error [req t]
   (@on-error_
    {;; req is under own key as it can contain data you don't want to log.
     :req   (dissoc req :async-channel :websocket?)
     :error (let [m (Throwable->map t)]
              (-> m
-               (update :cause str/replace #"\"" "'")
+               (update :cause double-quote->single-quote)
                (update :trace (fn [trace]
                                 (into []
                                   (comp demunge-csl-xf
