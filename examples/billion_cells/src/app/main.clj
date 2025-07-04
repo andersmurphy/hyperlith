@@ -225,19 +225,21 @@
     (and focus (= focus sid))
     (let [on-load  (str "$cellvalue = '" (or value "") "';el.focus();")
           on-input (str "@post('" handler-save-cell "')")
-          id (str "focus-" local-id)]
+          id       (str "focus-" local-id)]
       (h/html
         [:div.focus-cell
          [:input.focus-user
-          {:id                            id
-           :data-id                       local-id
-           :data-parentid                 chunk-id
-           :maxlength                     20
-           :size                          10
-           :type                          "text"           
-           :data-on-load                  on-load
-           :data-bind                     "cellvalue"
-           :data-on-input__debounce.200ms on-input}]]))
+          (array-map
+            :id                            id
+            :data-id                       local-id
+            :data-parentid                 chunk-id
+            :maxlength                     20
+            :size                          10
+            :type                          "text"
+            :data-on-load                  on-load
+            :data-preserve-attr            "data-on-load"
+            :data-bind                     "cellvalue"
+            :data-on-input__debounce.200ms on-input)]]))
 
     focus
     (h/html
@@ -451,4 +453,3 @@
 ;; focus element
 ;; focus element value
 ;; swap
-
