@@ -15,7 +15,7 @@ java -Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl}" -jar 
 Move JAR to server (this will trigger a service restart).
 
 ```bash
-scp target/app.jar root@checkboxes.andersmurphy.com:/home/app/
+scp target/app.jar root@cells.andersmurphy.com:/home/app/
 ```
 
 ## After deploying first jar
@@ -29,6 +29,6 @@ ssh root@checkboxes.andersmurphy.com "reboot"
 ## SSH into repl
 
 ```bash
-ssh root@checkboxes.andersmurphy.com "nc localhost:5555"
+ssh root@cells.andersmurphy.com "nc localhost:5555"
 ```
 

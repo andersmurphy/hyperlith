@@ -12,11 +12,6 @@
                   int))
 (def board-size-px (* 32 chunk-size board-size))
 (def size (* board-size chunk-size))
-(def states
-  [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14])
-
-(def state->class
-  (mapv #(str "_" %) states))
 
 (def css
   (let [black         "#000000"
@@ -230,19 +225,21 @@
 (defn Cell [chunk-id local-id {:keys [value focus]} sid]
   (cond
     (and focus (= focus sid))
-    (h/html
-      [:div.focus-cell
-       [:input.focus-user
-        {:id                            local-id
-         :data-id                       local-id
-         :data-parentid                 chunk-id
-         :maxlength                     20
-         :size                          10
-         :data-on-load                  "el.focus()"
-         :type                          "text"
-         :value                         value
-         :data-bind                     "cellvalue"
-         :data-on-input__debounce.200ms (str "@post('" handler-save-cell "')")}]])
+    (let [on-load  (str "$cellvalue = '" (or value "") "';el.focus();")
+          on-input (str "@post('" handler-save-cell "')")
+          id (str "focus-" local-id)]
+      (h/html
+        [:div.focus-cell
+         [:input.focus-user
+          {:id                            id
+           :data-id                       local-id
+           :data-parentid                 chunk-id
+           :maxlength                     20
+           :size                          10
+           :type                          "text"           
+           :data-on-load                  on-load
+           :data-bind                     "cellvalue"
+           :data-on-input__debounce.200ms on-input}]]))
 
     focus
     (h/html
@@ -320,8 +317,8 @@
 (def shim-headers
   (h/html
     [:link#css {:rel "stylesheet" :type "text/css" :href css}]
-    [:title nil "One billion checkboxes"]
-    [:meta {:content "So many checkboxes" :name "description"}]))
+    [:title nil "One billion cells"]
+    [:meta {:content "So many cells" :name "description"}]))
 
 (defview handler-root
   {:path     "/" :shim-headers shim-headers :br-window-size 19
@@ -339,7 +336,6 @@
           "evt.target.classList.add('pop');"
           "$targetid = evt.target.dataset.id;"
           "$parentid = evt.target.dataset.parentid;"
-          "$cellvalue = evt.target.dataset.value;"
           "@post(`${evt.target.dataset.action}`);"
           "}")}
        [:div#view.view
