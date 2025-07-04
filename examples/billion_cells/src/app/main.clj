@@ -145,32 +145,30 @@
          :border-radius :0.15em
          :border        "0.15em solid currentColor"
          :padding       :5px}]])))
-
 (defn get-tab-state [db sid tabid]
-  (-> (d/q db {:select [:state]
-               :from   :tab
-               :where  [:and [:= :sid sid] [:= :tabid tabid]]})
+  (-> (d/q db ["SELECT state FROM tab WHERE (sid = ?) AND (tabid = ?)"
+               sid tabid])
     first))
 
 (defn update-tab-state! [db sid tabid update-fn]
   (let [old-state (get-tab-state db sid tabid)
         new-state (update-fn old-state)]
     (if old-state
-      (d/q db {:update :tab
-               :set    {:state [:lift new-state]}
-               :where  [:and [:= :sid sid] [:= :tabid tabid]]})
-      (d/q db {:insert-into :tab
-               :values      [{:sid   sid
-                              :tabid tabid
-                              :state [:lift (assoc new-state
-                                              :sid sid
-                                              :tabid tabid)]}]}))))
+      (d/q db
+        ["UPDATE tab SET state = ? WHERE (sid = ?) AND (tabid = ?)"
+         new-state sid tabid])
+      (d/q db
+        ["INSERT INTO tab (sid, tabid, state) VALUES (?, ?, ?)"
+         sid
+         tabid
+         (assoc new-state
+           :sid sid
+           :tabid tabid)]))))
 
 (defn update-chunk! [db chunk-cache chunk-id update-fn]
   (let [old-chunk (or (@chunk-cache chunk-id)
-                    (-> (d/q db {:select [:chunk]
-                                 :from   :chunk
-                                 :where  [:= :id chunk-id]})
+                    (-> (d/q db
+                          ["SELECT chunk FROM chunk WHERE id = ?" chunk-id])
                       first))
         new-chunk (update-fn old-chunk)]
     (swap! chunk-cache assoc chunk-id new-chunk)))
@@ -286,9 +284,8 @@
 
 (defn UserView [{:keys [x y sid] :or {x 0 y 0}} db]
   (->> (d/q db
-         {:select [:id :chunk]
-          :from   :chunk
-          :where  [:in :id (xy->chunk-ids x y)]})
+         (into ["SELECT id, chunk FROM chunk WHERE id IN (?, ?, ?, ?, ?, ?, ?, ?, ?)"]
+           (xy->chunk-ids x y)))
     (mapv (fn [[id chunk]]
             (Chunk id chunk sid)))))
 
@@ -359,7 +356,9 @@
         " and "
         [:a {:href "https://data-star.dev"} "Datastar"]
         " - "
-        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_cells/src/app/main.clj" } "source"]]])))
+        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_cells/src/app/main.clj" } "source"]
+        " - "
+        [:a {:href "https://checkboxes.andersmurphy.com"} " more like this"]]])))
 
 (def blank-chunk
   (-> (repeat (* chunk-size chunk-size) {})
@@ -391,6 +390,14 @@
   (when-not (d/q db {:select [:id] :from :chunk :limit 1})
     (initial-board-db-state! db)))
 
+(d/format-query
+  (let [sid 1 tabid 2 new-state {} chunk-id 3 foo [1 2 3 4 5 6 7 8 9]
+        new-chunk {}]
+    {:update :chunk
+   :set    {:chunk [:lift new-chunk]}
+   :where  [:= :id chunk-id]}))
+  
+
 (defn ctx-start []
   (let [{:keys [writer reader]}
         (d/init-db! "database-new.db"
@@ -409,9 +416,8 @@
                         (run! (fn [thunk] (thunk db chunk-cache)) thunks)
                         (run! (fn [[chunk-id new-chunk]]
                                 (d/q db
-                                  {:update :chunk
-                                   :set    {:chunk [:lift new-chunk]}
-                                   :where  [:= :id chunk-id]}))
+                                  ["UPDATE chunk SET chunk = ? WHERE id = ?"
+                                   new-chunk chunk-id]))
                           @chunk-cache)))
                     (h/refresh-all!))
                   {:run-every-ms 100})}))

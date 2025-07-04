@@ -17,6 +17,8 @@
 ;; (defmacro q [db query & [opts]]
 ;;   `(d/q ~db ~(hsql/format query {:params opts})))
 
+(def format-query hsql/format)
+
 ;;; - UTILITY -
 
 (defn table-info [db table-name]
