@@ -353,7 +353,7 @@
         " - "
         [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "source"]
         " - "
-        [:a {:href "https://lospec.com/palette-list/pico-8"} "palette"]]])))
+        [:a {:href "https://cells.andersmurphy.com"} " more like this"]]])))
 
 (def blank-chunk
   (-> (repeat (* chunk-size chunk-size) 0)
