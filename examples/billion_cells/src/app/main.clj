@@ -398,7 +398,6 @@
     {:update :chunk
    :set    {:chunk [:lift new-chunk]}
    :where  [:= :id chunk-id]}))
-  
 
 (defn ctx-start []
   (let [{:keys [writer reader]}
@@ -447,6 +446,14 @@
   (((h/get-app) :stop))
 
   (def db (-> (h/get-app) :ctx :db))
+
+  
+
+  
+  (d/q db {:select [[[:count [:distinct :sid]]]]
+           :from   :tab})
+  ;; 4677
+  
 
   ,)
 

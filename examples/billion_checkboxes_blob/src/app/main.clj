@@ -466,6 +466,8 @@
   (d/table-info db :chunks)
   (d/table-list db)
 
+  ;; (+ 7784 3249)
+
   ,)
 
 (comment
