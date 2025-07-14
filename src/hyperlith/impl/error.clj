@@ -1,4 +1,5 @@
-(ns hyperlith.impl.error)
+(ns hyperlith.impl.error 
+  (:require [clojure.pprint :as pprint]))
 
 (defonce on-error_ (atom nil))
 
@@ -12,12 +13,8 @@
 
 (defn wrap-error [handler]
   (fn [req]
-    (or (try-on-error req (handler req)) {:status 500})))
+    (or (try-on-error (handler req)) {:status 500})))
 
-(defn default-on-error [{:keys [cause trace type] :as _error}]
-  (println "")
-  (println type)
-  (println cause)
-  (println "")
-  (run! println trace)
+(defn default-on-error [error]
+  (pprint/pprint error)
   (flush))

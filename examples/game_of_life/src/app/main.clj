@@ -1,7 +1,6 @@
 (ns app.main
   (:gen-class)
-  (:require [clojure.pprint :as pprint]
-            [hyperlith.core :as h :refer [defaction defview]]
+  (:require [hyperlith.core :as h :refer [defaction defview]]
             [app.game :as game]))
 
 (def board-size 50)
@@ -110,18 +109,18 @@
 
 (defview render-home {:path "/" :shim-headers shim-headers}
   [{:keys [board-cache _sid] :as _req}]
-    (h/html
-      [:link#css {:rel "stylesheet" :type "text/css" :href css}]
-      [:main#morph.main
-       [:h1 "Game of Life (multiplayer)"]
-       [:p "Built with ❤️ using "
-        [:a {:href "https://clojure.org/"} "Clojure"]
-        " and "
-        [:a {:href "https://data-star.dev"} "Datastar"]
-        "🚀"]
-       [:p "Source code can be found "
-        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/game_of_life/main.clj"} "here"]]
-       @board-cache]))
+  (h/html
+    [:link#css {:rel "stylesheet" :type "text/css" :href css}]
+    [:main#morph.main
+     [:h1 "Game of Life (multiplayer)"]
+     [:p "Built with ❤️ using "
+      [:a {:href "https://clojure.org/"} "Clojure"]
+      " and "
+      [:a {:href "https://data-star.dev"} "Datastar"]
+      "🚀"]
+     [:p "Source code can be found "
+      [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/game_of_life/main.clj"} "here"]]
+     @board-cache]))
 
 (defview render-home-embed {:path "/embed" :shim-headers shim-headers}
   [{:keys [board-cache _sid] :as _req}]
@@ -153,23 +152,18 @@
 (defn ctx-start []
   (let [db_         (atom {:board (game/empty-board board-size board-size)
                            :users {}})
-        board-cache (atom nil)]
-    (add-watch db_ :refresh-on-change
-      (fn [_ _ old-state new-state]
-        ;; Only refresh if state has changed
-        (when-not (= old-state new-state)
-          (h/refresh-all!))))
-    (let [tx-batch! (h/batch!
+        board-cache (atom nil)
+        tx-batch!   (h/batch!
                       (fn [thunks]
                         (run! (fn [thunk] (thunk db_)) thunks)
                         ;; rebuild board state
                         (reset! board-cache (board @db_))
                         (h/refresh-all!))
                       {:run-every-ms 200})]
-      {:board-cache board-cache
-       :db          db_
-       :tx-batch!   tx-batch!
-       :game-stop   (start-game! tx-batch!)})))
+    {:board-cache board-cache
+     :db          db_
+     :tx-batch!   tx-batch!
+     :game-stop   (start-game! tx-batch!)}))
 
 (defonce app_ (atom nil))
 
