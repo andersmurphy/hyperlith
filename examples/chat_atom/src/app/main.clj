@@ -1,7 +1,6 @@
 (ns app.main
   (:gen-class)
-  (:require [clojure.pprint :as pprint]
-            [clojure.string :as str]
+  (:require [clojure.string :as str]
             [hyperlith.core :as h :refer [defaction defview]]))
 
 (def css
@@ -65,10 +64,7 @@
     {:max-refresh-ms 100
      :ctx-start      ctx-start
      :ctx-stop       (fn [_state] nil)
-     :csrf-secret    (h/env :csrf-secret)
-     :on-error       (fn [_ctx {:keys [req error]}]
-                       (pprint/pprint req)
-                       (pprint/pprint error))}))
+     :csrf-secret    (h/env :csrf-secret)}))
 
 ;; Refresh app when you re-eval file
 (h/refresh-all!)

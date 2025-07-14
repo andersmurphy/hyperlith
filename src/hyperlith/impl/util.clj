@@ -55,22 +55,6 @@
   [m ns]
   (update-keys m (fn [k] (keyword (name ns) (name k)))))
 
-(defn dedupe-with
-  ([f]
-   (fn [rf]
-     (let [pv (volatile! ::none)]
-       (fn
-         ([] (rf))
-         ([result] (rf result))
-         ([result input]
-          (let [prior   @pv
-                f-input (f input)]
-            (vreset! pv f-input)
-            (if (= prior f-input)
-              result
-              (rf result input))))))))
-  ([f coll] (sequence (dedupe-with f) coll)))
-
 (defn modulo-pick
   "Given a coll and a value x. Returns a random value from coll.
   Always returns the same value for a given coll and value."

@@ -165,7 +165,7 @@
                      [<ch]
                      ([_]
                       (when-some ;; stop in case of error
-                          [new-view (er/try-log req (render-fn req))]
+                          [new-view (er/try-on-error req (render-fn req))]
                         (let [new-view-str  (h/html->str new-view)
                               new-view-hash (crypto/digest new-view-str)]
                           ;; only send an event if the view has changed

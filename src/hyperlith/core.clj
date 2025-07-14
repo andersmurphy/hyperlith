@@ -71,7 +71,7 @@
    traces-reset!]
   ;; ERROR
   [hyperlith.impl.error
-   try-log]
+   try-on-error]
   ;; CODEC
   [hyperlith.impl.codec
    url-query-string
