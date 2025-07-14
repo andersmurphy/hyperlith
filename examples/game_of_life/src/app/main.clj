@@ -66,15 +66,13 @@
         {:background :purple
          :transition cell-transition}]])))
 
-(def board-state
-  (h/cache
-    (fn [db]
-      (into []
-        (comp
-          (map-indexed
-            (fn [id color-class]
-                (h/html [:div.tile {:class   color-class :data-id id}]))))
-        (:board db)))))
+(defn board-state [db]
+  (into []
+    (comp
+      (map-indexed
+        (fn [id color-class]
+          (h/html [:div.tile {:class color-class :data-id id}]))))
+    (:board db)))
 
 (defn fill-cell [board color id]
   (if ;; crude overflow check
@@ -91,9 +89,11 @@
       (update :board fill-cell user-color (+ id 1))
       (update :board fill-cell user-color (+ id board-size)))))
 
-(defaction handler-tap-cell [{:keys [sid db] {:strs [id]} :query-params}]
+(defaction handler-tap-cell [{:keys [tx-batch! sid] {:strs [id]} :query-params}]
   (when id
-    (swap! db fill-cross (parse-long id) sid)))
+    (tx-batch!
+      (fn [db]
+        (swap! db fill-cross (parse-long id) sid)))))
 
 (def shim-headers
   (h/html
@@ -109,8 +109,7 @@
        [:div.board nil view]])))
 
 (defview render-home {:path "/" :shim-headers shim-headers}
-  [{:keys [db _sid] :as _req}]
-  (let [snapshot @db]
+  [{:keys [board-cache _sid] :as _req}]
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href css}]
       [:main#morph.main
@@ -121,18 +120,17 @@
         [:a {:href "https://data-star.dev"} "Datastar"]
         "🚀"]
        [:p "Source code can be found "
-        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/app/main.clj"} "here"]]
-       (board snapshot)])))
+        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/game_of_life/main.clj"} "here"]]
+       @board-cache]))
 
 (defview render-home-embed {:path "/embed" :shim-headers shim-headers}
-  [{:keys [db _sid] :as _req}]
-  (let [snapshot @db]
+  [{:keys [board-cache _sid] :as _req}]
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href css}]
       [:main#morph.main
        [:h1 "Game of Life (multiplayer)"]
        [:p "Built with ❤️ using Clojure and Datastar 🚀"]
-       (board snapshot)])))
+       @board-cache]))
 
 (defn next-gen-board [current-board]
   (game/next-gen-board
@@ -143,47 +141,62 @@
 (defn next-generation! [db]
   (swap! db update :board next-gen-board))
 
-(defn start-game! [db]
+(defn start-game! [tx-batch!]
   (let [running_ (atom true)]
     (h/thread
       (while @running_
         (Thread/sleep 200) ;; 5 fps
-        (next-generation! db)))
+        (tx-batch!
+          (fn [db] (next-generation! db)))))
     (fn stop-game! [] (reset! running_ false))))
 
 (defn ctx-start []
-  (let [db_ (atom {:board (game/empty-board board-size board-size)
-                   :users {}})]
+  (let [db_         (atom {:board (game/empty-board board-size board-size)
+                           :users {}})
+        board-cache (atom nil)]
     (add-watch db_ :refresh-on-change
       (fn [_ _ old-state new-state]
         ;; Only refresh if state has changed
         (when-not (= old-state new-state)
           (h/refresh-all!))))
-    {:db        db_
-     :game-stop (start-game! db_)}))
+    (let [tx-batch! (h/batch!
+                      (fn [thunks]
+                        (run! (fn [thunk] (thunk db_)) thunks)
+                        ;; rebuild board state
+                        (reset! board-cache (board @db_))
+                        (h/refresh-all!))
+                      {:run-every-ms 200})]
+      {:board-cache board-cache
+       :db          db_
+       :tx-batch!   tx-batch!
+       :game-stop   (start-game! tx-batch!)})))
 
-(defn -main [& _]
-  (h/start-app
-    {:max-refresh-ms 200
-     :ctx-start      ctx-start
-     :ctx-stop       (fn [{:keys [game-stop]}] (game-stop))
-     :csrf-secret    (h/env :csrf-secret)
-     :on-error       (fn [_ctx {:keys [_req error]}]
-                       ;; (pprint/pprint req)
-                       (pprint/pprint error)
-                       (flush))}))
+(defonce app_ (atom nil))
+
+(defn start-app [port]
+  (reset! app_
+    (h/start-app
+      {:port           port
+       :max-refresh-ms 200
+       :ctx-start      ctx-start
+       :ctx-stop       (fn [{:keys [game-stop]}] (game-stop))
+       :csrf-secret    (h/env :csrf-secret)
+       :on-error       (fn [_ctx {:keys [_req error]}]
+                         ;; (pprint/pprint req)
+                         (pprint/pprint error)
+                         (flush))})))
 
 ;; Refresh app when you re-eval file
 (h/refresh-all!)
 
 (comment
-  (-main)
+  (start-app 8080)
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
   
   ;; stop server
-  (((h/get-app) :stop))
+  ((@app_ :stop))
 
-  (def db (-> (h/get-app) :ctx :db))
+  (def db (-> @app_ :ctx :db))
 
   (reset! db {:board (game/empty-board board-size board-size)
               :users {}})

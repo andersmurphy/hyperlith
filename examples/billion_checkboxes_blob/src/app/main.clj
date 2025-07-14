@@ -208,15 +208,6 @@
       (when (>= (dec (* chunk-size chunk-size)) cell-id 0)
         (tx-batch!
           (fn [db chunk-cache]
-            (let [[checks] (d/q db {:select [:checks]
-                                    :from   :session
-                                    :where  [:= :id sid]})]
-              (if checks
-                (d/q db {:update :session
-                         :set    {:checks (inc checks)}
-                         :where  [:= :id sid]})
-                (d/q db {:insert-into :session
-                         :values      [{:id sid :checks 1}]})))
             (let [chunk (or (@chunk-cache chunk-id)
                           (-> (d/q db {:select [:chunk]
                                        :from   :chunk
@@ -381,8 +372,6 @@
   (d/q db
     ["CREATE TABLE IF NOT EXISTS chunk(id INT PRIMARY KEY, chunk BLOB)"])
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data INTEGER) WITHOUT ROWID"])
-  (d/q db
     ["CREATE TABLE IF NOT EXISTS tab(sid TEXT, tabid TEXT, state BLOB, PRIMARY KEY (sid, tabid)) WITHOUT ROWID"])
   (when-not (d/q db {:select [:id] :from :chunk :limit 1})
     (initial-board-db-state! db)))
@@ -416,12 +405,15 @@
   (.close (:db-write ctx))
   (.close (:db-read ctx)))
 
+(defonce app_ (atom nil))
+
 (defn -main [& _]
-  (h/start-app
-    {:max-refresh-ms 100
-     :ctx-start      ctx-start
-     :ctx-stop       ctx-stop
-     :csrf-secret    (h/env :csrf-secret)}))
+  (reset! app_
+    (h/start-app
+      {:max-refresh-ms 100
+       :ctx-start      ctx-start
+       :ctx-stop       ctx-stop
+       :csrf-secret    (h/env :csrf-secret)})))
 
 ;; Refresh app when you re-eval file
 (h/refresh-all!)
@@ -432,14 +424,14 @@
   
 
   ;; stop server
-  (((h/get-app) :stop))
+  ((@app_ :stop))
 
-  (def db (-> (h/get-app) :ctx :db))
+  (def db (-> @app_ :ctx :db))
 
   ,)
 
 (comment
-  (def db (-> (h/get-app) :ctx :db))
+  (def db (-> @app_ :ctx :db))
   (d/pragma-check db)
   
   ;; Execution time mean : 148.516131 ms
@@ -458,11 +450,6 @@
   ;; Execution time mean : 151.256280 µs
   (user/bench (do (UserView {:x 1 :y 1} db) nil))
 
-  (d/q db {:select [[[:count :*]]] :from :session})
-  (d/q db {:select [[[:sum :checks]]] :from :session})
-  (d/q db {:select   [:checks] :from :session
-           :order-by [[:checks :desc]]})
-
   (d/table-info db :chunks)
   (d/table-list db)
 
@@ -475,11 +462,11 @@
     (d/q db
       ["SELECT chunk_id, JSON_GROUP_ARRAY(state) AS chunk_cells FROM cell WHERE chunk_id IN (?, ?, ?, ?, ?, ?, ?, ?, ?)  GROUP BY chunk_id" 1978 3955 5932 1979 3956 5933 1980 3957 5934]))
 
-  (def tab-state (-> (h/get-app) :ctx :tab))
+  (def tab-state (-> @app_ :ctx :tab))
 
   (count @tab-state)
 
-  (def db-write (-> (h/get-app) :ctx :db-write))
+  (def db-write (-> @app_ :ctx :db-write))
 
   (d/q db-write
     {:update :chunk
@@ -504,7 +491,7 @@
   )
 
 (comment
-  (def wraped-router (-> (h/get-app) :wraped-router))
+  (def wrapped-router (-> @app_ :wrapped-router))
   
   (future
     (time
@@ -512,7 +499,7 @@
         (fn [_]
           (run!
             (fn [_]
-              (wraped-router
+              (wrapped-router
                 {:headers
                  {"accept-encoding" "br"
                   "cookie"          "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY; __Host-csrf=3UsG62ic9wLsg9EVQhGupw"

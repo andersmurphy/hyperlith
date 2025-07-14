@@ -29,11 +29,9 @@
 (defn get-messages [db]
   (reverse (@db :messages)))
 
-(def messages
-  (h/cache
-    (fn [db]
-      (for [[id content] (get-messages db)]
-        [:p {:id id} content]))))
+(defn messages [db]
+  (for [[id content] (get-messages db)]
+    [:p {:id id} content]))
 
 (defaction handler-send-message [{:keys [_sid db] {:keys [message]} :body}]
   (when-not (str/blank? message)
@@ -76,12 +74,12 @@
 (h/refresh-all!)
 
 (comment
-  (-main)
+  (def app (-main))
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
   ;; stop server
-  (((h/get-app) :stop))
+  ((app :stop))
 
   ;; query outside of handler
-  (get-messages (-> (h/get-app) :ctx :db))
+  (get-messages (-> app :ctx :db))
   ,)

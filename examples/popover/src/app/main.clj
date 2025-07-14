@@ -71,10 +71,10 @@
 (h/refresh-all!)
 
 (comment
-  (-main)
+  (def app (-main))
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
   ;; stop server
-  (((h/get-app) :stop))
+  ((app :stop))
 
   ,)

@@ -392,13 +392,6 @@
   (when-not (d/q db {:select [:id] :from :chunk :limit 1})
     (initial-board-db-state! db)))
 
-(d/format-query
-  (let [sid 1 tabid 2 new-state {} chunk-id 3 foo [1 2 3 4 5 6 7 8 9]
-        new-chunk {}]
-    {:update :chunk
-   :set    {:chunk [:lift new-chunk]}
-   :where  [:= :id chunk-id]}))
-
 (defn ctx-start []
   (let [{:keys [writer reader]}
         (d/init-db! "database-new.db"
@@ -427,12 +420,15 @@
   (.close (:db-write ctx))
   (.close (:db-read ctx)))
 
+(defonce app_ (atom nil))
+
 (defn -main [& _]
-  (h/start-app
-    {:max-refresh-ms 100
-     :ctx-start      ctx-start
-     :ctx-stop       ctx-stop
-     :csrf-secret    (h/env :csrf-secret)}))
+  (reset! app_
+    (h/start-app
+      {:max-refresh-ms 100
+       :ctx-start      ctx-start
+       :ctx-stop       ctx-stop
+       :csrf-secret    (h/env :csrf-secret)})))
 
 ;; Refresh app when you re-eval file
 (h/refresh-all!)
@@ -443,9 +439,9 @@
 
 
   ;; stop server
-  (((h/get-app) :stop))
+  ((@app_ :stop))
 
-  (def db (-> (h/get-app) :ctx :db))
+  (def db (-> @app_ :ctx :db))
 
   
 

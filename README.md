@@ -77,19 +77,15 @@ The only way for actions to affect the view returned by the `render-fn` running 
 - Actions modify the database and return a 204 or a 200 if they `patch-signals`.
 - Render functions re-render when the database changes and send an update down the updates SSE connection.
 
-#### Work sharing (caching)
-
-Work sharing is the term I'm using for sharing renders between connected users. This can be useful when a lot of connected users share the same view. For example a leader board, game board, presence indicator etc. It ensures the work (eg: query and html generation) for that view is only done once regardless of the number of connected users. 
-
-There's a lot of ways you can do this. I've settled on a simple cache that gets invalidate when a `:refresh-event` is fired. This means the cache is invalidated at most every X msec (determined by `:max-refresh-ms`) and only if the db state has changed.
-
-To add something to the cache wrap the function in the `cache` higher order function.
-
 #### Batching
 
-Batching pairs really well with CQRS as you have a resolution window, this defines the maximum frequency the view can update, or in other terms the granularity/resolution of the view. Batching can generally be used to improve throughput by batching changes. 
+Batching pairs really well with CQRS as you have a resolution window, this defines the maximum frequency the view can update, or in other terms the granularity/resolution of the view. Batching can generally be used to improve throughput by batching changes.
 
-However, there is one downsides with batching to keep in mind and that is you don't get atomic transactions. The transaction move to the batch level, not the transact/insert level. Transaction matter when you are dealing with constraints you want to deal with at the database level, classic example is accounting systems or ledgers where you want to be able to fail an atomic transaction that violates a constraint (like user balance going negative). The problem with batching is that that transaction constraint failure, fails the whole batch not only the transact that was culpable.
+#### Work sharing (caching)
+
+Work sharing is the term I'm using for sharing renders between connected users. This can be useful when a lot of connected users share the same view. For example a leader board, game board, presence indicator etc. It ensures the work (eg: query and html generation) for that view is only done once regardless of the number of connected users.
+
+The simplest way to do this is to recalculate and cache values after after a batch has been run.
 
 #### Use `data-on-pointerdown/mous` over  `data-on-click`
 
