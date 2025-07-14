@@ -180,11 +180,7 @@
        :max-refresh-ms 200
        :ctx-start      ctx-start
        :ctx-stop       (fn [{:keys [game-stop]}] (game-stop))
-       :csrf-secret    (h/env :csrf-secret)
-       :on-error       (fn [_ctx {:keys [_req error]}]
-                         ;; (pprint/pprint req)
-                         (pprint/pprint error)
-                         (flush))})))
+       :csrf-secret    (h/env :csrf-secret)})))
 
 ;; Refresh app when you re-eval file
 (h/refresh-all!)

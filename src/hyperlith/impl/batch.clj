@@ -26,7 +26,7 @@
             (let [;; Timer is started before task to prevent task duration
                   ;; from affecting interval (unless it exceeds interval).
                   <new-t (a/timeout run-every-ms)]
-              (er/try-log {} (effect-fn batch))
+              (er/try-on-error (effect-fn batch))
               (recur <new-t []))
 
             ;; Add to batch
@@ -35,6 +35,6 @@
 
             ;; if upstream is close run final batch and stop
             :else
-            (er/try-log {} (effect-fn (apply concat batch)))))))
+            (er/try-on-error {} (effect-fn (apply concat batch)))))))
     (fn [items]
       (a/>!! <in items))))
