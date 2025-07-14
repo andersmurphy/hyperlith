@@ -35,6 +35,6 @@
 
             ;; if upstream is close run final batch and stop
             :else
-            (er/try-on-error {} (effect-fn (apply concat batch)))))))
+            (er/try-on-error (effect-fn (apply concat batch)))))))
     (fn [items]
       (a/>!! <in items))))

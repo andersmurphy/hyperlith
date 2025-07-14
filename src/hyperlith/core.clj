@@ -117,7 +117,7 @@
   (let [<refresh-ch    (a/chan (a/dropping-buffer 1))
         _              (reset! refresh-ch_ <refresh-ch)
         ctx            (ctx-start)
-        _              (reset! er/on-error_ (partial on-error ctx))
+        _              (reset! er/on-error_ on-error)
         refresh-mult   (-> (ds/throttle <refresh-ch max-refresh-ms)
                         a/mult)
         wrap-ctx       (fn [handler]
