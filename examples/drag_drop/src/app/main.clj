@@ -52,17 +52,15 @@
       (swap! db h/assoc-in-if-missing [:stars (str "s" x y)]
         {:x x :y y}))))
 
-(def stars
-  (h/cache
-    (fn [db]
-      (for [[star-id {:keys [x y]}] (:stars @db)]
-        [:div.star
-         {:id        star-id
-          :style     {:left (str x "%") :top (str y "%")}
-          :draggable "true"
-          :data-on-dragstart
-          "evt.dataTransfer.setData('text/plain', evt.target.id)"}
-         "⭐"]))))
+(defn stars [db]
+  (for [[star-id {:keys [x y]}] (:stars @db)]
+    [:div.star
+     {:id        star-id
+      :style     {:left (str x "%") :top (str y "%")}
+      :draggable "true"
+      :data-on-dragstart
+      "evt.dataTransfer.setData('text/plain', evt.target.id)"}
+     "⭐"]))
 
 (defn remove-star [db id]
   (-> (update db :stars dissoc id)
@@ -127,14 +125,14 @@
 (h/refresh-all!)
 
 (comment
-  (-main)
+  (def app (-main))
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
   ;; stop server
-  (((h/get-app) :stop))
+  ((app :stop))
 
-  (:db ((h/get-app) :ctx))
+  (:db (app :ctx))
 
-  (place-stars (:db ((h/get-app) :ctx)) 10)
+  (place-stars (:db (app :ctx)) 10)
 
   ,)

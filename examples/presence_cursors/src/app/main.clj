@@ -18,14 +18,12 @@
       {:position   :absolute
        :transition "all 0.2s ease-in-out"}]]))
 
-(def cursors
-  (h/cache
-    (fn [db]
-      (for [[sid [x y]] @db]
-        [:div.cursor
-         {:id    (h/digest sid)
-          :style {:left (str x "px") :top (str y "px")}}
-         "🚀"]))))
+(defn cursors [db]
+  (for [[sid [x y]] @db]
+    [:div.cursor
+     {:id    (h/digest sid)
+      :style {:left (str x "px") :top (str y "px")}}
+     "🚀"]))
 
 (defaction handle-user-cursor-position
   [{:keys [sid db] {:keys [x y]} :body}]
@@ -68,22 +66,22 @@
 (h/refresh-all!)
 
 (comment
-  (-main)
+  (def app (-main))
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
   ;; stop server
-  (((h/get-app) :stop))
+  ((app :stop))
 
-  (-> (h/get-app) :ctx :db)
+  (-> app :ctx :db)
 
-  (reset! (-> (h/get-app) :ctx :db) {})
+  (reset! (-> app :ctx :db) {})
 
   ;; Example backend driven cursor test
-  (def wraped-router (-> (h/get-app) :wraped-router))
+  (def wrapped-router (-> app :wrapped-router))
   
   (doseq [_x (range 10000)]
     (Thread/sleep 1)
-    (wraped-router
+    (wrapped-router
       {:headers
        {"accept-encoding" "br"
         "cookie"          "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY; __Host-csrf=3UsG62ic9wLsg9EVQhGupw"
