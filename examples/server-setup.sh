@@ -2,10 +2,12 @@
 set -x
 set -e
 
+# Needed because Ubuntu 24.04 doesn't have java 23+
+add-apt-repository ppa:openjdk-r/ppa 
 # Dependencies
 apt-get update
 apt-get upgrade
-apt-get -y install openjdk-24-jre-headless ufw caddy
+apt-get -y install openjdk-23-jre-headless ufw caddy
 
 # App user (you cannot login as this user)
 useradd -rms /usr/sbin/nologin app
