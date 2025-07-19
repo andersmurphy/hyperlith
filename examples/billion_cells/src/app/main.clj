@@ -10,7 +10,8 @@
                   math/sqrt
                   math/ceil
                   int))
-(def board-size-px (* 32 chunk-size board-size))
+(def cell-size 32)
+(def board-size-px (* cell-size chunk-size board-size))
 (def size (* board-size chunk-size))
 
 (def css
@@ -54,26 +55,32 @@
          :flex-direction :column}]
 
        [:.view
-        {:overflow        :scroll
+        {:position        :relative
+         :overflow        :scroll
          :scroll-behavior :smooth
          :scrollbar-color (str black " transparent")
          :overflow-anchor :none
          :width           "min(100% - 2rem , 42rem)"
          :height          "min(100% - 2rem , 42rem)"}]
 
+       [:.board-container
+        {:position :relative}]
+
        [:.board
-        {:background            white
+        {:position              :absolute
          :width                 board-size-px
+         :height                board-size-px
          :display               :grid
-         :aspect-ratio          "1/1"
-         :border                (str "1px solid " black)
          :grid-template-rows    (str "repeat(" board-size ", 1fr)")
          :grid-template-columns (str "repeat(" board-size ", 1fr)")
          :pointer-events        :none}]
 
+       [:.board-background
+        {:width        board-size-px
+         :height       board-size-px}]
+
        [:.chunk
-        {:background            white
-         :display               :grid
+        {:display               :grid
          :grid-template-rows    (str "repeat(" chunk-size ", 1fr)")
          :grid-template-columns (str "repeat(" chunk-size ", 1fr)")}]
 
@@ -98,9 +105,9 @@
        [:a {:color accent}]
 
        [:.cell
-        {:font-size      :1.2rem
-         :background     white
-         :border         (str "1px solid " black)
+        {:width  (str cell-size "px")
+         :height (str cell-size "px")
+         :font-size      :1.2rem
          :display        :grid
          :overflow       :hidden
          :white-space    :nowrap
@@ -108,10 +115,11 @@
          :pointer-events :all}]
 
        [:.focus-cell
-        {:background white
-         :position   :relative
-         :border     (str "1px solid " black)
-         :font-size  :1.2rem}]
+        {:background  white
+         :margin-left :2px
+         :margin-top  :2px
+         :position    :relative
+         :font-size   :1.2rem}]
 
        [:.focus-user
         {:font-size      :1.2rem
@@ -145,6 +153,7 @@
          :border-radius :0.15em
          :border        "0.15em solid currentColor"
          :padding       :5px}]])))
+
 (defn get-tab-state [db sid tabid]
   (-> (d/q db ["SELECT state FROM tab WHERE (sid = ?) AND (tabid = ?)"
                sid tabid])
@@ -342,7 +351,19 @@
          :data-on-load                                   "el.scrollTo(0,0)"
          :data-ref                                       "_view"
          :data-on-scroll__throttle.100ms.trail.noleading on-scroll-js}
-        [:div#board.board nil content]]
+        [:div.board-container
+         [:div#board.board nil content]
+         [:div.board-background nil
+          [:svg
+           {:width "100%" :height "100%" :xmlns "http://www.w3.org/2000/svg"}
+           [:defs
+            [:pattern#grid
+             {:width "32" :height "32" :patternUnits "userSpaceOnUse"}
+             [:path {:d            "M 32 0 L 0 0 0 32"
+                     :fill         "none"
+                     :stroke       "black"
+                     :stroke-width "4"}]]]
+           [:rect {:width "100%" :height "100%" :fill "url(#grid)"}]]]]]
        [:div.jump
         [:h2 "X:"]
         [:input.jump-input
@@ -456,3 +477,4 @@
 ;; focus element
 ;; focus element value
 ;; swap
+;; quad key
