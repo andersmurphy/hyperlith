@@ -354,8 +354,7 @@
         [:div.board-container
          [:div#board.board nil content]
          [:div.board-background nil
-          [:svg
-           {:width "100%" :height "100%" :xmlns "http://www.w3.org/2000/svg"}
+          [:svg {:width "100%" :height "100%"}
            [:defs
             [:pattern#grid
              {:width "32" :height "32" :patternUnits "userSpaceOnUse"}
