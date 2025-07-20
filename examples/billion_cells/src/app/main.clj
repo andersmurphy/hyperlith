@@ -11,13 +11,13 @@
                   math/ceil
                   int))
 (def cell-size 32)
-(def board-size-px (* cell-size chunk-size board-size))
+(def board-size-px (+ 2 (* cell-size chunk-size board-size)))
 (def size (* board-size chunk-size))
+(def black "#000000")
+(def white "#FFF1E8")
 
 (def css
-  (let [black         "#000000"
-        white         "#FFF1E8"
-        accent        "#008751"
+  (let [accent        "#008751"
         other         "#FF004D"
         board-size-px (str board-size-px "px")]
     (h/static-css
@@ -64,7 +64,9 @@
          :height          "min(100% - 2rem , 42rem)"}]
 
        [:.board-container
-        {:position :relative}]
+        {:width                 board-size-px
+         :height                board-size-px
+         :position :relative}]
 
        [:.board
         {:position              :absolute
@@ -357,11 +359,12 @@
           [:svg {:width "100%" :height "100%"}
            [:defs
             [:pattern#grid
-             {:width "32" :height "32" :patternUnits "userSpaceOnUse"}
-             [:path {:d            "M 32 0 L 0 0 0 32"
+             {:width 32 :height 32 :patternUnits "userSpaceOnUse"}
+             [:rect {:x            1  :y      1
+                     :width        32 :height 32
                      :fill         "none"
-                     :stroke       "black"
-                     :stroke-width "4"}]]]
+                     :stroke       black
+                     :stroke-width 2}]]]
            [:rect {:width "100%" :height "100%" :fill "url(#grid)"}]]]]]
        [:div.jump
         [:h2 "X:"]
