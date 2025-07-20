@@ -40,6 +40,13 @@
     "\ndata: signals " (j/edn->json signals)
     "\n\n\n"))
 
+(defn execute-expression [script]
+  (str "event: datastar-patch-elements"
+    "\ndata: selector body"
+    "\ndata: mode append"
+    "\ndata: elements <div data-on-load=\"" script ";el.remove()\"></div>"
+    "\n\n\n"))
+
 (defn throttle [<in-ch msec]
   (let [;; No buffer on the out-ch as the in-ch should be buffered
         <out-ch (a/chan)]
@@ -108,21 +115,37 @@
 (defn signals [signals]
   {:hyperlith.core/signals signals})
 
+(defn execute-expr [expression]
+  {:hyperlith.core/execute-expr expression})
+
 (defn action-handler [path thunk]
   (router/add-route! [:post path]
     (fn handler [req]
-      (if-let [signals (:hyperlith.core/signals (thunk req))]
-        {:status  200
-         ;; 200 signal responses have reduced headers
-         :headers {"Content-Type"              "text/event-stream"
-                   "Cache-Control"             "no-store"
-                   "Content-Encoding"          "br"
-                   "Strict-Transport-Security" strict-transport}
-         :body    (br/compress (patch-signals signals))}
-        ;; 204 needs even less
-        {:headers {"Strict-Transport-Security" strict-transport
-                   "Cache-Control"             "no-store"}
-         :status  204}))))
+      (let [resp (thunk req)]
+        (cond ;; TODO: What if you want to return signals and a script?
+          (:hyperlith.core/signals resp)
+          {:status  200
+           :headers {"Content-Type"              "text/event-stream"
+                     "Cache-Control"             "no-store"
+                     "Content-Encoding"          "br"
+                     "Strict-Transport-Security" strict-transport}
+           :body    (br/compress
+                      (patch-signals (:hyperlith.core/signals resp)))}
+          (:hyperlith.core/execute-expr resp)
+          {:status  200
+           :headers {"Content-Type"              "text/event-stream"
+                     "Cache-Control"             "no-store"
+                     "Content-Encoding"          "br"
+                     "Strict-Transport-Security" strict-transport}
+           :body    (br/compress
+                      (execute-expression
+                        (:hyperlith.core/execute-expr resp)))}
+          
+          :else
+          ;; 204 needs even less
+          {:headers {"Strict-Transport-Security" strict-transport
+                     "Cache-Control"             "no-store"}
+           :status  204})))))
 
 (defn render-handler
   [path render-fn & {:keys [on-close on-open br-window-size] :as _opts
