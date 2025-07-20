@@ -172,11 +172,6 @@
           {:on-open
            (fn hk-on-open [ch]
              (util/thread
-               ;; Note: it is possible to perform diffing here. However, because
-               ;; we are compressing the stream for the duration of the
-               ;; connection and html compresses well we get insane compression.
-               ;; To the point were it's more network efficient and more
-               ;; performant than diffing.
                (with-open [out (br/byte-array-out-stream)
                            br  (br/compress-out-stream out
                                  :window-size br-window-size)]
@@ -190,7 +185,9 @@
                       (when-some ;; stop in case of error
                           [new-view (er/try-on-error (render-fn req))]
                         (let [new-view-str  (h/html->str new-view)
-                              new-view-hash (crypto/digest new-view-str)]
+                              ;; This is a very fast hash 
+                              new-view-hash (Integer/toHexString
+                                              (hash new-view-str))]
                           ;; only send an event if the view has changed
                           (when (not= last-view-hash new-view-hash)
                             (->> (patch-elements
