@@ -51,7 +51,8 @@
    digest]
   ;; DATASTAR
   [hyperlith.impl.datastar
-   signals]
+   signals
+   execute-expr]
   ;; HTTP
   [hyperlith.impl.http
    get!
