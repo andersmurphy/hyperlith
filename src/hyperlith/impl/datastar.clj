@@ -29,9 +29,8 @@
      :content-type "text/javascript"
      :compress?        true}))
 
-(defn patch-elements [event-id elements]
+(defn patch-elements [elements]
   (str "event: datastar-patch-elements"
-    "\nid: " event-id
     "\ndata: elements " (str/replace elements "\n" "\ndata: elements ")
     "\n\n\n"))
 
@@ -149,32 +148,23 @@
           {:on-open
            (fn hk-on-open [ch]
              (util/thread
-               ;; Note: it is possible to perform diffing here. However, because
-               ;; we are compressing the stream for the duration of the
-               ;; connection and html compresses well we get insane compression.
-               ;; To the point were it's more network efficient and more
-               ;; performant than diffing.
                (with-open [out (br/byte-array-out-stream)
                            br  (br/compress-out-stream out
                                  :window-size br-window-size)]
-                 (loop [last-view-hash ((:headers req) "last-event-id")]
+                 (loop []
                    (a/alt!!
                      [<cancel]
                      (do (a/close! <ch) (a/close! <cancel))
 
                      [<ch]
                      ([_]
-                      (when-some ;; stop in case of error
-                          [new-view (er/try-on-error (render-fn req))]
-                        (let [new-view-str  (h/html->str new-view)
-                              new-view-hash (crypto/digest new-view-str)]
-                          ;; only send an event if the view has changed
-                          (when (not= last-view-hash new-view-hash)
-                            (->> (patch-elements
-                                   new-view-hash new-view-str)
-                              (br/compress-stream out br)
-                              (send! ch)))
-                          (recur new-view-hash))))
+                      ;; stop in case of error
+                      (when-some [new-view (er/try-on-error (render-fn req))]
+                        (->> (h/html->str new-view)
+                          patch-elements
+                          (br/compress-stream out br)
+                          (send! ch))
+                        (recur)))
                      ;; we want work cancelling to have higher priority
                      :priority true))
                  ;; Close channel on error or when thread stops
