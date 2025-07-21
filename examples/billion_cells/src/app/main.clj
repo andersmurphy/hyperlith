@@ -26,6 +26,19 @@
          :margin     0
          :padding    0}]
 
+       [:.toast
+        {:animation      "pop .3s ease"
+         :position       :absolute
+         :pointer-events :none
+         :top            0
+         :left           0
+         :width          :100%
+         :height         :100%
+         :display        :grid
+         :place-items    :center
+         :text-align     :center
+         :z-index        10}]
+
        [:.pe-none
         {:pointer-events :none
          :user-select    :none}]
@@ -247,13 +260,23 @@
                  (subs cellvalue 0 (min (count cellvalue) 20))))))))))
 
 (defn scroll-to-xy-js [x y]
-  (str
-    "$_view.scroll(" (int (* (/ x size) board-size-px))
-    "," (int (* (/ y size) board-size-px)) ")"))
+  (str "$_view.scroll(" (int (* (/ x size) board-size-px))
+    "," (int (* (/ y size) board-size-px)) ");"))
 
 (defaction handler-jump
   [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
   (h/execute-expr (scroll-to-xy-js jumpx jumpy)))
+
+(defaction handler-share
+  [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
+  (h/html
+    (h/execute-expr
+      (str "navigator.clipboard.writeText("
+        "'https://cells.andersmurphy.com" "?x=" jumpx "&y=" jumpy "')"))
+    [:div.toast {:data-on-load__delay.3s "el.remove()"}
+     [:div.button
+      [:p [:strong (str "X: " jumpx " Y: " jumpy)]]
+      [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]]]))
 
 (defn Cell [chunk-id local-id {:keys [value focus]} sid]
   (cond
@@ -393,7 +416,9 @@
         [:h2 "X:"] [:input.jump-input {:type "number" :data-bind "jumpx"}]
         [:h2 "Y:"] [:input.jump-input {:type "number" :data-bind "jumpy"}]
         [:div.button {:data-action handler-jump}
-         [:strong.pe-none "GO"]]]
+         [:strong.pe-none "GO"]]
+        [:div.button {:data-action handler-share}
+         [:strong.pe-none "SHARE"]]]
        [:h1 "One Billion Cells"]
        [:p "Built using "
         [:a {:href "https://clojure.org/"} "Clojure"]

@@ -1,7 +1,6 @@
 (ns hyperlith.impl.datastar
   (:require [hyperlith.impl.assets :refer [static-asset]]
             [hyperlith.impl.session :refer [csrf-cookie-js]]
-            [hyperlith.impl.json :as j]
             [hyperlith.impl.headers
              :refer [default-headers strict-transport]]
             [hyperlith.impl.util :as util]
@@ -9,6 +8,7 @@
             [hyperlith.impl.crypto :as crypto]
             [hyperlith.impl.html :as h]
             [hyperlith.impl.error :as er]
+            [hyperlith.impl.json :as json]
             [hyperlith.impl.router :as router]
             [org.httpkit.server :as hk]
             [clojure.string :as str]
@@ -35,17 +35,11 @@
     "\ndata: elements " (str/replace elements "\n" "\ndata: elements ")
     "\n\n\n"))
 
-(defn patch-signals [signals]
-  (str "event: datastar-patch-signals"
-    "\ndata: onlyIfMissing false"
-    "\ndata: signals " (j/edn->json signals)
-    "\n\n\n"))
-
-(defn execute-expression [script]
+(defn patch-append-body [elements]
   (str "event: datastar-patch-elements"
     "\ndata: selector body"
     "\ndata: mode append"
-    "\ndata: elements <div data-on-load=\"" script ";el.remove()\"></div>"
+    "\ndata: elements " (str/replace elements "\n" "\ndata: elements ")
     "\n\n\n"))
 
 (defn throttle [<in-ch msec]
@@ -113,36 +107,19 @@
           {:status 304}
           resp)))))
 
-(defn signals [signals]
-  {:hyperlith.core/signals signals})
-
-(defn execute-expr [expression]
-  {:hyperlith.core/execute-expr expression})
-
 (defn action-handler [path thunk]
   (router/add-route! [:post path]
     (fn handler [req]
       (let [resp (thunk req)]
-        (cond ;; TODO: What if you want to return signals and a script?
-          (:hyperlith.core/signals resp)
+        (if (h/chassis-data? resp)
           {:status  200
            :headers {"Content-Type"              "text/event-stream"
                      "Cache-Control"             "no-store"
                      "Content-Encoding"          "br"
                      "Strict-Transport-Security" strict-transport}
-           :body    (br/compress
-                      (patch-signals (:hyperlith.core/signals resp)))}
-          (:hyperlith.core/execute-expr resp)
-          {:status  200
-           :headers {"Content-Type"              "text/event-stream"
-                     "Cache-Control"             "no-store"
-                     "Content-Encoding"          "br"
-                     "Strict-Transport-Security" strict-transport}
-           :body    (br/compress
-                      (execute-expression
-                        (:hyperlith.core/execute-expr resp)))}
-          
-          :else
+           :body    (-> (h/html->str resp)
+                      patch-append-body
+                      br/compress)}
           ;; 204 needs even less
           {:headers {"Strict-Transport-Security" strict-transport
                      "Cache-Control"             "no-store"}
@@ -203,4 +180,11 @@
            :on-close (fn hk-on-close [_ _]
                        (a/>!! <cancel :cancel)
                        (when on-close (on-close req)))})))))
+
+(defn patch-signals [signals]
+  (h/html [:div {:data-signals (json/edn->json signals)
+                 :data-on-load "el.remove()"}]))
+
+(defn execute-expr [expr]
+  (h/html [:div {:data-on-load (str expr ";el.remove()")}]))
 
