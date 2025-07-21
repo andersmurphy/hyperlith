@@ -31,10 +31,10 @@
          :padding    0}]
 
        [:html
-        {:font-family  "Arial, Helvetica, sans-serif"
-         :font-size    :1.0rem
-         :color        black
-         :background   white}]
+        {:font-family "Arial, Helvetica, sans-serif"
+         :font-size   :1.0rem
+         :color       black
+         :background  white}]
 
        [:.toast
         {:animation      "pop .3s ease"
@@ -182,7 +182,7 @@
          :border-radius :0.15em
          :border        "0.15em solid currentColor"
          :padding       :5px}]
-       
+
        [:.button
         {:background    white
          :font-size     :1.2rem
@@ -255,12 +255,9 @@
 (defaction handler-share
   [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
   (h/html
-    (h/execute-expr
-      (str "navigator.clipboard.writeText("
-        "'https://checkboxes.andersmurphy.com" "?x=" jumpx "&y=" jumpy "')"))
     [:div.toast {:data-on-load__delay.3s "el.remove()"}
      [:div.button
-      [:p [:strong (str "X: " jumpx " Y: " jumpy)]]
+      [:p [:strong nil (str "X: " jumpx " Y: " jumpy)]]
       [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]]]))
 
 (defn Checkbox [local-id state]
@@ -325,6 +322,8 @@
     "$x = x; $y = y;"
     "change && @post(`" handler-scroll "`)"))
 
+(def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
+
 (defn Palette [current-selected]
   (h/html
     [:div.palette nil
@@ -377,7 +376,8 @@
         [:h2 "Y:"] [:input.jump-input {:type "number" :data-bind "jumpy"}]
         [:div.button {:data-action handler-jump}
          [:strong.pe-none "JUMP"]]
-        [:div.button {:data-action handler-share}
+        [:div.button {:data-action       handler-share
+                      :data-on-mousedown copy-xy-to-clipboard-js}
          [:strong.pe-none "SHARE"]]]
        palette
        [:h1 "One Billion Checkboxes"]
@@ -465,7 +465,7 @@
 (comment
   (do (-main) nil)
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
-  
+
 
   ;; stop server
   ((@app_ :stop))
@@ -477,7 +477,7 @@
 (comment
   (def db (-> @app_ :ctx :db))
   (d/pragma-check db)
-  
+
   ;; Execution time mean : 148.516131 ms
   (user/bench
     (->> (mapv
@@ -490,12 +490,18 @@
                  nil)))
            (range 0 4000))
       (run! (fn [x] @x))))
-  
+
   ;; Execution time mean : 151.256280 µs
   (user/bench (do (UserView {:x 1 :y 1} db) nil))
 
   (d/table-info db :chunks)
   (d/table-list db)
+
+  (d/q db {:select [[[:count [:distinct :sid]]]]
+           :from   :tab})
+
+  (d/q db {:select [[[:count :*]]]
+           :from   :session})
 
   ;; (+ 7784 3249)
 
@@ -523,7 +529,7 @@
   (d/q db-write ["PRAGMA wal_checkpoint(PASSIVE)"])
   (d/q db-write ["PRAGMA wal_checkpoint(TRUNCATE)"])
 
-  
+
 
   ,)
 
@@ -536,7 +542,7 @@
 
 (comment
   (def wrapped-router (-> @app_ :wrapped-router))
-  
+
   (future
     (time
       (run!
@@ -558,5 +564,5 @@
           (Thread/sleep 1))
         (range 10000))))
 
-  
+
   )
