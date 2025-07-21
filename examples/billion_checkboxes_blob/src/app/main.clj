@@ -231,12 +231,14 @@
               (swap! chunk-cache assoc chunk-id
                 (update chunk cell-id #(if (= 0 %) user-color 0))))))))))
 
+(defn scroll-to-xy-js [x y]
+  (str
+    "$_view.scroll(" (int (* (/ x size) board-size-px))
+    "," (int (* (/ y size) board-size-px)) ");"))
+
 (defaction handler-jump
   [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
-  (h/execute-expr
-    (str
-      "$_view.scroll(" (int (* (/ jumpx size) board-size-px))
-      "," (int (* (/ jumpy size) board-size-px)) ")")))
+  (h/execute-expr (scroll-to-xy-js jumpx jumpy)))
 
 (defn Checkbox [local-id state]
   (let [state       (or state 0)
@@ -321,8 +323,12 @@
 
 (defview handler-root
   {:path "/" :shim-headers shim-headers :br-window-size 19}
-  [{:keys [db sid tabid] :as _req}]
-  (let [user    (get-tab-state db sid tabid)
+  [{:keys         [db sid tabid]
+    {:strs [x y]} :query-params
+    :as           _req}]
+  (let [x       (h/try-parse-long x 0)
+        y       (h/try-parse-long y 0)
+        user    (get-tab-state db sid tabid)
         content (UserView user db)
         palette (Palette (or (:color user) 1))]
     (h/html
@@ -339,7 +345,7 @@
           "}")}
        [:div#view.view
         {;; firefox sometimes preserves scroll on refresh and we don't want that
-         :data-on-load                                   "el.scrollTo(0,0)"
+         :data-on-load                                   (scroll-to-xy-js x y)
          :data-ref                                       "_view"
          :data-on-scroll__throttle.100ms.trail.noleading on-scroll-js}
         [:div#board.board nil content]]
@@ -347,7 +353,7 @@
         [:h2 "X:"] [:input.jump-input {:type "number" :data-bind "jumpx"}]
         [:h2 "Y:"] [:input.jump-input {:type "number" :data-bind "jumpy"}]
         [:div.jump-button {:data-action handler-jump}
-         [:strong.pe-none "GO"]]]
+         [:strong.pe-none "JUMP"]]]
        palette
        [:h1 "One Billion Checkboxes"]
        [:p "Built using "
