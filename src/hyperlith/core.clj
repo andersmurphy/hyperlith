@@ -39,7 +39,8 @@
    assoc-in-if-missing
    qualify-keys
    modulo-pick
-   thread]
+   thread
+   try-parse-long]
   ;; HTML
   [hyperlith.impl.html
    html
