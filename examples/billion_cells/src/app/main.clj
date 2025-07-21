@@ -246,12 +246,14 @@
               #(assoc-in % [cell-id :value]
                  (subs cellvalue 0 (min (count cellvalue) 20))))))))))
 
+(defn scroll-to-xy-js [x y]
+  (str
+    "$_view.scroll(" (int (* (/ x size) board-size-px))
+    "," (int (* (/ y size) board-size-px)) ")"))
+
 (defaction handler-jump
   [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
-  (h/execute-expr
-    (str
-      "$_view.scroll(" (int (* (/ jumpx size) board-size-px))
-      "," (int (* (/ jumpy size) board-size-px)) ")")))
+  (h/execute-expr (scroll-to-xy-js jumpx jumpy)))
 
 (defn Cell [chunk-id local-id {:keys [value focus]} sid]
   (cond
@@ -350,8 +352,12 @@
   {:path     "/" :shim-headers shim-headers :br-window-size 19
    :on-close (fn [{:keys [tx-batch! sid tabid]}]
                (tx-batch! (partial remove-focus! sid tabid)))}
-  [{:keys [db sid tabid] :as _req}]
-  (let [user    (get-tab-state db sid tabid)
+  [{:keys         [db sid tabid]
+    {:strs [x y]} :query-params
+    :as           _req}]
+  (let [x       (h/try-parse-long x 0)
+        y       (h/try-parse-long y 0)
+        user    (get-tab-state db sid tabid)
         content (UserView user db)]
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href css}]
@@ -367,7 +373,7 @@
           "}")}
        [:div#view.view
         {;; firefox sometimes preserves scroll on refresh and we don't want that
-         :data-on-load                                   "el.scrollTo(0,0)"
+         :data-on-load                                   (scroll-to-xy-js x y)
          :data-ref                                       "_view"
          :data-on-scroll__throttle.100ms.trail.noleading on-scroll-js}
         [:div.board-container
