@@ -36,6 +36,19 @@
          :color        black
          :background   white}]
 
+       [:.toast
+        {:animation      "pop .3s ease"
+         :position       :absolute
+         :pointer-events :none
+         :top            0
+         :left           0
+         :width          :100%
+         :height         :100%
+         :display        :grid
+         :place-items    :center
+         :text-align     :center
+         :z-index        10}]
+
        [:.pe-none
         {:pointer-events :none
          :user-select    :none}]
@@ -72,7 +85,6 @@
          :scroll-behavior :smooth
          :scrollbar-color (str black " transparent")
          :overflow-anchor :none
-         :width           "min(100% - 2rem , 42rem)"
          :height          "min(100% - 2rem , 42rem)"}]
 
        [:.board
@@ -240,6 +252,17 @@
   [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
   (h/execute-expr (scroll-to-xy-js jumpx jumpy)))
 
+(defaction handler-share
+  [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
+  (h/html
+    (h/execute-expr
+      (str "navigator.clipboard.writeText("
+        "'https://checkboxes.andersmurphy.com" "?x=" jumpx "&y=" jumpy "')"))
+    [:div.toast {:data-on-load__delay.3s "el.remove()"}
+     [:div.button
+      [:p [:strong (str "X: " jumpx " Y: " jumpy)]]
+      [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]]]))
+
 (defn Checkbox [local-id state]
   (let [state       (or state 0)
         checked     (not= state 0)
@@ -353,7 +376,9 @@
         [:h2 "X:"] [:input.jump-input {:type "number" :data-bind "jumpx"}]
         [:h2 "Y:"] [:input.jump-input {:type "number" :data-bind "jumpy"}]
         [:div.button {:data-action handler-jump}
-         [:strong.pe-none "JUMP"]]]
+         [:strong.pe-none "JUMP"]]
+        [:div.button {:data-action handler-share}
+         [:strong.pe-none "SHARE"]]]
        palette
        [:h1 "One Billion Checkboxes"]
        [:p "Built using "

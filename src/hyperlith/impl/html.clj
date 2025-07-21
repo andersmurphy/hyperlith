@@ -18,3 +18,7 @@
     `(cc/compile ~node)))
 
 (def html-resolve-alias h/resolve-alias)
+
+(defn chassis-data? [x]
+  (or (:dev.onionpancakes.chassis.core/content (meta x))
+    (= (type x) dev.onionpancakes.chassis.core.RawString)))

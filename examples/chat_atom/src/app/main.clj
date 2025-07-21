@@ -35,7 +35,7 @@
 (defaction handler-send-message [{:keys [_sid db] {:keys [message]} :body}]
   (when-not (str/blank? message)
     (swap! db update :messages conj [(h/new-uid) message])
-    (h/signals {:message ""})))
+    (h/patch-signals {:message ""})))
 
 (def shim-headers
   (h/html
