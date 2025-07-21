@@ -26,6 +26,15 @@
          :margin     0
          :padding    0}]
 
+       [:.pe-none
+        {:pointer-events :none
+         :user-select    :none}]
+
+       ["@keyframes pop"
+        "{  0% {transform: scale(1);}
+           25% {transform: scale(0.8);}
+          100% {transform: scale(1);}}"]
+
        [:html
         {:font-family "Arial, Helvetica, sans-serif"
          :font-size   :1.0rem
@@ -88,9 +97,8 @@
 
        [:.pop
         {;; Animation that depresses the element
-         :transform      "scale(0.8)"
-         :transition     "scale 0.6s ease"
-         ;; Disable element until next frame/morph
+         :animation      "pop .3s ease"
+         ;; Disable element until this class is removed
          :pointer-events :none}]
 
        [:.jump
@@ -99,10 +107,25 @@
          :flex-direction :row
          :align-items    :center}]
 
+       [:.jump-input
+        {:background    white
+         :width         :6rem
+         :font-size     :1.2rem
+         :border-radius :0.15em
+         :border        "0.15em solid currentColor"
+         :padding       :5px}]
+
        ["input[type=\"number\"]:focus"
         {:outline       :none
          :border-radius :0.15em
          :border        (str "0.15em solid " accent)}]
+
+       [:.jump-button
+        {:background     white
+         :font-size      :1.2rem
+         :border-radius  :0.15em
+         :border         "0.15em solid currentColor"
+         :padding        :5px}]
 
        [:a {:color accent}]
 
@@ -146,15 +169,7 @@
          :position       :absolute
          :outline        :none
          :border         (str "4px solid " other)
-         :pointer-events :none}]
-
-       [:.jump-input
-        {:background    white
-         :width         :6rem
-         :font-size     :1.2rem
-         :border-radius :0.15em
-         :border        "0.15em solid currentColor"
-         :padding       :5px}]])))
+         :pointer-events :none}]])))
 
 (defn get-tab-state [db sid tabid]
   (-> (d/q db ["SELECT state FROM tab WHERE (sid = ?) AND (tabid = ?)"
@@ -230,6 +245,13 @@
             (update-chunk! db chunk-cache chunk-id
               #(assoc-in % [cell-id :value]
                  (subs cellvalue 0 (min (count cellvalue) 20))))))))))
+
+(defaction handler-jump
+  [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
+  (h/execute-expr
+    (str
+      "$_view.scroll(" (int (* (/ jumpx size) board-size-px))
+      "," (int (* (/ jumpy size) board-size-px)) ")")))
 
 (defn Cell [chunk-id local-id {:keys [value focus]} sid]
   (cond
@@ -308,16 +330,10 @@
 (defn scroll->cell-xy-js [n]
   (str "Math.round((" n "/" board-size-px ")*" size ")"))
 
-(def scroll-jumpx-js
-  (str "$_view.scrollLeft= $_jumpx/" size "*" board-size-px ";"))
-
-(def scroll-jumpy-js
-  (str "$_view.scrollTop=  $_jumpy/" size "*" board-size-px ";"))
-
 (def on-scroll-js
   (str
-    "$_jumpx = " (scroll->cell-xy-js "el.scrollLeft") ";"
-    "$_jumpy = " (scroll->cell-xy-js "el.scrollTop") ";"
+    "$jumpx = " (scroll->cell-xy-js "el.scrollLeft") ";"
+    "$jumpy = " (scroll->cell-xy-js "el.scrollTop") ";"
     "let x = " (scroll-offset-js "el.scrollLeft") ";"
     "let y = " (scroll-offset-js "el.scrollTop") ";"
     "let change = x !== $x || y !== $y;"
@@ -347,6 +363,7 @@
           "$targetid = evt.target.dataset.id;"
           "$parentid = evt.target.dataset.parentid;"
           "@post(`${evt.target.dataset.action}`);"
+          "setTimeout(() => evt.target.classList.remove('pop'), 300)"
           "}")}
        [:div#view.view
         {;; firefox sometimes preserves scroll on refresh and we don't want that
@@ -367,14 +384,10 @@
                      :stroke-width 2}]]]
            [:rect {:width "100%" :height "100%" :fill "url(#grid)"}]]]]]
        [:div.jump
-        [:h2 "X:"]
-        [:input.jump-input
-         {:type                       "number" :data-bind "_jumpx"
-          :data-on-input__debounce.1s scroll-jumpx-js}]
-        [:h2 "Y:"]
-        [:input.jump-input
-         {:type                       "number" :data-bind "_jumpy"
-          :data-on-input__debounce.1s scroll-jumpy-js}]]
+        [:h2 "X:"] [:input.jump-input {:type "number" :data-bind "jumpx"}]
+        [:h2 "Y:"] [:input.jump-input {:type "number" :data-bind "jumpy"}]
+        [:div.jump-button {:data-action handler-jump}
+         [:strong.pe-none "GO"]]]
        [:h1 "One Billion Cells"]
        [:p "Built using "
         [:a {:href "https://clojure.org/"} "Clojure"]
@@ -460,13 +473,10 @@
   (do (-main) nil)
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
-
   ;; stop server
   ((@app_ :stop))
 
   (def db (-> @app_ :ctx :db))
-
-  
 
   
   (d/q db {:select [[[:count [:distinct :sid]]]]
@@ -476,7 +486,4 @@
 
   ,)
 
-;; focus element
-;; focus element value
-;; swap
-;; quad key
+;; Make pop time out on client
