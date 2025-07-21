@@ -270,12 +270,9 @@
 (defaction handler-share
   [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
   (h/html
-    (h/execute-expr
-      (str "navigator.clipboard.writeText("
-        "'https://cells.andersmurphy.com" "?x=" jumpx "&y=" jumpy "')"))
     [:div.toast {:data-on-load__delay.3s "el.remove()"}
      [:div.button
-      [:p [:strong (str "X: " jumpx " Y: " jumpy)]]
+      [:p [:strong nil (str "X: " jumpx " Y: " jumpy)]]
       [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]]]))
 
 (defn Cell [chunk-id local-id {:keys [value focus]} sid]
@@ -365,6 +362,8 @@
     "$x = x; $y = y;"
     "change && @post(`" handler-scroll "`)"))
 
+(def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://cells.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
+
 (def shim-headers
   (h/html
     [:link#css {:rel "stylesheet" :type "text/css" :href css}]
@@ -417,7 +416,9 @@
         [:h2 "Y:"] [:input.jump-input {:type "number" :data-bind "jumpy"}]
         [:div.button {:data-action handler-jump}
          [:strong.pe-none "GO"]]
-        [:div.button {:data-action handler-share}
+        [:div.button
+         {:data-action handler-share
+          :data-on-mousedown copy-xy-to-clipboard-js}
          [:strong.pe-none "SHARE"]]]
        [:h1 "One Billion Cells"]
        [:p "Built using "
