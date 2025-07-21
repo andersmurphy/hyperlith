@@ -36,6 +36,15 @@
          :color        black
          :background   white}]
 
+       [:.pe-none
+        {:pointer-events :none
+         :user-select    :none}]
+
+       ["@keyframes pop"
+        "{  0% {transform: scale(1);}
+           25% {transform: scale(0.8);}
+          100% {transform: scale(1);}}"]
+
        ["input[type=\"number\"]::-webkit-outer-spin-button,
          input[type=\"number\"]::-webkit-inner-spin-button"
         {:-webkit-appearance :none :margin 0}]
@@ -103,9 +112,8 @@
 
        [:.pop
         {;; Animation that depresses the element
-         :transform      "scale(0.8)"
-         :transition     "scale 0.6s ease"
-         ;; Disable element until next frame/morph
+         :animation      "pop .3s ease"
+         ;; Disable element until this class is removed
          :pointer-events :none}]
 
        [:._1  {:background-color "#FF004D"}]
@@ -161,6 +169,13 @@
          :font-size     :1.2rem
          :border-radius :0.15em
          :border        "0.15em solid currentColor"
+         :padding       :5px}]
+       
+       [:.jump-button
+        {:background    white
+         :font-size     :1.2rem
+         :border-radius :0.15em
+         :border        "0.15em solid currentColor"
          :padding       :5px}]])))
 
 (defn get-tab-state [db sid tabid]
@@ -169,7 +184,7 @@
                :where  [:and [:= :sid sid] [:= :tabid tabid]]})
     first))
 
-(defn upsert-tab-state! [db sid tabid update-fn]
+(defn update-tab-state! [db sid tabid update-fn]
   (let [old-state (get-tab-state db sid tabid)
         new-state (update-fn old-state)]
     (if old-state
@@ -185,7 +200,7 @@
   [{:keys [sid tabid tx-batch!] {:keys [x y]} :body}]
   (tx-batch!
     (fn [db _]
-      (upsert-tab-state! db sid tabid
+      (update-tab-state! db sid tabid
         #(assoc %
            :x (max (int x) 0)
            :y (max (int y) 0))))))
@@ -196,7 +211,7 @@
     (when (< 0 color (count states))
       (tx-batch!
         (fn [db _]
-          (upsert-tab-state! db sid tabid #(assoc % :color color)))))))
+          (update-tab-state! db sid tabid #(assoc % :color color)))))))
 
 (defaction handler-check
   [{:keys                       [sid tx-batch! db tabid]
@@ -215,6 +230,13 @@
                             first))]
               (swap! chunk-cache assoc chunk-id
                 (update chunk cell-id #(if (= 0 %) user-color 0))))))))))
+
+(defaction handler-jump
+  [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
+  (h/execute-expr
+    (str
+      "$_view.scroll(" (int (* (/ jumpx size) board-size-px))
+      "," (int (* (/ jumpy size) board-size-px)) ")")))
 
 (defn Checkbox [local-id state]
   (let [state       (or state 0)
@@ -268,16 +290,10 @@
 (defn scroll->cell-xy-js [n]
   (str "Math.round((" n "/" board-size-px ")*" size ")"))
 
-(def scroll-jumpx-js
-  (str "$_view.scrollLeft= $_jumpx/" size "*" board-size-px ";"))
-
-(def scroll-jumpy-js
-  (str "$_view.scrollTop=  $_jumpy/" size "*" board-size-px ";"))
-
 (def on-scroll-js
-  (str    
-    "$_jumpx = " (scroll->cell-xy-js "el.scrollLeft") ";"
-    "$_jumpy = " (scroll->cell-xy-js "el.scrollTop") ";"
+  (str
+    "$jumpx = " (scroll->cell-xy-js "el.scrollLeft") ";"
+    "$jumpy = " (scroll->cell-xy-js "el.scrollTop") ";"
     "let x = " (scroll-offset-js "el.scrollLeft") ";"
     "let y = " (scroll-offset-js "el.scrollTop") ";"
     "let change = x !== $x || y !== $y;"
@@ -289,7 +305,7 @@
     [:div.palette nil
      (mapv (fn [state]
              (h/html [:div.palette-item
-                      {:data-id state
+                      {:data-id     state
                        :data-action handler-palette
                        :class
                        (str (state->class state)
@@ -319,6 +335,7 @@
           "$targetid = evt.target.dataset.id;"
           "$parentid = evt.target.parentElement.dataset.id;"
           "@post(`${evt.target.dataset.action}`);"
+          "setTimeout(() => evt.target.classList.remove('pop'), 300)"
           "}")}
        [:div#view.view
         {;; firefox sometimes preserves scroll on refresh and we don't want that
@@ -327,14 +344,10 @@
          :data-on-scroll__throttle.100ms.trail.noleading on-scroll-js}
         [:div#board.board nil content]]
        [:div.jump
-        [:h2 "X:"]
-        [:input.jump-input
-         {:type                       "number" :data-bind "_jumpx"
-          :data-on-input__debounce.1s scroll-jumpx-js}]
-        [:h2 "Y:"]
-        [:input.jump-input
-         {:type                       "number" :data-bind "_jumpy"
-          :data-on-input__debounce.1s scroll-jumpy-js}]]
+        [:h2 "X:"] [:input.jump-input {:type "number" :data-bind "jumpx"}]
+        [:h2 "Y:"] [:input.jump-input {:type "number" :data-bind "jumpy"}]
+        [:div.jump-button {:data-action handler-jump}
+         [:strong.pe-none "GO"]]]
        palette
        [:h1 "One Billion Checkboxes"]
        [:p "Built using "
