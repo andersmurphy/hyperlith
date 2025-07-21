@@ -14,6 +14,11 @@
         [cur val])
       val)))
 
+(defn try-parse-long
+  ([x] (try-parse-long x nil))
+  ([x default]
+   (or (try (parse-long x) (catch Throwable _ default)) default)))
+
 (defn merge
   "Faster merge."
   [m1 m2]
