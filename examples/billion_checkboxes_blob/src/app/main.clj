@@ -171,7 +171,7 @@
          :border        "0.15em solid currentColor"
          :padding       :5px}]
        
-       [:.jump-button
+       [:.button
         {:background    white
          :font-size     :1.2rem
          :border-radius :0.15em
@@ -352,7 +352,7 @@
        [:div.jump
         [:h2 "X:"] [:input.jump-input {:type "number" :data-bind "jumpx"}]
         [:h2 "Y:"] [:input.jump-input {:type "number" :data-bind "jumpy"}]
-        [:div.jump-button {:data-action handler-jump}
+        [:div.button {:data-action handler-jump}
          [:strong.pe-none "JUMP"]]]
        palette
        [:h1 "One Billion Checkboxes"]
