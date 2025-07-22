@@ -184,30 +184,31 @@
          :border         (str "4px solid " other)
          :pointer-events :none}]])))
 
-(defn get-tab-state [db sid tabid]
-  (-> (d/q db ["SELECT state FROM tab WHERE (sid = ?) AND (tabid = ?)"
-               sid tabid])
+(defn get-session-data [db sid]
+  (-> (d/q db
+        {:select [:data]
+         :from   :session
+         :where  [:= :id sid]})
     first))
 
-(defn update-tab-state! [db sid tabid update-fn]
-  (let [old-state (get-tab-state db sid tabid)
-        new-state (update-fn old-state)]
-    (if old-state
-      (d/q db
-        ["UPDATE tab SET state = ? WHERE (sid = ?) AND (tabid = ?)"
-         new-state sid tabid])
-      (d/q db
-        ["INSERT INTO tab (sid, tabid, state) VALUES (?, ?, ?)"
-         sid
-         tabid
-         (assoc new-state
-           :sid sid
-           :tabid tabid)]))))
+(defn get-tab-data [db sid tabid]
+  (-> (get-session-data db sid) :tabs (get tabid)))
+
+(defn update-tab-data! [db sid tabid update-fn]
+  (let [old-data (get-session-data db sid)
+        new-data (update-in old-data [:tabs tabid] update-fn)]
+    (if old-data
+      (d/q db {:update :session
+               :set    {:data [:lift new-data]}
+               :where  [:= :id sid]})
+      (d/q db {:insert-into :session
+               :values      [{:id   sid
+                              :data [:lift (assoc new-data :sid sid)]}]}))))
 
 (defn update-chunk! [db chunk-cache chunk-id update-fn]
   (let [old-chunk (or (@chunk-cache chunk-id)
                     (-> (d/q db
-                          ["SELECT chunk FROM chunk WHERE id = ?" chunk-id])
+                          ["SELECT data FROM chunk WHERE id = ?" chunk-id])
                       first))
         new-chunk (update-fn old-chunk)]
     (swap! chunk-cache assoc chunk-id new-chunk)))
@@ -216,14 +217,14 @@
   [{:keys [sid tabid tx-batch!] {:keys [x y]} :body}]
   (tx-batch!
     (fn [db _]
-      (update-tab-state! db sid tabid
+      (update-tab-data! db sid tabid
         #(assoc %
            :x (max (int x) 0)
            :y (max (int y) 0))))))
 
 (defn remove-focus! [sid tabid db chunk-cache]
   (let [{:keys [focus-chunk-id focus-cell-id]}
-        (get-tab-state db sid tabid)]
+        (get-tab-data db sid tabid)]
     (when (and focus-chunk-id focus-cell-id)
       (update-chunk! db chunk-cache focus-chunk-id
         ;; Should this be tab id too?
@@ -242,7 +243,7 @@
             (update-chunk! db chunk-cache chunk-id
               ;; Should this be tab id too?
               #(assoc-in % [cell-id :focus] sid))
-            (update-tab-state! db sid tabid
+            (update-tab-data! db sid tabid
               #(assoc % :focus-chunk-id chunk-id
                  :focus-cell-id cell-id))))))))
 
@@ -341,7 +342,7 @@
 
 (defn UserView [{:keys [x y sid] :or {x 0 y 0}} db]
   (->> (d/q db
-         (into ["SELECT id, chunk FROM chunk WHERE id IN (?, ?, ?, ?, ?, ?, ?, ?, ?)"]
+         (into ["SELECT id, data FROM chunk WHERE id IN (?, ?, ?, ?, ?, ?, ?, ?, ?)"]
            (xy->chunk-ids x y)))
     (mapv (fn [[id chunk]]
             (Chunk id chunk sid)))))
@@ -379,7 +380,8 @@
     :as           _req}]
   (let [x       (h/try-parse-long x 0)
         y       (h/try-parse-long y 0)
-        user    (get-tab-state db sid tabid)
+        user    (assoc (get-tab-data db sid tabid)
+                  :sid sid :tabid tabid)
         content (UserView user db)]
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href css}]
@@ -443,7 +445,7 @@
                   (d/q db
                     {:insert-into :chunk
                      :values      [{:id    (xy->chunk-id x y)
-                                    :chunk [:lift blank-chunk]}]}))
+                                    :data [:lift blank-chunk]}]}))
             board-range)
           (print ".") (flush))
         board-range)))
@@ -454,9 +456,9 @@
   ;; Create tables
   (println "Running migrations...")
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS chunk(id INT PRIMARY KEY, chunk BLOB)"])
+    ["CREATE TABLE IF NOT EXISTS chunk(id INT PRIMARY KEY, data BLOB)"])
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS tab(sid TEXT, tabid TEXT, state BLOB, PRIMARY KEY (sid, tabid)) WITHOUT ROWID"])
+    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"])
   (when-not (d/q db {:select [:id] :from :chunk :limit 1})
     (initial-board-db-state! db)))
 
@@ -478,7 +480,7 @@
                         (run! (fn [thunk] (thunk db chunk-cache)) thunks)
                         (run! (fn [[chunk-id new-chunk]]
                                 (d/q db
-                                  ["UPDATE chunk SET chunk = ? WHERE id = ?"
+                                  ["UPDATE chunk SET data = ? WHERE id = ?"
                                    new-chunk chunk-id]))
                           @chunk-cache)))
                     (h/refresh-all!))
@@ -511,11 +513,9 @@
   (def db (-> @app_ :ctx :db))
 
   
-  (d/q db {:select [[[:count [:distinct :sid]]]]
-           :from   :tab})
-  ;; 4677
+  (d/q db {:select [[[:count [:distinct :sd]]]]
+           :from   :session})
+  ;; 4897
   
 
   ,)
-
-;; Make pop time out on client

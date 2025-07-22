@@ -190,29 +190,32 @@
          :border        "0.15em solid currentColor"
          :padding       :5px}]])))
 
-(defn get-tab-state [db sid tabid]
-  (-> (d/q db {:select [:state]
-               :from   :tab
-               :where  [:and [:= :sid sid] [:= :tabid tabid]]})
+(defn get-session-data [db sid]
+  (-> (d/q db
+        {:select [:data]
+         :from   :session
+         :where  [:= :id sid]})
     first))
 
-(defn update-tab-state! [db sid tabid update-fn]
-  (let [old-state (get-tab-state db sid tabid)
-        new-state (update-fn old-state)]
-    (if old-state
-      (d/q db {:update :tab
-               :set    {:state [:lift new-state]}
-               :where  [:and [:= :sid sid] [:= :tabid tabid]]})
-      (d/q db {:insert-into :tab
-               :values      [{:sid   sid
-                              :tabid tabid
-                              :state [:lift new-state]}]}))))
+(defn get-tab-data [db sid tabid]
+  (-> (get-session-data db sid) :tabs (get tabid)))
+
+(defn update-tab-data! [db sid tabid update-fn]
+  (let [old-data (get-session-data db sid)
+        new-data (update-in old-data [:tabs tabid] update-fn)]
+    (if old-data
+      (d/q db {:update :session
+               :set    {:data [:lift new-data]}
+               :where  [:= :id sid]})
+      (d/q db {:insert-into :session
+               :values      [{:id  sid
+                              :data [:lift new-data]}]}))))
 
 (defaction handler-scroll
   [{:keys [sid tabid tx-batch!] {:keys [x y]} :body}]
   (tx-batch!
     (fn [db _]
-      (update-tab-state! db sid tabid
+      (update-tab-data! db sid tabid
         #(assoc %
            :x (max (int x) 0)
            :y (max (int y) 0))))))
@@ -223,20 +226,20 @@
     (when (< 0 color (count states))
       (tx-batch!
         (fn [db _]
-          (update-tab-state! db sid tabid #(assoc % :color color)))))))
+          (update-tab-data! db sid tabid #(assoc % :color color)))))))
 
 (defaction handler-check
   [{:keys                       [sid tx-batch! db tabid]
     {:keys [targetid parentid]} :body}]
   (when (and targetid parentid)
-    (let [user-color (or (:color (get-tab-state db sid tabid)) 1)
+    (let [user-color (or (:color (get-tab-data db sid tabid)) 1)
           cell-id    (int (parse-long targetid))
           chunk-id   (int (parse-long parentid))]
       (when (>= (dec (* chunk-size chunk-size)) cell-id 0)
         (tx-batch!
           (fn [db chunk-cache]
             (let [chunk (or (@chunk-cache chunk-id)
-                          (-> (d/q db {:select [:chunk]
+                          (-> (d/q db {:select [:data]
                                        :from   :chunk
                                        :where  [:= :id chunk-id]})
                             first))]
@@ -300,7 +303,7 @@
 
 (defn UserView [{:keys [x y] :or {x 0 y 0}} db]
   (->> (d/q db
-         {:select [:id :chunk]
+         {:select [:id :data]
           :from   :chunk
           :where  [:in :id (xy->chunk-ids x y)]})
     (mapv (fn [[id chunk]]
@@ -348,11 +351,11 @@
   [{:keys         [db sid tabid]
     {:strs [x y]} :query-params
     :as           _req}]
-  (let [x       (h/try-parse-long x 0)
-        y       (h/try-parse-long y 0)
-        user    (get-tab-state db sid tabid)
-        content (UserView user db)
-        palette (Palette (or (:color user) 1))]
+  (let [x        (h/try-parse-long x 0)
+        y        (h/try-parse-long y 0)
+        tab-data (get-tab-data db sid tabid)
+        content  (UserView tab-data db)
+        palette  (Palette (or (:color tab-data) 1))]
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href css}]
       [:main#morph.main
@@ -403,7 +406,7 @@
                   (d/q db
                     {:insert-into :chunk
                      :values      [{:id    (xy->chunk-id x y)
-                                    :chunk [:lift blank-chunk]}]}))
+                                    :data [:lift blank-chunk]}]}))
             board-range)
           (print ".") (flush))
         board-range)))
@@ -416,7 +419,7 @@
   (d/q db
     ["CREATE TABLE IF NOT EXISTS chunk(id INT PRIMARY KEY, chunk BLOB)"])
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS tab(sid TEXT, tabid TEXT, state BLOB, PRIMARY KEY (sid, tabid)) WITHOUT ROWID"])
+    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"])
   (when-not (d/q db {:select [:id] :from :chunk :limit 1})
     (initial-board-db-state! db)))
 
@@ -439,7 +442,7 @@
                         (run! (fn [[chunk-id new-chunk]]
                                 (d/q db
                                   {:update :chunk
-                                   :set    {:chunk [:lift new-chunk]}
+                                   :set    {:data [:lift new-chunk]}
                                    :where  [:= :id chunk-id]}))
                           @chunk-cache)))
                     (h/refresh-all!))
@@ -474,6 +477,8 @@
 
   ,)
 
+(comment)
+
 (comment
   (def db (-> @app_ :ctx :db))
   (d/pragma-check db)
@@ -494,16 +499,13 @@
   ;; Execution time mean : 151.256280 µs
   (user/bench (do (UserView {:x 1 :y 1} db) nil))
 
-  (d/table-info db :chunks)
+  (d/table-info db :chunk)
   (d/table-list db)
-
-  (d/q db {:select [[[:count [:distinct :sid]]]]
-           :from   :tab})
 
   (d/q db {:select [[[:count :*]]]
            :from   :session})
 
-  ;; (+ 7784 3249)
+  ;; (+ 7784 3249 500)
 
   ,)
 
@@ -520,7 +522,7 @@
 
   (d/q db-write
     {:update :chunk
-     :set    {:chunk [:lift blank-chunk]}
+     :set    {:data [:lift blank-chunk]}
      :where  [:= :id 0]})
 
   ;; Free up space (slow)
