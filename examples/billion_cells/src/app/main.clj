@@ -11,7 +11,7 @@
                   math/ceil
                   int))
 (def cell-size 32)
-(def board-size-px (+ 2 (* cell-size chunk-size board-size)))
+(def board-size-px (* cell-size chunk-size board-size))
 (def size (* board-size chunk-size))
 (def black "#000000")
 (def white "#FFF1E8")
