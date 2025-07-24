@@ -191,10 +191,10 @@
          :padding       :5px}]])))
 
 (defn get-session-data [db sid]
-  (-> (d/q db
-        {:select [:data]
-         :from   :session
-         :where  [:= :id sid]})
+  (-> (d/q db '{select [data]
+                 from   session
+                 where  [= id ?sid]}
+        {:sid sid})
     first))
 
 (defn get-tab-data [db sid tabid]
@@ -204,12 +204,14 @@
   (let [old-data (get-session-data db sid)
         new-data (update-in old-data [:tabs tabid] update-fn)]
     (if old-data
-      (d/q db {:update :session
-               :set    {:data [:lift new-data]}
-               :where  [:= :id sid]})
-      (d/q db {:insert-into :session
-               :values      [{:id  sid
-                              :data [:lift new-data]}]}))))
+      (d/q db '{update session
+                set    {data ?new-data}
+                where  [= id ?sid]}
+        {:sid sid :new-data new-data})
+      (d/q db '{insert-into session
+                values      [{:id   ?sid
+                              :data ?new-data}]}
+        {:sid sid :new-data new-data}))))
 
 (defaction handler-scroll
   [{:keys [sid tabid tx-batch!] {:keys [x y]} :body}]
@@ -239,9 +241,10 @@
         (tx-batch!
           (fn [db chunk-cache]
             (let [chunk (or (@chunk-cache chunk-id)
-                          (-> (d/q db {:select [:data]
-                                       :from   :chunk
-                                       :where  [:= :id chunk-id]})
+                          (-> (d/q db '{select [data]
+                                        from   chunk
+                                        where  [= id ?chunk-id]}
+                                {:chunk-id chunk-id})
                             first))]
               (swap! chunk-cache assoc chunk-id
                 (update chunk cell-id #(if (= 0 %) user-color 0))))))))))
@@ -302,10 +305,12 @@
          chunk-cells)])))
 
 (defn UserView [{:keys [x y] :or {x 0 y 0}} db]
-  (->> (d/q db
-         {:select [:id :data]
-          :from   :chunk
-          :where  [:in :id (xy->chunk-ids x y)]})
+  (->> (let [[a b c d e f g h i] (xy->chunk-ids x y)]
+         (d/q db
+           '{select [id data]
+             from   chunk
+             where  [in id ?chunk-ids]}
+           {:chunk-ids [a b c d e f g h i]}))
     (mapv (fn [[id chunk]]
             (Chunk id chunk)))))
 
@@ -404,9 +409,11 @@
         (fn [y]
           (run! (fn [x]
                   (d/q db
-                    {:insert-into :chunk
-                     :values      [{:id    (xy->chunk-id x y)
-                                    :data [:lift blank-chunk]}]}))
+                    '{insert-into chunk
+                      values      [{id   ?chunk-id
+                                    data ?blank-chunk}]}
+                    {:chunk-id    (xy->chunk-id x y)
+                     :blank-chunk blank-chunk}))
             board-range)
           (print ".") (flush))
         board-range)))
@@ -420,7 +427,7 @@
     ["CREATE TABLE IF NOT EXISTS chunk(id INT PRIMARY KEY, chunk BLOB)"])
   (d/q db
     ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"])
-  (when-not (d/q db {:select [:id] :from :chunk :limit 1})
+  (when-not (d/q db '{select [id] from chunk limit 1})
     (initial-board-db-state! db)))
 
 (defn ctx-start []
@@ -440,10 +447,11 @@
                       (d/with-write-tx [db writer]
                         (run! (fn [thunk] (thunk db chunk-cache)) thunks)
                         (run! (fn [[chunk-id new-chunk]]
-                                (d/q db
-                                  {:update :chunk
-                                   :set    {:data [:lift new-chunk]}
-                                   :where  [:= :id chunk-id]}))
+                                (d/q db '{update chunk
+                                           set    {data ?new-chunk}
+                                           where  [= id ?chunk-id]}
+                                  {:chunk-id  chunk-id
+                                   :new-chunk new-chunk}))
                           @chunk-cache)))
                     (h/refresh-all!))
                   {:run-every-ms 100})}))
@@ -477,8 +485,6 @@
 
   ,)
 
-(comment)
-
 (comment
   (def db (-> @app_ :ctx :db))
   (d/pragma-check db)
@@ -502,8 +508,7 @@
   (d/table-info db :chunk)
   (d/table-list db)
 
-  (d/q db {:select [[[:count :*]]]
-           :from   :session})
+  (d/q db '{select [[[count *]]]from session})
 
   ;; (+ 7784 3249 500)
 
@@ -521,9 +526,10 @@
   (def db-write (-> @app_ :ctx :db-write))
 
   (d/q db-write
-    {:update :chunk
-     :set    {:data [:lift blank-chunk]}
-     :where  [:= :id 0]})
+    '{update chunk
+      set    {data ?blank-chunk}
+      where  [= id 0]}
+    {:blank-chunk blank-chunk})
 
   ;; Free up space (slow)
   ;; (time (d/q db-write ["VACUUM"]))
