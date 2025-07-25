@@ -166,6 +166,7 @@
         {:display        :flex
          :gap            :5px
          :flex-direction :row
+         :flex-wrap      :wrap
          :align-items    :center}]
 
        ["input[type=\"number\"]:focus"
