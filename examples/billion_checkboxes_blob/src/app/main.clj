@@ -5,13 +5,14 @@
             [clj-async-profiler.core :as prof]
             [clojure.math :as math]))
 
+(def cell-size 32)
 (def chunk-size 16)
 (def board-size (->> (math/pow chunk-size 2)
                   (/ 1000000000)
                   math/sqrt
                   math/ceil
                   int))
-(def board-size-px (* 32 chunk-size board-size))
+(def board-size-px (* cell-size chunk-size board-size))
 (def size (* board-size chunk-size))
 (def states
   [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14])
@@ -23,7 +24,8 @@
   (let [black         "#000000"
         white         "#FFF1E8"
         accent        "#FFA300"
-        board-size-px (str board-size-px "px")]
+        board-size-px (str board-size-px "px")
+        max-width (* 20 cell-size)]
     (h/static-css
       [["*, *::before, *::after"
         {:box-sizing :border-box
@@ -76,7 +78,7 @@
          :margin-inline  :auto
          :padding-block  :2dvh
          :display        :flex
-         :width          "min(100% - 2rem , 42rem)"
+         :width          (str "min(100% - 2rem ," max-width "px)")
          :gap            :5px
          :flex-direction :column}]
 
@@ -85,7 +87,7 @@
          :scroll-behavior :smooth
          :scrollbar-color (str black " transparent")
          :overflow-anchor :none
-         :height          "min(100% - 2rem , 42rem)"}]
+         :height          (str "min(100% - 2rem , " max-width "px)")}]
 
        [:.board
         {:background            white
@@ -147,7 +149,7 @@
         {:margin-block          :5px
          :font-size             :1.2rem
          :background            white
-         :width                 "min(100% - 2rem , 42rem)"
+         :width                 "min(100% - 2rem , 62rem)"
          :display               :grid
          :gap                   :10px
          :grid-template-columns "repeat(auto-fill, 2rem)"
