@@ -19,7 +19,8 @@
 (def css
   (let [accent        "#008751"
         other         "#FF004D"
-        board-size-px (str board-size-px "px")]
+        board-size-px (str board-size-px "px")
+        max-width (* 20 cell-size)]
     (h/static-css
       [["*, *::before, *::after"
         {:box-sizing :border-box
@@ -72,7 +73,7 @@
          :margin-inline  :auto
          :padding-block  :2dvh
          :display        :flex
-         :width          "min(100% - 2rem , 42rem)"
+         :width          (str "min(100% - 2rem ," max-width "px)")
          :gap            :5px
          :flex-direction :column}]
 
@@ -82,8 +83,7 @@
          :scroll-behavior :smooth
          :scrollbar-color (str black " transparent")
          :overflow-anchor :none
-         :width           "min(100% - 2rem , 42rem)"
-         :height          "min(100% - 2rem , 42rem)"}]
+         :width           (str "min(100% - 2rem ," max-width "px)")}]
 
        [:.board-container
         {:width                 board-size-px
