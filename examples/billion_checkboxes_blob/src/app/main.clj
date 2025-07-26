@@ -1,6 +1,7 @@
 (ns app.main
   (:gen-class)
-  (:require [hyperlith.core :as h :refer [defaction defview]]
+  (:require [app.qrcode :as qrcode]
+            [hyperlith.core :as h :refer [defaction defview]]
             [hyperlith.extras.sqlite :as d]
             [clj-async-profiler.core :as prof]
             [clojure.math :as math]))
@@ -25,7 +26,7 @@
         white         "#FFF1E8"
         accent        "#FFA300"
         board-size-px (str board-size-px "px")
-        max-width (* 20 cell-size)]
+        max-width     (* 20 cell-size)]
     (h/static-css
       [["*, *::before, *::after"
         {:box-sizing :border-box
@@ -191,7 +192,11 @@
          :font-size     :1.2rem
          :border-radius :0.15em
          :border        "0.15em solid currentColor"
-         :padding       :5px}]])))
+         :padding       :5px}]
+
+       [:.qrcode
+        {:padding       :5px
+         :margin-top    :5px}]])))
 
 (defn get-session-data [db sid]
   (-> (d/q db '{select [data]
@@ -264,10 +269,14 @@
 (defaction handler-share
   [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
   (h/html
-    [:div.toast {:data-on-load__delay.3s "el.remove()"}
+    [:div.toast {:data-on-load__delay.10s "el.remove()"}
      [:div.button
       [:p [:strong nil (str "X: " jumpx " Y: " jumpy)]]
-      [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]]]))
+      [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]
+      [:div.qrcode
+       (qrcode/url->qrcode-svg
+         (str "https://checkboxes.andersmurphy.com?x="
+           jumpx "&=" jumpy))]]]))
 
 (defn Checkbox [local-id state]
   (let [state       (or state 0)
