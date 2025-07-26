@@ -195,7 +195,9 @@
          :padding       :5px}]
 
        [:.qrcode
-        {:padding       :5px
+        {:border-radius :0.15em
+         :border        "0.15em solid currentColor"
+         :padding       :5px
          :margin-top    :5px}]])))
 
 (defn get-session-data [db sid]
@@ -273,7 +275,7 @@
      [:div.button
       [:p [:strong nil (str "X: " jumpx " Y: " jumpy)]]
       [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]
-      [:div.qrcode
+      [:div.qrcode nil
        (qrcode/url->qrcode-svg
          (str "https://checkboxes.andersmurphy.com?x="
            jumpx "&=" jumpy))]]]))
