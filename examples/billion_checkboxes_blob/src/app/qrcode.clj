@@ -12,5 +12,5 @@
                    (.append sb (format "M%d,%dh1v1h-1z" x y))))
                (.toString sb))]
     (h/html
-      [:svg {:width "100%" :viewBox "0 0 29 29"}
+      [:svg {:width "100%" :viewBox "0 0 33 33"}
        [:path {:d path}]])))
