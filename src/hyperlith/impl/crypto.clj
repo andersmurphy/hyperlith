@@ -42,7 +42,9 @@
   "Short digest, compact but with a higher collision rate."
   [data]
   (-> (doto (MessageDigest/getInstance "MD5")
-        (.update (String/.getBytes (str data))))
+        (.update (if (bytes? data)
+                   data
+                   (String/.getBytes (str data)))))
     (.digest)
     bytes->base64
     (subs 10)))
