@@ -21,12 +21,15 @@
 (def state->class
   (mapv #(str "_" %) states))
 
+(def black         "#000000")
+(def white         "#FFF1E8")
+
 (def css
   (let [black         "#000000"
         white         "#FFF1E8"
         accent        "#FFA300"
         board-size-px (str board-size-px "px")
-        max-width     (* 20 cell-size)]
+        max-width     (* 25 cell-size)]
     (h/static-css
       [["*, *::before, *::after"
         {:box-sizing :border-box
@@ -38,19 +41,6 @@
          :font-size   :1.0rem
          :color       black
          :background  white}]
-
-       [:.toast
-        {:animation      "pop .3s ease"
-         :position       :absolute
-         :pointer-events :none
-         :top            0
-         :left           0
-         :width          :100%
-         :height         :100%
-         :display        :grid
-         :place-items    :center
-         :text-align     :center
-         :z-index        10}]
 
        [:.pe-none
         {:pointer-events :none
@@ -194,11 +184,31 @@
          :border        "0.15em solid currentColor"
          :padding       :5px}]
 
+       [:.toast
+        {:backdrop-filter "blur(5px)"
+         :position        :absolute
+         :top             0
+         :left            0
+         :width           :100%
+         :height          :100%
+         :display         :grid
+         :place-items     :center
+         :text-align      :center
+         :z-index         10}]
+
+       [:.toast-card
+        {:animation      "pop .3s ease"
+         :pointer-events :none
+         :background     white
+         :font-size      :1.2rem
+         :border-radius  :0.15em
+         :border         "0.15em solid currentColor"
+         :padding        :10px}]
+
        [:.qrcode
-        {:border-radius :0.15em
-         :border        "0.15em solid currentColor"
-         :padding       :5px
-         :margin-top    :5px}]])))
+        {:border-radius :15px
+         :padding       :8px
+         :margin-top    :8px}]])))
 
 (defn get-session-data [db sid]
   (-> (d/q db '{select [data]
@@ -271,14 +281,15 @@
 (defaction handler-share
   [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
   (h/html
-    [:div.toast {:data-on-load__delay.10s "el.remove()"}
-     [:div.button
+    [:div.toast {:data-on-mousedown "el.remove()"}
+     [:div.toast-card
       [:p [:strong nil (str "X: " jumpx " Y: " jumpy)]]
       [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]
       [:div.qrcode nil
        (qrcode/url->qrcode-svg
          (str "https://checkboxes.andersmurphy.com?x="
-           jumpx "&=" jumpy))]]]))
+           jumpx "&y=" jumpy)
+         {:dark black :light white})]]]))
 
 (defn Checkbox [local-id state]
   (let [state       (or state 0)
