@@ -21,6 +21,11 @@
 (def state->class
   (mapv #(str "_" %) states))
 
+(def icon
+  (h/static-asset
+    {:body         (h/load-resource "check.png")
+     :content-type "image/png"}))
+
 (def black         "#000000")
 (def white         "#FFF1E8")
 
@@ -374,6 +379,7 @@
   (h/html
     [:link#css {:rel "stylesheet" :type "text/css" :href css}]
     [:title nil "One billion checkboxes"]
+    [:link {:rel "icon" :type "image/png" :href icon}]
     [:meta {:content "So many checkboxes" :name "description"}]))
 
 (defview handler-root
