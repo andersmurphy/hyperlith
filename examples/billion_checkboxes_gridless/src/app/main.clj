@@ -6,6 +6,24 @@
             [clj-async-profiler.core :as prof]
             [clojure.math :as math]))
 
+;; This version of checkboxes uses relative positioning
+;; and translate instead of a large grid.
+;; 
+;; Grids are only used for the "9 patch" view and
+;; the 9 chunks that compose it.
+;;
+;; The advantage of this version is you can use more fine
+;; grained chunks on the view and it lets you scale max
+;; grid size rendering limits. The grid approach falls
+;; down around a billion grid chunks as the browser can't
+;; handle it.
+;;
+;; With this approach there is no theoretical limit.
+;;
+;; The reason for using translate is it's a lot more
+;; performant than top/left as it uses the GPU. It also
+;; significantly reduces layout shifts.
+
 (def cell-size 32)
 (def chunk-size 16)
 (def board-size (->> (math/pow chunk-size 2)
@@ -88,19 +106,26 @@
        [:.board
         {:background            white
          :width                 board-size-px
-         :display               :grid
-         :aspect-ratio          "1/1"
-         :gap                   :10px
-         :grid-template-rows    (str "repeat(" board-size ", 1fr)")
-         :grid-template-columns (str "repeat(" board-size ", 1fr)")
+         :height                board-size-px
          :pointer-events        :none}]
+
+       [:.nine-patch
+        {:position :relative
+         :grid-template-rows    (str "repeat(" (* 3 chunk-size) ", 1fr)")
+         :grid-template-columns (str "repeat(" (* 3 chunk-size) ", 1fr)")
+         :width    (str (* chunk-size cell-size 3) "px")
+         :height   (str (* chunk-size cell-size 3) "px")
+         :display  :grid
+         :gap      :10px}]
 
        [:.chunk
         {:background            white
+         :grid-column           (str "span " chunk-size)
+         :grid-row              (str "span " chunk-size)
          :display               :grid
          :gap                   :10px
-         :grid-template-rows    (str "repeat(" chunk-size ", 1fr)")
-         :grid-template-columns (str "repeat(" chunk-size ", 1fr)")}]
+         :grid-template-rows    :subgrid
+         :grid-template-columns :subgrid}]
 
        ["input[type=\"checkbox\"]"
         {:appearance     :none
@@ -322,27 +347,29 @@
     vec))
 
 (defn Chunk [chunk-id chunk-cells]
-  (let [[x y] (chunk-id->xy chunk-id)
-        x     (inc x)
-        y     (inc y)]
-    (h/html
-      [:div.chunk
-       {:id      chunk-id
-        :data-id chunk-id
-        :style   {:grid-column x :grid-row y}}
-       (into []
-         (map-indexed (fn [local-id box] (Checkbox local-id box)))
-         chunk-cells)])))
+  (h/html
+    [:div.chunk
+     {:id      chunk-id
+      :data-id chunk-id}
+     (into []
+       (map-indexed (fn [local-id box] (Checkbox local-id box)))
+       chunk-cells)]))
 
 (defn UserView [{:keys [x y] :or {x 0 y 0}} db]
-  (->> (let [[a b c d e f g h i] (xy->chunk-ids x y)]
-         (d/q db
-           '{select [id data]
-             from   chunk
-             where  [in id ?chunk-ids]}
-           {:chunk-ids [a b c d e f g h i]}))
-    (mapv (fn [[id chunk]]
-            (Chunk id chunk)))))
+  (h/html
+    [:div#nine-patch.nine-patch
+     {:style
+      {:transform
+       (str "translate(" (* x chunk-size cell-size)"px,"
+         (* y chunk-size cell-size) "px)")}}
+      (->> (let [[a b c d e f g h i] (xy->chunk-ids x y)]
+            (d/q db
+              '{select [id data]
+                from   chunk
+                where  [in id ?chunk-ids]}
+              {:chunk-ids [a b c d e f g h i]}))
+       (mapv (fn [[id chunk]]
+               (Chunk id chunk))))]))
 
 (defn scroll-offset-js [n]
   (str "Math.round((" n "/" board-size-px ")*" board-size "-1)"))
