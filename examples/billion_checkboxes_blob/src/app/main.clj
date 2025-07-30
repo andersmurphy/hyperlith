@@ -455,7 +455,7 @@
   ;; Create tables
   (println "Running migrations...")
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS chunk(id INT PRIMARY KEY, chunk BLOB)"])
+    ["CREATE TABLE IF NOT EXISTS chunk(id INT PRIMARY KEY, data BLOB)"])
   (d/q db
     ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"])
   (when-not (d/q db '{select [id] from chunk limit 1})
