@@ -27,13 +27,13 @@
   "Allows uid implementation to be changed if need be."
   random-unguessable-uid)
 
-(defn secret-key->hmac-md5-keyspec [secret-key]
-  (SecretKeySpec/new (String/.getBytes secret-key) "HmacMD5"))
+(defn secret-key->hmac-sha256-keyspec [secret-key]
+  (SecretKeySpec/new (String/.getBytes secret-key) "HmacSha256"))
 
 (defn hmac-md5
   "Used for quick stateless csrf token generation."
   [key-spec data]
-  (-> (doto (Mac/getInstance "HmacMD5")
+  (-> (doto (Mac/getInstance "HmacSha256")
         (.init key-spec))
     (.doFinal (String/.getBytes data))
     bytes->base64))
@@ -41,12 +41,11 @@
 (defn digest
   "Short digest, compact but with a higher collision rate."
   [data]
-  (-> (doto (MessageDigest/getInstance "MD5")
-        (.update (if (bytes? data)
-                   data
-                   (String/.getBytes (str data)))))
-    (.digest)
-    bytes->base64
-    (subs 10)))
-
-
+  (let [^byte/1 bytes (if (bytes? data)
+                        data
+                        (String/.getBytes (str data)))]
+    (-> (doto (MessageDigest/getInstance "SHA256")
+          (MessageDigest/.update bytes))
+        (MessageDigest/.digest)
+        bytes->base64
+        (subs 10))))

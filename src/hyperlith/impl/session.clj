@@ -17,7 +17,7 @@
 (defn wrap-session
   [handler csrf-secret]
   (let [;; Only create the spec once.
-        csrf-keyspec (crypto/secret-key->hmac-md5-keyspec csrf-secret)
+        csrf-keyspec (crypto/secret-key->hmac-sha256-keyspec csrf-secret)
         sid->csrf    (fn sid->csrf [sid] (crypto/hmac-md5 csrf-keyspec sid))]
     (fn [req]
       (let [body (:body req)
