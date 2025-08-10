@@ -3,6 +3,9 @@
   (:require [hyperlith.core :as h :refer [defaction defview]]
             [hyperlith.extras.sqlite :as d]))
 
+(def row-height 20)
+(def view-rows 300)
+
 (def css
   (h/static-css
     [["*, *::before, *::after"
@@ -33,21 +36,26 @@
 
      [:.table
       {:background     :white
-       :display        :grid
        :pointer-events :none}]
 
-     [:.row
-      {:display        :grid
-       :grid-template-columns (str "repeat(" 4 ", auto)")}]]))
+     [:table-view
+      ;; Using implicit rows here (not specifying the row template) prevents a
+      ;; layout shift.
+      {:position :relative
+       :display  :grid}]
 
-(def row-height 20)
+     [:.row
+      {;; Set row height explicitly 
+       :height (str row-height "px")
+       :display               :grid
+       :grid-template-columns (str "repeat(" 4 ", auto)")}]]))
 
 (defn get-session-data [db sid]
   (-> (d/q db '{select [data]
                 from   session
                 where  [= id ?sid]}
         {:sid sid})
-    first))
+      first))
 
 (defn get-tab-data [db sid tabid]
   (-> (get-session-data db sid) :tabs (get tabid)))
@@ -65,29 +73,37 @@
                               :data ?new-data}]}
         {:sid sid :new-data new-data}))))
 
+(defn row->offset [row-cursor]
+  (max (- row-cursor 100) 0))
+
 (defaction handler-scroll
   [{:keys [sid tabid tx-batch!] {:keys [y]} :body}]
-  (tx-batch!
-    (fn [db]
-      (update-tab-data! db sid tabid
-        #(assoc % :y (max (int y) 0))))))
+  ;; We don't actually care about the number of rows only their height
+  ;; this makes the maths simpler
+  (let [row-cursor (int (/ y row-height))]
+    (tx-batch!
+      (fn [db]
+        (update-tab-data! db sid tabid
+          #(assoc % :row-cursor (max (int row-cursor) 0)))))))
 
-(defn y->offset [row-count y]
-  (max (- (int (* (/ y (* row-count row-height)) row-count)) 100) 0))
-
-(defn Row [y id [a b c :as _data]]
-  (h/html [:div.row {:style {:grid-row y}}
+(defn Row [id [a b c :as _data]]
+  (h/html [:div.row
            [:div id] [:div a] [:div b] [:div c]]))
 
-(defn UserView [{:keys [y row-count] :or {y 0}} db]
-  (let [current-offset (y->offset row-count y)]
-    (->> (d/q db
-           '{select [id data]
-             from   row
-             offset ?offset
-             limit  300}
-           {:offset current-offset})
-         (map-indexed (fn [i [id row]] (Row (+ current-offset i) id row))))))
+(defn UserView [{:keys [row-cursor] :or {row-cursor 0}} db]
+  (let [current-offset (row->offset row-cursor)]
+    (h/html
+      [:div#table-view.table-view
+       {:style
+        {:transform (str "translateY(" (* current-offset row-height) "px)")}}
+       (->> (d/q db
+              '{select [id data]
+                from   row
+                offset ?offset
+                limit  ?limit}
+              {:offset current-offset
+               :limit  view-rows})
+            (mapv (fn [[id row]] (Row id row))))])))
 
 (def on-scroll-js
   (str "$y = el.scrollTop; @post(`" handler-scroll "`)"))
@@ -102,9 +118,9 @@
   {:path "/" :shim-headers shim-headers :br-window-size 19}
   [{:keys [db sid tabid] :as _req}]
   (let [;; TODO: make this dynamic
-        row-count 100000
-        tab-data         (get-tab-data db sid tabid)
-        content          (UserView (assoc tab-data :row-count row-count) db)]
+        row-count 200000
+        tab-data  (get-tab-data db sid tabid)
+        content   (UserView (assoc tab-data :row-count row-count) db)]
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href css}]
       [:main#morph.main
@@ -112,9 +128,7 @@
         {:data-ref                                       "_view"
          :data-on-scroll__throttle.100ms.trail.noleading on-scroll-js}
         [:div#table.table
-         {:style
-          {:grid-template-rows
-           (str "repeat(" row-count "," row-height "px)")}}
+         {:style {:height (str (* row-count row-height) "px")}}
          content]]])))
 
 (defn initial-table-db-state! [db]
