@@ -3,7 +3,6 @@
   (:require [app.qrcode :as qrcode]
             [hyperlith.core :as h :refer [defaction defview]]
             [hyperlith.extras.sqlite :as d]
-            [clj-async-profiler.core :as prof]
             [clojure.math :as math]))
 
 ;; This version of checkboxes uses relative positioning
@@ -24,14 +23,15 @@
 ;; performant than top/left as it uses the GPU. It also
 ;; significantly reduces layout shifts.
 
-(def cell-size 32)
+(def cell-size-px 32)
 (def chunk-size 16)
+(def chunk-size-px (* cell-size-px chunk-size))
 (def board-size (->> (math/pow chunk-size 2)
                   (/ 1000000000)
                   math/sqrt
                   math/ceil
                   int))
-(def board-size-px (* cell-size chunk-size board-size))
+(def board-size-px (* cell-size-px chunk-size board-size))
 (def size (* board-size chunk-size))
 (def states
   [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14])
@@ -52,7 +52,7 @@
         white         "#FFF1E8"
         accent        "#FFA300"
         board-size-px (str board-size-px "px")
-        max-width     (* 25 cell-size)]
+        max-width     (* 25 cell-size-px)]
     (h/static-css
       [["*, *::before, *::after"
         {:box-sizing :border-box
@@ -110,33 +110,35 @@
          :pointer-events        :none}]
 
        [:.nine-patch
-        {:position :relative
+        {:position              :relative
          :grid-template-rows    (str "repeat(" (* 3 chunk-size) ", 1fr)")
          :grid-template-columns (str "repeat(" (* 3 chunk-size) ", 1fr)")
-         :width    (str (* chunk-size cell-size 3) "px")
-         :height   (str (* chunk-size cell-size 3) "px")
-         :display  :grid
-         :gap      :10px}]
+         :width                 (str (* chunk-size-px 3) "px")
+         :height                (str (* chunk-size-px 3) "px")
+         :display               :grid}]
 
        [:.chunk
         {:background            white
          :grid-column           (str "span " chunk-size)
          :grid-row              (str "span " chunk-size)
          :display               :grid
-         :gap                   :10px
          :grid-template-rows    :subgrid
          :grid-template-columns :subgrid}]
 
-       ["input[type=\"checkbox\"]"
-        {:appearance     :none
-         :font           :inherit
-         :font-size      :1.2rem
-         :color          :currentColor
-         :border         "0.15em solid currentColor"
-         :border-radius  :0.15em
-         :display        :grid
-         :place-content  :center
-         :pointer-events :all}]
+       (let [padding 5]
+         ["input[type=\"checkbox\"]"
+          {:width          (str (- cell-size-px (* 2 padding)) "px")
+           :height         (str (- cell-size-px (* 2 padding)) "px")
+           :padding        (str padding "px")
+           :appearance     :none
+           :font           :inherit
+           :font-size      :1.2rem
+           :color          :currentColor
+           :border         "0.15em solid currentColor"
+           :border-radius  :0.15em
+           :display        :grid
+           :place-content  :center
+           :pointer-events :all}])
 
        ["input[type=\"checkbox\"]:checked::before"
         {:content    "\"\""
@@ -360,8 +362,8 @@
     [:div#nine-patch.nine-patch
      {:style
       {:transform
-       (str "translate(" (* x chunk-size cell-size)"px,"
-         (* y chunk-size cell-size) "px)")}}
+       (str "translate(" (* x chunk-size cell-size-px)"px,"
+         (* y chunk-size cell-size-px) "px)")}}
       (->> (let [[a b c d e f g h i] (xy->chunk-ids x y)]
             (d/q db
               '{select [id data]
@@ -372,10 +374,10 @@
                (Chunk id chunk))))]))
 
 (defn scroll-offset-js [n]
-  (str "Math.round((" n "/" board-size-px ")*" board-size "-1)"))
+  (str "Math.round((" n "/" chunk-size-px ") -1)"))
 
 (defn scroll->cell-xy-js [n]
-  (str "Math.round((" n "/" board-size-px ")*" size ")"))
+  (str "Math.round((" n "/" cell-size-px "))"))
 
 (def on-scroll-js
   (str
@@ -542,93 +544,3 @@
   (def db (-> @app_ :ctx :db))
 
   ,)
-
-(comment
-  (def db (-> @app_ :ctx :db))
-  (d/pragma-check db)
-
-  ;; Execution time mean : 148.516131 ms
-  (user/bench
-    (->> (mapv
-           (fn [n]
-             (future
-               (let [n (mod n board-size)]
-                 (UserView {:x n :y n} db)
-                 ;; we don't want to hold onto the object
-                 ;; not realistic
-                 nil)))
-           (range 0 4000))
-      (run! (fn [x] @x))))
-
-  ;; Execution time mean : 151.256280 µs
-  (user/bench (do (UserView {:x 1 :y 1} db) nil))
-
-  (d/table-info db :chunk)
-  (d/table-list db)
-
-  (d/q db '{select [[[count *]]]from session})
-
-  ;; (+ 7784 3249 500)
-
-  ,)
-
-(comment
-  (user/bench
-    (d/q db
-      ["SELECT chunk_id, JSON_GROUP_ARRAY(state) AS chunk_cells FROM cell WHERE chunk_id IN (?, ?, ?, ?, ?, ?, ?, ?, ?)  GROUP BY chunk_id" 1978 3955 5932 1979 3956 5933 1980 3957 5934]))
-
-  (def tab-state (-> @app_ :ctx :tab))
-
-  (count @tab-state)
-
-  (def db-write (-> @app_ :ctx :db-write))
-
-  (d/q db-write
-    '{update chunk
-      set    {data ?blank-chunk}
-      where  [= id 0]}
-    {:blank-chunk blank-chunk})
-
-  ;; Free up space (slow)
-  ;; (time (d/q db-write ["VACUUM"]))
-  ;; Checkpoint the WAL
-  (d/q db-write ["PRAGMA wal_checkpoint(PASSIVE)"])
-  (d/q db-write ["PRAGMA wal_checkpoint(TRUNCATE)"])
-
-
-
-  ,)
-
-(comment ;; Profiling
-  (prof/start)
-  (prof/stop)
-  (prof/serve-ui 7777)
-  ;; (clojure.java.browse/browse-url "http://localhost:7777/")
-  )
-
-(comment
-  (def wrapped-router (-> @app_ :wrapped-router))
-
-  (future
-    (time
-      (run!
-        (fn [_]
-          (run!
-            (fn [_]
-              (wrapped-router
-                {:headers
-                 {"accept-encoding" "br"
-                  "cookie"          "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY; __Host-csrf=3UsG62ic9wLsg9EVQhGupw"
-                  "content-type"    "application/json"}
-                 :request-method :post
-                 :uri            handler-check
-                 :body           {:csrf     "3UsG62ic9wLsg9EVQhGupw"
-                                  :parentid "0"
-                                  :targetid (str (rand-int 200))}}))
-            ;; 10000r/s
-            (range 10))
-          (Thread/sleep 1))
-        (range 10000))))
-
-
-  )
