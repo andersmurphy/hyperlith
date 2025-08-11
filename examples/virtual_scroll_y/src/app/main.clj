@@ -1,10 +1,10 @@
 (ns app.main
   (:gen-class)
   (:require [hyperlith.core :as h :refer [defaction defview]]
-            [hyperlith.extras.sqlite :as d]))
+            [hyperlith.extras.sqlite :as d]
+            [app.virtual-scroll :as vs]))
 
 (def row-height 20)
-(def view-rows 300)
 
 (def css
   (h/static-css
@@ -28,26 +28,8 @@
        :gap            :5px
        :flex-direction :column}]
 
-     [:.view
-      {:overflow-y      :scroll
-       :scroll-behavior :smooth
-       :overflow-anchor :none
-       :height          "min(100% - 2rem , 60rem)"}]
-
-     [:.table
-      {:background     :white
-       :pointer-events :none}]
-
-     [:table-view
-      ;; Using implicit rows here (not specifying the row template) prevents a
-      ;; layout shift.
-      {:position :relative
-       :display  :grid}]
-
      [:.row
-      {;; Set row height explicitly 
-       :height (str row-height "px")
-       :display               :grid
+      {:display               :grid
        :grid-template-columns (str "repeat(" 4 ", auto)")}]]))
 
 (defn get-session-data [db sid]
@@ -73,40 +55,33 @@
                               :data ?new-data}]}
         {:sid sid :new-data new-data}))))
 
-(defn row->offset [row-cursor]
-  (max (- row-cursor 100) 0))
-
 (defaction handler-scroll
-  [{:keys [sid tabid tx-batch!] {:keys [y]} :body}]
+  [{:keys [sid tabid tx-batch!] {:strs [y]} :query-params}]
   ;; We don't actually care about the number of rows only their height
   ;; this makes the maths simpler
-  (let [row-cursor (int (/ y row-height))]
+  (when-let [y (int (parse-long y))]
     (tx-batch!
       (fn [db]
         (update-tab-data! db sid tabid
-          #(assoc % :row-cursor (max (int row-cursor) 0)))))))
+          #(assoc % :y (max y 0)))))))
 
 (defn Row [id [a b c :as _data]]
-  (h/html [:div.row
-           [:div id] [:div a] [:div b] [:div c]]))
+  (h/html [:div.row {:id id}
+           [:div nil id] [:div nil a] [:div nil b] [:div nil c]]))
 
-(defn UserView [{:keys [row-cursor] :or {row-cursor 0}} db]
-  (let [current-offset (row->offset row-cursor)]
-    (h/html
-      [:div#table-view.table-view
-       {:style
-        {:transform (str "translateY(" (* current-offset row-height) "px)")}}
-       (->> (d/q db
-              '{select [id data]
-                from   row
-                offset ?offset
-                limit  ?limit}
-              {:offset current-offset
-               :limit  view-rows})
-            (mapv (fn [[id row]] (Row id row))))])))
+(defn row-builder [db offset limit]
+  (->> (d/q db
+         '{select [id data]
+           from   row
+           offset ?offset
+           limit  ?limit}
+         {:offset offset
+          :limit  limit})
+       (mapv (fn [[id row]] (Row id row)))))
 
-(def on-scroll-js
-  (str "$y = el.scrollTop; @post(`" handler-scroll "`)"))
+(defn row-count [db]
+  (-> (d/q db '{select [[[count *]]] from row})
+      first))
 
 (def shim-headers
   (h/html
@@ -117,19 +92,19 @@
 (defview handler-root
   {:path "/" :shim-headers shim-headers :br-window-size 19}
   [{:keys [db sid tabid] :as _req}]
-  (let [;; TODO: make this dynamic
-        row-count 200000
-        tab-data  (get-tab-data db sid tabid)
-        content   (UserView (assoc tab-data :row-count row-count) db)]
+  (let [tab-data (get-tab-data db sid tabid)]
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href css}]
       [:main#morph.main
-       [:div#view.view
-        {:data-ref                                       "_view"
-         :data-on-scroll__throttle.100ms.trail.noleading on-scroll-js}
-        [:div#table.table
-         {:style {:height (str (* row-count row-height) "px")}}
-         content]]])))
+       [:pre {:data-json-signals true} nil]
+       [::vs/Virtual#view
+        {:v/row-height          20
+         :v/view-height         1000
+         :v/max-rendered-rows   1000
+         :v/row-fn              (partial row-builder db)
+         :v/row-count-fn        (partial row-count db)
+         :v/scroll-handler-path handler-scroll
+         :v/scroll-pos          (:y tab-data)}]])))
 
 (defn initial-table-db-state! [db]
   (let [number-of-rows 200000
@@ -202,5 +177,17 @@
   ((@app_ :stop))
 
   (def db (-> @app_ :ctx :db))
+
+  (user/bench
+    (html/html->str
+      (html/html
+        [::vs/Virtual#view
+         {:v/row-height          20
+          :v/view-height         1000
+          :v/max-rendered-rows   300
+          :v/row-fn              (partial row-builder db)
+          :v/row-count-fn        (partial row-count db)
+          :v/scroll-handler-path handler-scroll
+          :v/scroll-pos          (:y 10)}])))
 
   ,)
