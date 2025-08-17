@@ -32,7 +32,7 @@
         total-row-count  (row-count-fn)
         table-height     (* total-row-count row-height)
         threshold        (int (/ rendered-rows 6))
-        fired-signal     (str id "-fired")
+        fired-signal     (str id "fired")
         remaining-rows   (- total-row-count offset-rows)
         fetch-next-page? (fetch-next-page-js fired-signal
                            (if (= offset-rows 0)
@@ -46,7 +46,7 @@
                            scroll-handler-path)]
     (h/html
       [:div (assoc attrs
-              :data-signals (h/edn->json {fired-signal offset-rows})
+              (str "data-signals-" fired-signal)  offset-rows
               :data-on-load   fetch-next-page?
               :data-on-scroll fetch-next-page?
               :style {:scroll-behavior :smooth
