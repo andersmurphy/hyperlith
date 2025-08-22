@@ -1,7 +1,8 @@
 (ns hyperlith.extras.sqlite
   (:require [hyperlith.impl.namespaces :refer [import-vars]]
             [sqlite4clj.core :as d]
-            [honey.sql :as hsql]))
+            [honey.sql :as hsql]
+            [clojure.java.process :as proc]))
 
 (import-vars
   [sqlite4clj.core
@@ -33,3 +34,11 @@
         (q db ["pragma page_size"])
         (q db ["pragma cache_size"])
         (q db ["pragma temp_store"])]))
+
+(defn restore-from-litestream!
+  "This is a noop if db already exists."
+  [db-name]
+  (try
+    (proc/exec "litestream" "restore" db-name)
+    (catch Throwable _
+      (println "warning, litestream not found."))))

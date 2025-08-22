@@ -477,8 +477,10 @@
     ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"]))
 
 (defn ctx-start []
-  (let [{:keys [writer reader]}
-        (d/init-db! "database-new.db"
+  (let [db-name "database-new.db"
+        _       (d/restore-from-litestream! db-name)
+        {:keys [writer reader]}
+        (d/init-db! db-name
           {:pool-size 4
            :pragma    {:foreign_keys false}})]
     ;; Run migrations

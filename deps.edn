@@ -1,6 +1,6 @@
 {:paths ["src" "resources"]
  :deps
- {org.clojure/clojure    {:mvn/version "1.12.0"}
+ {org.clojure/clojure    {:mvn/version "1.12.2"}
   org.clojure/data.json  {:mvn/version "2.5.1"}
   org.clojure/core.async {:mvn/version "1.7.701"}
 
@@ -19,7 +19,7 @@
   ;; SQLITE
   andersmurphy/sqlite4clj 
   {:git/url "https://github.com/andersmurphy/sqlite4clj"
-   :git/sha "3a665c64a1bfe092038bec8396d4298dffe801b6"}
+   :git/sha "801c075b7d9042f03a0ff03c646395dac9d93ca6"}
   com.github.seancorfield/honeysql {:mvn/version "2.7.1325"}}
  :aliases
  {:dev
