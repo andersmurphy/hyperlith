@@ -1,6 +1,10 @@
 (ns app.virtual-scroll
   (:require [hyperlith.core :as h]))
 
+(defn resize-js [resize-handler-path]
+  (format "@post(`%s?height=${el.clientHeight}`);"
+    resize-handler-path))
+
 (defn fetch-next-page-js [fired-signal bottom top scroll-handler-path]
   (format
     "if (($%s !== -1)  && (%s > el.scrollTop || %s < el.scrollTop))
@@ -11,30 +15,35 @@
     fired-signal
     scroll-handler-path))
 
-;; TODO: get user's initial view size
-;; TODO: user view resize
-;; TODO: variable item height
+;; TODO: variable item height?
+;; TODO: send up initial device height on connect
+;; TODO: auto session/tab state with security/validation
 
 (defmethod h/html-resolve-alias ::Virtual
   [_
    {:keys   [id]
     :v/keys [row-height max-rendered-rows row-fn row-count-fn
-             scroll-handler-path scroll-pos view-height]
+             scroll-handler-path
+             resize-handler-path
+             scroll-pos
+             view-height]
     :as     attrs}
    _]
-  (let [visible-rows     (min (int (/ view-height row-height))
-                           (or max-rendered-rows 1000))
-        view-height      (* visible-rows row-height)
-        rendered-rows    (* 6 visible-rows)
-        shift            (int (- (/ rendered-rows 2) (/ visible-rows 2)))
-        scroll-pos       (or scroll-pos 0)
-        offset-rows      (max (- (int (/ scroll-pos row-height)) shift) 0)
-        total-row-count  (row-count-fn)
-        table-height     (* total-row-count row-height)
-        threshold        (int (/ rendered-rows 6))
-        fired-signal     (str id "fired")
-        remaining-rows   (- total-row-count offset-rows)
-        fetch-next-page? (fetch-next-page-js fired-signal
+  (let [scroll-pos        (or scroll-pos 0)
+        view-height       (or view-height 1000)
+        max-rendered-rows (or max-rendered-rows 1000)
+        max-height        (* (int (/ max-rendered-rows 6)) row-height)
+        visible-rows      (min (int (/ view-height row-height))
+                            (int (/ max-rendered-rows 6)))
+        rendered-rows     (* 6 visible-rows)
+        shift             (int (- (/ rendered-rows 2) (/ visible-rows 2)))
+        offset-rows       (max (- (int (/ scroll-pos row-height)) shift) 0)
+        total-row-count   (row-count-fn)
+        table-height      (* total-row-count row-height)
+        threshold         (int (/ rendered-rows 6))
+        fired-signal      (str id "fired")
+        remaining-rows    (- total-row-count offset-rows)
+        fetch-next-page?  (fetch-next-page-js fired-signal
                            (if (= offset-rows 0)
                              0
                              (* (+ offset-rows threshold) row-height))
@@ -42,17 +51,23 @@
                              (* (- (+ offset-rows rendered-rows)
                                    visible-rows threshold)
                                 row-height)
-                             100000000000)
+                             9007199254740991)
                            scroll-handler-path)]
     (h/html
       [:div (assoc attrs
               (str "data-signals-" fired-signal)  offset-rows
+              :data-on-resize__debounce.100ms__window
+              (resize-js resize-handler-path)
               :data-on-load   fetch-next-page?
               :data-on-scroll fetch-next-page?
               :style {:scroll-behavior :smooth
                       :overflow-anchor :none
                       :overflow-y      :scroll
-                      :height          (str view-height "px")})
+                      :max-height      (str max-height "px")
+                      :height          :100%})
+       ;; For showing adaptive number of rows rendered
+       [:div {:style {:position :absolute :left :100px }}
+        [:p {:style {:color :red}} [:strong (str rendered-rows)]]]
        [:div
         {:id    (str id "-virtual-table")
          :style {:pointer-events :none
