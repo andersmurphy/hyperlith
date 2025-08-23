@@ -65,6 +65,14 @@
         (update-tab-data! db sid tabid
           #(assoc % :y (max y 0)))))))
 
+(defaction handler-resize
+  [{:keys [sid tabid tx-batch!] {:strs [height]} :query-params}]
+  (when-let [height (int (parse-long height))]
+    (tx-batch!
+      (fn [db]
+        (update-tab-data! db sid tabid
+          #(assoc % :height (max height 0)))))))
+
 (defn Row [id [a b c :as _data]]
   (h/html [:div.row {:id id}
            [:div nil id] [:div nil a] [:div nil b] [:div nil c]]))
@@ -99,11 +107,12 @@
        [:pre {:data-json-signals true} nil]
        [::vs/Virtual#view
         {:v/row-height          20
-         :v/view-height         1000
          :v/max-rendered-rows   1000
          :v/row-fn              (partial row-builder db)
          :v/row-count-fn        (partial row-count db)
          :v/scroll-handler-path handler-scroll
+         :v/resize-handler-path handler-resize
+         :v/view-height         (:height tab-data)
          :v/scroll-pos          (:y tab-data)}]])))
 
 (defn initial-table-db-state! [db]
@@ -170,24 +179,12 @@
 
 (comment
   (do (-main) nil)
-  ;; (clojure.java.browse/browse-url "http://localhost:8080/")
+  ;; (clojure.java.browse/browse-url "https://localhost:3030/")
 
 
   ;; stop server
   ((@app_ :stop))
 
   (def db (-> @app_ :ctx :db))
-
-  (user/bench
-    (html/html->str
-      (html/html
-        [::vs/Virtual#view
-         {:v/row-height          20
-          :v/view-height         1000
-          :v/max-rendered-rows   300
-          :v/row-fn              (partial row-builder db)
-          :v/row-count-fn        (partial row-count db)
-          :v/scroll-handler-path handler-scroll
-          :v/scroll-pos          (:y 10)}])))
 
   ,)
