@@ -66,8 +66,8 @@
           #(assoc % :y (max y 0)))))))
 
 (defaction handler-resize
-  [{:keys [sid tabid tx-batch!] {:strs [height]} :query-params}]
-  (when-let [height (int (parse-long height))]
+  [{:keys [sid tabid tx-batch!] {:strs [h]} :query-params}]
+  (when-let [height (int (parse-long h))]
     (tx-batch!
       (fn [db]
         (update-tab-data! db sid tabid
@@ -178,7 +178,7 @@
 (h/refresh-all!)
 
 (comment
-  (do (-main) nil) 
+  (do (-main) nil)
   ;; (clojure.java.browse/browse-url "https://localhost:3030/")
 
 

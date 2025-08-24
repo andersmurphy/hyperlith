@@ -2,16 +2,23 @@
   (:require [hyperlith.core :as h]))
 
 (defn resize-js [resize-handler-path]
-  (format "@post(`%s?height=${el.clientHeight}`);"
+  (format "@post(`%s?h=${el.clientHeight}&w${el.clientWidth}`);"
     resize-handler-path))
 
-(defn fetch-next-page-js [fired-signal bottom top scroll-handler-path]
+(defn fetch-next-page-js
+  [{:keys [fired-signal bottom top left right scroll-handler-path]
+    :or   {top    0
+           bottom 9007199254740991
+           left   0
+           right  9007199254740991}}]
   (format
-    "if (($%s !== -1)  && (%s > el.scrollTop || %s < el.scrollTop))
-    {$%s = -1; @post(`%s?y=${Math.floor(el.scrollTop)}`);}"
+    "if (($%s !== -1)  && (%s > el.scrollTop || %s < el.scrollTop || %s > el.scrollLeft || %s < el.scrollLeft))
+    {$%s = -1; @post(`%s?x=${Math.floor(el.scrollLeft)}&y=${Math.floor(el.scrollTop)}`);}"
     fired-signal
+    top    
     bottom
-    top
+    left
+    right
     fired-signal
     scroll-handler-path))
 
@@ -43,16 +50,17 @@
         threshold         (int (/ rendered-rows 6))
         fired-signal      (str id "fired")
         remaining-rows    (- total-row-count offset-rows)
-        fetch-next-page?  (fetch-next-page-js fired-signal
-                           (if (= offset-rows 0)
-                             0
-                             (* (+ offset-rows threshold) row-height))
-                           (if (> remaining-rows rendered-rows)
-                             (* (- (+ offset-rows rendered-rows)
-                                   visible-rows threshold)
-                                row-height)
-                             9007199254740991)
-                           scroll-handler-path)]
+        fetch-next-page?  (fetch-next-page-js
+                            {:fired-signal        fired-signal
+                             :top
+                             (when (not= offset-rows 0)
+                               (* (+ offset-rows threshold) row-height))
+                             :bottom
+                             (when (> remaining-rows rendered-rows)
+                               (* (- (+ offset-rows rendered-rows)
+                                     visible-rows threshold)
+                                  row-height))
+                             :scroll-handler-path scroll-handler-path})]
     (h/html
       [:div (assoc attrs
               (str "data-signals-" fired-signal)  offset-rows
@@ -65,9 +73,6 @@
                       :overflow-y      :scroll
                       :max-height      (str max-height "px")
                       :height          :100%})
-       ;; For showing adaptive number of rows rendered
-       [:div {:style {:position :absolute :left :100px }}
-        [:p {:style {:color :red}} [:strong (str rendered-rows)]]]
        [:div
         {:id    (str id "-virtual-table")
          :style {:pointer-events :none
