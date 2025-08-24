@@ -2,7 +2,7 @@
   (:gen-class)
   (:require [hyperlith.core :as h :refer [defaction defview]]
             [hyperlith.extras.sqlite :as d]
-            [app.virtual-scroll :as vs]))
+            [hyperlith.extras.virtual-scroll :as vs]))
 
 (def row-height 20)
 
@@ -178,7 +178,7 @@
 (h/refresh-all!)
 
 (comment
-  (do (-main) nil)
+  (do (-main) nil) 
   ;; (clojure.java.browse/browse-url "https://localhost:3030/")
 
 

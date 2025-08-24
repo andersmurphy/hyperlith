@@ -1,4 +1,4 @@
-(ns app.virtual-scroll
+(ns hyperlith.extras.virtual-scroll
   (:require [hyperlith.core :as h]))
 
 (defn resize-js [resize-handler-path]
