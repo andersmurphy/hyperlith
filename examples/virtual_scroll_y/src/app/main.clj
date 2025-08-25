@@ -55,10 +55,16 @@
                               :data ?new-data}]}
         {:sid sid :new-data new-data}))))
 
-(defaction handler-scroll
+(defaction handler-scroll-component-1
+  [{:keys [sid tabid tx-batch!] {:strs [x]} :query-params}]
+  (when-let [x (int (parse-long x))]
+    (tx-batch!
+      (fn [db]
+        (update-tab-data! db sid tabid
+          #(assoc % :x (max x 0)))))))
+
+(defaction handler-scroll-component-2
   [{:keys [sid tabid tx-batch!] {:strs [y]} :query-params}]
-  ;; We don't actually care about the number of rows only their height
-  ;; this makes the maths simpler
   (when-let [y (int (parse-long y))]
     (tx-batch!
       (fn [db]
@@ -66,15 +72,19 @@
           #(assoc % :y (max y 0)))))))
 
 (defaction handler-resize
-  [{:keys [sid tabid tx-batch!] {:strs [h]} :query-params}]
-  (when-let [height (int (parse-long h))]
-    (tx-batch!
-      (fn [db]
-        (update-tab-data! db sid tabid
-          #(assoc % :height (max height 0)))))))
+  [{:keys [sid tabid tx-batch!] {:strs [h w]} :query-params}]
+  (let [height (int (parse-long h))
+        width  (int (parse-long w))]
+    (when (and height width)
+      (tx-batch!
+        (fn [db]
+          (update-tab-data! db sid tabid
+            #(assoc %
+               :height (max height 0)
+               :width (max width 0))))))))
 
 (defn Row [id [a b c :as _data]]
-  (h/html [:div.row {:id id}
+  (h/html [:div.row {:id (str "y" id)}
            [:div nil id] [:div nil a] [:div nil b] [:div nil c]]))
 
 (defn row-builder [db offset limit]
@@ -86,6 +96,20 @@
          {:offset offset
           :limit  limit})
        (mapv (fn [[id row]] (Row id row)))))
+
+(defn Col [id [_a _b _c :as _data]]
+  (h/html [:div {:id (str "x" id)}
+           [:div nil id]]))
+
+(defn col-builder [db offset limit]
+  (->> (d/q db
+         '{select [id data]
+           from   row
+           offset ?offset
+           limit  ?limit}
+         {:offset offset
+          :limit  limit})
+       (mapv (fn [[id row]] (Col id row)))))
 
 (defn row-count [db]
   (-> (d/q db '{select [[[count *]]] from row})
@@ -104,19 +128,30 @@
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href css}]
       [:main#morph.main
-       [:pre {:data-json-signals true} nil]
-       [::vs/Virtual#view
-        {:v/row-height          20
-         :v/max-rendered-rows   1000
-         :v/row-fn              (partial row-builder db)
-         :v/row-count-fn        (partial row-count db)
-         :v/scroll-handler-path handler-scroll
-         :v/resize-handler-path handler-resize
-         :v/view-height         (:height tab-data)
-         :v/scroll-pos          (:y tab-data)}]])))
+       [:div#foo1 {:style {:height :10vh}}
+        [::vs/VirtualX#view-x
+         {:v/item-size           100
+          :v/max-rendered-items  1000
+          :v/item-fn             (partial col-builder db)
+          :v/item-count-fn       (partial row-count db)
+          :v/scroll-handler-path handler-scroll-component-1
+          :v/resize-handler-path handler-resize
+          :v/view-size           (:width tab-data)
+          :v/scroll-pos          (:x tab-data)}]]
+       [:div#foo2 {:style {:height :90vh}}
+        [::vs/VirtualY#view-y
+         {:v/item-size           20
+          :v/max-rendered-items  1000
+          :v/item-fn             (partial row-builder db)
+          :v/item-count-fn       (partial row-count db)
+          :v/scroll-handler-path handler-scroll-component-2
+          :v/resize-handler-path handler-resize
+          :v/view-size           (:height tab-data)
+          :v/scroll-pos          (:y tab-data)}]]])))
 
 (defn initial-table-db-state! [db]
-  (let [number-of-rows 200000
+  (let [;; chrome browsers seems to cut this off at 167771 items?
+        number-of-rows 200000 
         table-range    (range number-of-rows)]
     (d/with-write-tx [db db]
       (run! (fn [x]
