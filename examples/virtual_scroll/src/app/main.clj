@@ -71,7 +71,7 @@
         (update-tab-data! db sid tabid
           #(assoc % :y (max y 0)))))))
 
-(defaction handler-resize
+(defaction handler-resize-component-1
   [{:keys [sid tabid tx-batch!] {:strs [h w]} :query-params}]
   (let [height (int (parse-long h))
         width  (int (parse-long w))]
@@ -80,8 +80,20 @@
         (fn [db]
           (update-tab-data! db sid tabid
             #(assoc %
-               :height (max height 0)
-               :width (max width 0))))))))
+               :height-1 (max height 0)
+               :width-1 (max width 0))))))))
+
+(defaction handler-resize-component-2
+  [{:keys [sid tabid tx-batch!] {:strs [h w]} :query-params}]
+  (let [height (int (parse-long h))
+        width  (int (parse-long w))]
+    (when (and height width)
+      (tx-batch!
+        (fn [db]
+          (update-tab-data! db sid tabid
+            #(assoc %
+               :height-2 (max height 0)
+               :width-2 (max width 0))))))))
 
 (defn Row [id [a b c :as _data]]
   (h/html [:div.row {:id (str "y" id)}
@@ -135,8 +147,8 @@
           :v/item-fn             (partial col-builder db)
           :v/item-count-fn       (partial row-count db)
           :v/scroll-handler-path handler-scroll-component-1
-          :v/resize-handler-path handler-resize
-          :v/view-size           (:width tab-data)
+          :v/resize-handler-path handler-resize-component-1
+          :v/view-size           (:width-1 tab-data)
           :v/scroll-pos          (:x tab-data)}]]
        [:div#foo2 {:style {:height :90vh}}
         [::vs/VirtualY#view-y
@@ -145,9 +157,10 @@
           :v/item-fn             (partial row-builder db)
           :v/item-count-fn       (partial row-count db)
           :v/scroll-handler-path handler-scroll-component-2
-          :v/resize-handler-path handler-resize
-          :v/view-size           (:height tab-data)
-          :v/scroll-pos          (:y tab-data)}]]])))
+          :v/resize-handler-path handler-resize-component-2
+          :v/view-size           (:height-2 tab-data)
+          :v/scroll-pos          (:y tab-data)
+          }]]])))
 
 (defn initial-table-db-state! [db]
   (let [;; chrome browsers seems to cut this off at 167771 items?
@@ -204,8 +217,7 @@
 (defn -main [& _]
   (reset! app_
     (h/start-app
-      {:max-refresh-ms 100
-       :ctx-start      ctx-start
+      {:ctx-start      ctx-start
        :ctx-stop       ctx-stop
        :csrf-secret    (h/env :csrf-secret)})))
 
