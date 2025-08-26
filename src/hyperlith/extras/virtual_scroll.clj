@@ -40,7 +40,7 @@
                                       (int (/ visible-items 2))))
                              0)
         total-item-count   (item-count-fn)
-        remaining-items    (max (- total-item-count offset-items) 0)
+        remaining-items     (- total-item-count offset-items)
         threshold-low      (when (not= offset-items 0)
                              (* (+ offset-items visible-items) item-size))
         threshold-high     (when (> remaining-items rendered-items)
