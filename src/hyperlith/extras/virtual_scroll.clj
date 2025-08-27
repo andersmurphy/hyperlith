@@ -54,13 +54,11 @@
         ;; If a buffer item is one scroll will be triggered at 50%
         threshold-items     (* 0.5 buffer-items) 
         threshold-low      (when (not= offset-items 0)
-                             (int
-                               (* (+ offset-items threshold-items) item-size)))
+                               (* (+ offset-items threshold-items) item-size))
         threshold-high     (when (> remaining-items rendered-items)
-                             (int
                                (* (- (+ offset-items rendered-items)
                                      visible-items threshold-items)
-                                  item-size)))
+                                  item-size))
         translate          (* offset-items item-size)
         grid-count         (if (> remaining-items rendered-items)
                              rendered-items
