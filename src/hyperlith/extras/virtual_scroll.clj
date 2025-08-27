@@ -1,5 +1,6 @@
 (ns hyperlith.extras.virtual-scroll
-  (:require [hyperlith.core :as h]))
+  (:require [hyperlith.core :as h]
+            [clojure.math :as math]))
 
 (defn resize-js [resize-handler-path]
   (format "@post(`%s?h=${el.clientHeight}&w=${el.clientWidth}`);"
@@ -40,19 +41,26 @@
                                     ;; fits in 4000px as user scroll speed
                                     ;; not visible items determines how much
                                     ;; you need to buffer
-                                    (int (/ 4000 item-size))))
+                                    (int (/ 4000 item-size))
+                                    ;; TODO: fix if this is larger than max
+                                    ;; render
+                                    ))
         rendered-items     (+ (* 2 buffer-items) visible-items)
-        offset-items       (max (- (int (/ scroll-pos item-size)) buffer-items)
+        offset-items       (max (- (math/round (/ scroll-pos item-size))
+                                   buffer-items)
                              0)
         total-item-count   (item-count-fn)
         remaining-items    (- total-item-count offset-items)
-        threshold-items    (int (* 0.5 buffer-items))
+        ;; If a buffer item is one scroll will be triggered at 50%
+        threshold-items     (* 0.5 buffer-items) 
         threshold-low      (when (not= offset-items 0)
-                             (* (+ offset-items threshold-items) item-size))
+                             (int
+                               (* (+ offset-items threshold-items) item-size)))
         threshold-high     (when (> remaining-items rendered-items)
-                             (* (- (+ offset-items rendered-items)
-                                   visible-items threshold-items)
-                                item-size))
+                             (int
+                               (* (- (+ offset-items rendered-items)
+                                     visible-items threshold-items)
+                                  item-size)))
         translate          (* offset-items item-size)
         grid-count         (if (> remaining-items rendered-items)
                              rendered-items
