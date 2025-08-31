@@ -496,8 +496,7 @@
 (defn -main [& _]
   (reset! app_
     (h/start-app
-      {:max-refresh-ms 100
-       :ctx-start      ctx-start
+      {:ctx-start      ctx-start
        :ctx-stop       ctx-stop
        :csrf-secret    (h/env :csrf-secret)})))
 
