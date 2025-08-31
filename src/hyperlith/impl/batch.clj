@@ -5,11 +5,9 @@
 
 (defn batch!
   "Wraps side-effecting function in a queue and batch mechanism. The
-  batch is run every X ms when not empty and/or if it reaches it's max
-  size. Function must take a vector of items. Supports back pressure."
-  [effect-fn & {:keys [run-every-ms max-size]
-                :or   {run-every-ms 100
-                       max-size     1000}}]
+  batch is run every X ms when not empty. Function must take a vector of items. Supports back pressure."
+  [effect-fn & {:keys [run-every-ms]
+                :or   {run-every-ms 100}}]
   (let [<in (a/chan 1000)] ;; potentially pass this channel in
     (util/thread
       (loop [<t    (a/timeout run-every-ms)
@@ -21,8 +19,7 @@
             (recur (a/timeout run-every-ms) batch)
 
             ;; Run batch
-            (or (= p <t)
-              (and (= p <in) (>= (count batch) max-size)))
+            (= p <t)
             (let [;; Timer is started before task to prevent task duration
                   ;; from affecting interval (unless it exceeds interval).
                   <new-t (a/timeout run-every-ms)]

@@ -506,7 +506,7 @@
 
 (comment
   (do (-main) nil)
-  ;; (clojure.java.browse/browse-url "http://localhost:8080/")
+  ;; (clojure.java.browse/browse-url "https://localhost:3030/")
 
 
   ;; stop server
@@ -588,16 +588,17 @@
         (fn [_]
           (run!
             (fn [_]
-              (wrapped-router
-                {:headers
-                 {"accept-encoding" "br"
-                  "cookie"          "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY; __Host-csrf=3UsG62ic9wLsg9EVQhGupw"
-                  "content-type"    "application/json"}
-                 :request-method :post
-                 :uri            handler-check
-                 :body           {:csrf     "3UsG62ic9wLsg9EVQhGupw"
-                                  :parentid "0"
-                                  :targetid (str (rand-int 200))}}))
+              (-> (wrapped-router
+                    {:headers
+                     {"accept-encoding" "br"
+                      "cookie"          "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY; __Host-csrf=I3AAFrMG99lxoqwi87cSpn7unri5qYqJ-Vr9DLc4-s4"
+                      "content-type"    "application/json"}
+                     :request-method :post
+                     :uri            handler-check
+                     :body
+                     {:csrf     "I3AAFrMG99lxoqwi87cSpn7unri5qYqJ-Vr9DLc4-s4"
+                      :parentid "0"
+                      :targetid (str (rand-int 200))}})))
             ;; 10000r/s
             (range 10))
           (Thread/sleep 1))
