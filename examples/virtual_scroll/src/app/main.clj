@@ -2,7 +2,7 @@
   (:gen-class)
   (:require [hyperlith.core :as h :refer [defaction defview]]
             [hyperlith.extras.sqlite :as d]
-            [hyperlith.extras.virtual-scroll :as vs]))
+            [hyperlith.extras.ui.virtual-scroll :as vs]))
 
 (def row-height 20)
 
@@ -141,7 +141,7 @@
       [:link#css {:rel "stylesheet" :type "text/css" :href css}]
       [:main#morph.main
        [:div#foo1 {:style {:height :10vh}}
-        [::vs/VirtualX#view-x
+        [::vs/virtual-x#view-x
          {:v/item-size           100
           :v/max-rendered-items  1000
           :v/item-fn             (partial col-builder db)
@@ -151,7 +151,7 @@
           :v/view-size           (:width-1 tab-data)
           :v/scroll-pos          (:x tab-data)}]]
        [:div#foo2 {:style {:height :90vh}}
-        [::vs/VirtualY#view-y
+        [::vs/virtual-y#view-y
          {:v/item-size           20
           :v/max-rendered-items  1000
           :v/item-fn             (partial row-builder db)
