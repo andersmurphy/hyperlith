@@ -518,7 +518,7 @@
 
 (comment
   (do (-main) nil)
-  ;; (clojure.java.browse/browse-url "http://localhost:8080/")
+  ;; (clojure.java.browse/browse-url "https://localhost:3030/")
 
   ;; stop server
   ((@app_ :stop))

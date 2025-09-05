@@ -30,56 +30,56 @@
 
 (defn virtual-scroll-logic
   [{:v/keys [item-size max-rendered-items item-count-fn scroll-pos
-             view-size item-fn buffer-items]}]
+             view-size buffer-items]}]
   (let [scroll-pos         (or scroll-pos 0)
         view-size          (or view-size 1000)
         max-rendered-items (or max-rendered-items 1000)
         max-size           (* (int (/ max-rendered-items 2)) item-size)
         visible-items      (int (/ (min view-size max-size) item-size))
         buffer-items       (int (or buffer-items
-                                    ;; Default to number of items that
-                                    ;; fits in 4000px as user scroll speed
-                                    ;; not visible items determines how much
-                                    ;; you need to buffer
-                                    (int (/ 4000 item-size))
-                                    ;; TODO: fix if this is larger than max
-                                    ;; render
-                                    ))
+                                  ;; Default to number of items that
+                                  ;; fits in 4000px as user scroll speed
+                                  ;; not visible items determines how much
+                                  ;; you need to buffer
+                                  (int (/ 4000 item-size))
+                                  ;; TODO: fix if this is larger than max
+                                  ;; render
+                                  ))
         rendered-items     (+ (* 2 buffer-items) visible-items)
         offset-items       (max (- (math/round (/ scroll-pos item-size))
-                                   buffer-items)
+                                  buffer-items)
                              0)
         total-item-count   (item-count-fn)
         remaining-items    (- total-item-count offset-items)
         ;; If a buffer item is one scroll will be triggered at 50%
-        threshold-items     (* 0.5 buffer-items) 
+        threshold-items    (* 0.5 buffer-items)
         threshold-low      (when (not= offset-items 0)
-                               (* (+ offset-items threshold-items) item-size))
+                             (* (+ offset-items threshold-items) item-size))
         threshold-high     (when (> remaining-items rendered-items)
-                               (* (- (+ offset-items rendered-items)
-                                     visible-items threshold-items)
-                                  item-size))
+                             (* (- (+ offset-items rendered-items)
+                                  visible-items threshold-items)
+                               item-size))
         translate          (* offset-items item-size)
         grid-count         (if (> remaining-items rendered-items)
                              rendered-items
                              remaining-items)]
 
-    {:threshold-low    threshold-low
-     :threshold-high   threshold-high
-     :fired-signal-val offset-items
-     :translate        (str translate "px")
-     :max-size         (str max-size "px")
-     :item-grid-size   (str (* grid-count item-size) "px")
-     :item-grid        (str "repeat(" grid-count "," item-size "px)")
-     :size             (str (* total-item-count item-size) "px")
-     :item-fn          (fn [] (item-fn offset-items rendered-items))}))
+    {:threshold-low  threshold-low
+     :threshold-high threshold-high
+     :offset-items   offset-items
+     :translate      (str translate "px")
+     :max-size       (str max-size "px")
+     :item-grid-size (str (* grid-count item-size) "px")
+     :item-grid      (str "repeat(" grid-count "," item-size "px)")
+     :size           (str (* total-item-count item-size) "px")
+     :rendered-items rendered-items}))
 
 (defmethod h/html-resolve-alias ::virtual-x
   [_ {:keys   [id]
-      :v/keys [resize-handler-path scroll-handler-path]
+      :v/keys [resize-handler-path scroll-handler-path item-fn]
       :as     attrs} _]
-  (let [{:keys [threshold-low threshold-high item-grid fired-signal-val
-                translate max-size size item-fn item-grid-size]}
+  (let [{:keys [threshold-low threshold-high offset-items translate max-size
+                item-grid item-grid-size size rendered-items]}
         (virtual-scroll-logic attrs)
         fired-signal     (str id "fired")
         fetch-next-page? (fetch-next-page-js
@@ -89,7 +89,7 @@
                             :scroll-handler-path scroll-handler-path})]
     (h/html
       [:div {;; make sure signal is initialised before data-on-load
-             :data-signals (h/edn->json {fired-signal fired-signal-val})
+             :data-signals (h/edn->json {fired-signal offset-items})
              :style        {:width :100%}}
        [:div (assoc attrs
                :data-on-resize__debounce.100ms__window
@@ -114,14 +114,14 @@
             :display               :grid
             :grid-template-columns item-grid
             :transform             (str "translateX(" translate ")")}}
-          (item-fn)]]]])))
+          (item-fn offset-items rendered-items)]]]])))
 
 (defmethod h/html-resolve-alias ::virtual-y
   [_ {:keys   [id]
-      :v/keys [resize-handler-path scroll-handler-path]
+      :v/keys [resize-handler-path scroll-handler-path item-fn]
       :as     attrs} _]
-  (let [{:keys [threshold-low threshold-high item-grid fired-signal-val
-                translate max-size size item-fn item-grid-size]}
+  (let [{:keys [threshold-low threshold-high offset-items translate max-size
+                item-grid item-grid-size size rendered-items]}
         (virtual-scroll-logic attrs)
         fired-signal     (str id "fired")
         fetch-next-page? (fetch-next-page-js
@@ -131,7 +131,7 @@
                             :scroll-handler-path scroll-handler-path})]
     (h/html
       [:div {;; make sure signal is initialised before data-on-load
-             :data-signals (h/edn->json {fired-signal fired-signal-val})
+             :data-signals (h/edn->json {fired-signal offset-items})
              :style        {:height :100%}}
        [:div (assoc attrs
                :data-on-resize__debounce.100ms__window
@@ -155,6 +155,6 @@
             :display            :grid
             :grid-template-rows item-grid
             :transform          (str "translateY(" translate ")")}}
-          (item-fn)]]]])))
+          (item-fn offset-items rendered-items)]]]])))
 
 
