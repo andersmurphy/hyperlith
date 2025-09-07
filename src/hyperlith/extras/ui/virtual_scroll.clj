@@ -45,11 +45,13 @@ if (($%s !== -1) && (%s > el.scrollTop || %s < el.scrollTop || %s > el.scrollLef
                                   ;; TODO: fix if this is larger than max
                                   ;; render
                                   ))
-        rendered-items     (+ (* 2 buffer-items) visible-items)
-        offset-items       (max (- (math/round (/ scroll-pos item-size))
-                                  buffer-items)
-                             0)
+        rendered-items     (+ (* 2 buffer-items) visible-items)        
         total-item-count   (item-count-fn)
+        offset-items       (max (min (- (math/round (/ scroll-pos item-size))
+                                       buffer-items)
+                                  ;; can't offset more than total items
+                                  (- total-item-count rendered-items))
+                             0)
         remaining-items    (- total-item-count offset-items)
         ;; If a buffer item is one scroll will be triggered at 50%
         threshold-items    (* 0.5 buffer-items)
