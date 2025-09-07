@@ -327,15 +327,12 @@
         (xy->chunk-id x y))
     vec))
 
-(defn Chunk [stable-id chunk-id chunk-cells sid]
-  (let [stable-id (str "stable-chunk-" stable-id)]
-    (h/html
-      [:div.chunk
-       {:id      stable-id
-        :data-id chunk-id}
-       (into []
-         (map-indexed (fn [local-id box] (Cell chunk-id local-id box sid)))
-         chunk-cells)])))
+(defn Chunk [chunk-id chunk-cells sid]
+  (h/html
+    [:div.chunk {:data-id chunk-id}
+     (into []
+       (map-indexed (fn [local-id box] (Cell chunk-id local-id box sid)))
+       chunk-cells)]))
 
 (defn UserView [db sid {:keys [x-offset-items y-offset-items]}]
   (->> (let [[a b c d e f g h i] (xy->chunk-ids x-offset-items y-offset-items)]
@@ -344,9 +341,7 @@
              from   chunk
              where  [in id ?chunk-ids]}
            {:chunk-ids [a b c d e f g h i]}))
-    (into []
-      (map-indexed (fn [stable-id [id chunk]]
-                     (Chunk stable-id id chunk sid))))))
+    (mapv (fn [[id chunk]] (Chunk id chunk sid)))))
 
 (defn scroll->cell-xy-js [n]
   (str "Math.round((" n "/" board-size-px ")*" size ")"))
@@ -414,8 +409,14 @@
                      :stroke-width 2}]]]
            [:rect {:width "100%" :height "100%" :fill "url(#grid)"}]]]]]
        [:div.jump
-        [:h2 "X:"] [:input.jump-input {:type "number" :data-bind "jumpx"}]
-        [:h2 "Y:"] [:input.jump-input {:type "number" :data-bind "jumpy"}]
+        [:h2 "X:"] 
+        [:input.jump-input
+         {:type "number" :data-bind "jumpx"
+          :data-effect (str "$jumpx = " (scroll->cell-xy-js "$view-x"))}]
+        [:h2 "Y:"]
+        [:input.jump-input
+         {:type "number" :data-bind "jumpy"
+          :data-effect (str "$jumpy = " (scroll->cell-xy-js "$view-y"))}]
         [:div.button {:data-action handler-jump}
          [:strong.pe-none "GO"]]
         [:div.button
@@ -514,9 +515,7 @@
   ((@app_ :stop))
 
   (def db (-> @app_ :ctx :db))
-
-
-  (d/q db '{select [[[count *]]]from session})
+  (d/q db '{select [[[count *]]] from session})
   ;; 4897
   
 

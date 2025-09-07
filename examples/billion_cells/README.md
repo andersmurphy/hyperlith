@@ -23,7 +23,7 @@ scp target/app.jar root@cells.andersmurphy.com:/home/app/
 Optional: the first time you move the jar onto the server you will need to reboot to trigger/test systemd is working correctly.
 
 ```
-ssh root@checkboxes.andersmurphy.com "reboot"
+ssh root@cells.andersmurphy.com "reboot"
 ```
 
 ## SSH into repl

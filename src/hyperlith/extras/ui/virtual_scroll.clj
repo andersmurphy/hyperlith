@@ -11,13 +11,13 @@
 (defn fetch-next-page-js
   [{:keys [id fired-signal bottom top left right scroll-handler-path]}]
   (let [top    (or top 0)
-        bottom (or bottom 9007199254740991)
+        bottom (or bottom "Infinity")
         left   (or left 0)
-        right  (or right 9007199254740991)]
+        right  (or right "Infinity")]
     (format
       "$%s = Math.floor(el.scrollLeft); $%s = Math.floor(el.scrollTop);
 if (($%s !== -1) && (%s > el.scrollTop || %s < el.scrollTop || %s > el.scrollLeft || %s < el.scrollLeft))
-    {$%s = -1; @post('%s');}"
+    {$%s = -1; @post('%s', {retryMaxCount: Infinity});}"
       (str id  "-x")
       (str id  "-y")
       fired-signal
@@ -97,17 +97,21 @@ if (($%s !== -1) && (%s > el.scrollTop || %s < el.scrollTop || %s > el.scrollLef
                             :scroll-handler-path scroll-handler-path})]
     (h/html
       [:div {;; make sure signal is initialised before data-on-load
-             :data-signals (h/edn->json {fired-signal
-                                         (str x-offset-items y-offset-items)})
-             :style        {:width      :100%
-                            :height     :100%
-                            :max-width  x-max-size
-                            :max-height y-max-size}}
+             :data-signals   (h/edn->json {fired-signal
+                                           (str x-offset-items y-offset-items)})
+             :style          {:width      :100%
+                              :height     :100%
+                              :max-width  x-max-size
+                              :max-height y-max-size}}
        [:div (assoc attrs
                :data-on-resize__debounce.100ms__window
                (resize-js id resize-handler-path)
-               :data-on-load   fetch-next-page?
                :data-on-scroll fetch-next-page?
+               ;; Handles user drag scrolling
+               :data-on-load   fetch-next-page?
+               ;; Handles client going offline (and server not getting request)
+               :data-on-online__window
+               (str "$" fired-signal " = 1;" fetch-next-page?)
                :style {:scroll-behavior     :smooth
                        :overscroll-behavior :contain
                        :overflow-anchor     :none

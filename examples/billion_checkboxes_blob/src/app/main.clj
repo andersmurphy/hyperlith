@@ -323,15 +323,13 @@
         (xy->chunk-id x y))
     vec))
 
-(defn Chunk [stable-id chunk-id chunk-cells]
-  (let [stable-id (str "stable-chunk-" stable-id)]
-    (h/html
-      [:div.chunk
-       {:id      stable-id
-        :data-id chunk-id}
-       (into []
-         (map-indexed (fn [local-id box] (Checkbox local-id box)))
-         chunk-cells)])))
+(defn Chunk [chunk-id chunk-cells]
+  (h/html
+    [:div.chunk
+     {:data-id chunk-id}
+     (into []
+       (map-indexed (fn [local-id box] (Checkbox local-id box)))
+       chunk-cells)]))
 
 (defn UserView [db {:keys [x-offset-items y-offset-items]}]
   (->> (let [[a b c d e f g h i] (xy->chunk-ids x-offset-items y-offset-items)]
@@ -340,8 +338,7 @@
              from   chunk
              where  [in id ?chunk-ids]}
            {:chunk-ids [a b c d e f g h i]}))
-    (into []
-    (map-indexed (fn [stable-id [id chunk]] (Chunk stable-id id chunk))))))
+    (mapv (fn [[id chunk]] (Chunk id chunk)))))
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
@@ -544,7 +541,7 @@
   (d/table-info db :chunk)
   (d/table-list db)
 
-  (d/q db '{select [[[count *]]]from session})
+  (d/q db '{select [[[count *]]] from session})
 
   ;; (+ 7784 3249 500)
 
