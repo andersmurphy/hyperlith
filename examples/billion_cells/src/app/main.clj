@@ -327,14 +327,15 @@
         (xy->chunk-id x y))
     vec))
 
-(defn Chunk [chunk-id chunk-cells sid]
-  (h/html
-    [:div.chunk
-     {:id      chunk-id
-      :data-id chunk-id}
-     (into []
-       (map-indexed (fn [local-id box] (Cell chunk-id local-id box sid)))
-       chunk-cells)]))
+(defn Chunk [stable-id chunk-id chunk-cells sid]
+  (let [stable-id (str "stable-chunk-" stable-id)]
+    (h/html
+      [:div.chunk
+       {:id      stable-id
+        :data-id chunk-id}
+       (into []
+         (map-indexed (fn [local-id box] (Cell chunk-id local-id box sid)))
+         chunk-cells)])))
 
 (defn UserView [db sid {:keys [x-offset-items y-offset-items]}]
   (->> (let [[a b c d e f g h i] (xy->chunk-ids x-offset-items y-offset-items)]
@@ -343,8 +344,9 @@
              from   chunk
              where  [in id ?chunk-ids]}
            {:chunk-ids [a b c d e f g h i]}))
-    (mapv (fn [[id chunk]]
-            (Chunk id chunk sid)))))
+    (into []
+      (map-indexed (fn [stable-id [id chunk]]
+                     (Chunk stable-id id chunk sid))))))
 
 (defn scroll->cell-xy-js [n]
   (str "Math.round((" n "/" board-size-px ")*" size ")"))

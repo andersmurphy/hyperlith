@@ -35,7 +35,7 @@
   (let [black         "#000000"
         white         "#FFF1E8"
         accent        "#FFA300"
-        max-width     (* 16 cell-size-px)]
+        max-width     chunk-size-px]
     (h/static-css
       [["*, *::before, *::after"
         {:box-sizing :border-box
@@ -323,14 +323,15 @@
         (xy->chunk-id x y))
     vec))
 
-(defn Chunk [chunk-id chunk-cells]
-  (h/html
-    [:div.chunk
-     {:id      chunk-id
-      :data-id chunk-id}
-     (into []
-       (map-indexed (fn [local-id box] (Checkbox local-id box)))
-       chunk-cells)]))
+(defn Chunk [stable-id chunk-id chunk-cells]
+  (let [stable-id (str "stable-chunk-" stable-id)]
+    (h/html
+      [:div.chunk
+       {:id      stable-id
+        :data-id chunk-id}
+       (into []
+         (map-indexed (fn [local-id box] (Checkbox local-id box)))
+         chunk-cells)])))
 
 (defn UserView [db {:keys [x-offset-items y-offset-items]}]
   (->> (let [[a b c d e f g h i] (xy->chunk-ids x-offset-items y-offset-items)]
@@ -339,8 +340,8 @@
              from   chunk
              where  [in id ?chunk-ids]}
            {:chunk-ids [a b c d e f g h i]}))
-    (mapv (fn [[id chunk]]
-            (Chunk id chunk)))))
+    (into []
+    (map-indexed (fn [stable-id [id chunk]] (Chunk stable-id id chunk))))))
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
