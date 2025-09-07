@@ -2,19 +2,24 @@
   (:require [hyperlith.core :as h]
             [clojure.math :as math]))
 
-(defn resize-js [resize-handler-path]
-  (format "@post(`%s?h=${el.clientHeight}&w=${el.clientWidth}`);"
+(defn resize-js [id resize-handler-path]
+  (format "$%s = el.clientWidth; $%s = el.clientHeight; @post('%s');"
+    (str id "-w")
+    (str id "-h")
     resize-handler-path))
 
 (defn fetch-next-page-js
-  [{:keys [fired-signal bottom top left right scroll-handler-path]}]
+  [{:keys [id fired-signal bottom top left right scroll-handler-path]}]
   (let [top    (or top 0)
         bottom (or bottom 9007199254740991)
         left   (or left 0)
         right  (or right 9007199254740991)]
     (format
-      "if (($%s !== -1) && (%s > el.scrollTop || %s < el.scrollTop || %s > el.scrollLeft || %s < el.scrollLeft))
-    {$%s = -1; @post(`%s?x=${Math.floor(el.scrollLeft)}&y=${Math.floor(el.scrollTop)}`);}"
+      "$%s = Math.floor(el.scrollLeft); $%s = Math.floor(el.scrollTop);
+if (($%s !== -1) && (%s > el.scrollTop || %s < el.scrollTop || %s > el.scrollLeft || %s < el.scrollLeft))
+    {$%s = -1; @post('%s');}"
+      (str id  "-x")
+      (str id  "-y")
       fired-signal
       top
       bottom
@@ -23,19 +28,14 @@
       fired-signal
       scroll-handler-path)))
 
-;; TODO: variable item height?
-;; TODO: send up initial device height on connect
-;; TODO: auto session/tab state with security/validation
-;; TODO: X scroll bar has max size on chrome. Normalise scroll?
-
 (defn virtual-scroll-logic
-  [{:v/keys [item-size max-rendered-items item-count-fn scroll-pos
-             view-size buffer-items]}]
+  [{:keys [item-size max-rendered-items item-count-fn scroll-pos
+           view-size buffer-items]}]
   (let [scroll-pos         (or scroll-pos 0)
         view-size          (or view-size 1000)
         max-rendered-items (or max-rendered-items 1000)
         max-size           (* (int (/ max-rendered-items 2)) item-size)
-        visible-items      (int (/ (min view-size max-size) item-size))
+        visible-items      (max (int (/ (min view-size max-size) item-size)) 1)
         buffer-items       (int (or buffer-items
                                   ;; Default to number of items that
                                   ;; fits in 4000px as user scroll speed
@@ -62,99 +62,77 @@
         translate          (* offset-items item-size)
         grid-count         (if (> remaining-items rendered-items)
                              rendered-items
-                             remaining-items)]
+                             remaining-items)
+        translate          (str translate "px")
+        max-size           (str max-size "px")
+        item-grid-size     (str (* grid-count item-size) "px")
+        item-grid          (str "repeat(" grid-count "," item-size "px)")
+        size               (str (* total-item-count item-size) "px")]
+    [threshold-low threshold-high offset-items
+     translate max-size item-grid item-grid-size size
+     rendered-items]))
 
-    {:threshold-low  threshold-low
-     :threshold-high threshold-high
-     :offset-items   offset-items
-     :translate      (str translate "px")
-     :max-size       (str max-size "px")
-     :item-grid-size (str (* grid-count item-size) "px")
-     :item-grid      (str "repeat(" grid-count "," item-size "px)")
-     :size           (str (* total-item-count item-size) "px")
-     :rendered-items rendered-items}))
-
-(defmethod h/html-resolve-alias ::virtual-x
+(defmethod h/html-resolve-alias ::virtual
   [_ {:keys   [id]
-      :v/keys [resize-handler-path scroll-handler-path item-fn]
+      :v/keys [resize-handler-path scroll-handler-path item-fn x y]
       :as     attrs} _]
-  (let [{:keys [threshold-low threshold-high offset-items translate max-size
-                item-grid item-grid-size size rendered-items]}
-        (virtual-scroll-logic attrs)
+  (let [[x-threshold-low x-threshold-high x-offset-items
+         x-translate x-max-size x-item-grid x-item-grid-size x-size
+         x-rendered-items]
+        (when x (virtual-scroll-logic x))
+        [y-threshold-low y-threshold-high y-offset-items
+         y-translate y-max-size y-item-grid y-item-grid-size y-size
+         y-rendered-items]
+        (when y (virtual-scroll-logic y))
         fired-signal     (str id "fired")
         fetch-next-page? (fetch-next-page-js
-                           {:fired-signal        fired-signal
-                            :left                threshold-low
-                            :right               threshold-high
+                           {:id                  id
+                            :fired-signal        fired-signal
+                            :left                x-threshold-low
+                            :right               x-threshold-high
+                            :top                 y-threshold-low
+                            :bottom              y-threshold-high
                             :scroll-handler-path scroll-handler-path})]
     (h/html
       [:div {;; make sure signal is initialised before data-on-load
-             :data-signals (h/edn->json {fired-signal offset-items})
-             :style        {:width :100%}}
+             :data-signals (h/edn->json {fired-signal
+                                         (str x-offset-items y-offset-items)})
+             :style        {:width      :100%
+                            :height     :100%
+                            :max-width  x-max-size
+                            :max-height y-max-size}}
        [:div (assoc attrs
                :data-on-resize__debounce.100ms__window
-               (resize-js resize-handler-path)
+               (resize-js id resize-handler-path)
                :data-on-load   fetch-next-page?
                :data-on-scroll fetch-next-page?
                :style {:scroll-behavior     :smooth
                        :overscroll-behavior :contain
                        :overflow-anchor     :none
-                       :overflow-x          :scroll
-                       :max-width           max-size
-                       :width               :100%})
+                       :overflow-x          (when x :scroll)
+                       :overflow-y          (when y :scroll)
+                       :max-width           x-max-size
+                       :max-height          y-max-size
+                       :width               :100%
+                       :height              :100%})
         [:div
          {:id    (str id "-virtual-table")
           :style {:pointer-events :none
-                  :width          size}}
+                  :width          x-size
+                  :height         y-size}}
          [:div
           {:id (str id "-virtual-table-view")
            :style
            {;; if width isn't specified explicitly scroll bar will become chaos
-            :width                 item-grid-size
+            :width                 x-item-grid-size
+            :height                y-item-grid-size
             :display               :grid
-            :grid-template-columns item-grid
-            :transform             (str "translateX(" translate ")")}}
-          (item-fn offset-items rendered-items)]]]])))
-
-(defmethod h/html-resolve-alias ::virtual-y
-  [_ {:keys   [id]
-      :v/keys [resize-handler-path scroll-handler-path item-fn]
-      :as     attrs} _]
-  (let [{:keys [threshold-low threshold-high offset-items translate max-size
-                item-grid item-grid-size size rendered-items]}
-        (virtual-scroll-logic attrs)
-        fired-signal     (str id "fired")
-        fetch-next-page? (fetch-next-page-js
-                           {:fired-signal        fired-signal
-                            :top                 threshold-low
-                            :bottom              threshold-high
-                            :scroll-handler-path scroll-handler-path})]
-    (h/html
-      [:div {;; make sure signal is initialised before data-on-load
-             :data-signals (h/edn->json {fired-signal offset-items})
-             :style        {:height :100%}}
-       [:div (assoc attrs
-               :data-on-resize__debounce.100ms__window
-               (resize-js resize-handler-path)
-               :data-on-load   fetch-next-page?
-               :data-on-scroll fetch-next-page?
-               :style {:scroll-behavior :smooth
-                       :overflow-anchor :none
-                       :overflow-y      :scroll
-                       :max-height      max-size
-                       :height          :100%})
-        [:div
-         {:id    (str id "-virtual-table")
-          :style {:pointer-events :none
-                  :height         size}}
-         [:div
-          {:id (str id "-virtual-table-view")
-           :style
-           {;; if height isn't specified explicitly scroll bar will become chaos
-            :height             item-grid-size
-            :display            :grid
-            :grid-template-rows item-grid
-            :transform          (str "translateY(" translate ")")}}
-          (item-fn offset-items rendered-items)]]]])))
-
+            :grid-template-columns x-item-grid
+            :grid-template-rows    y-item-grid
+            :transform
+            (str "translate(" (or x-translate 0) "," (or y-translate 0) ")")}}
+          (item-fn {:x-offset-items   x-offset-items
+                    :x-rendered-items x-rendered-items
+                    :y-offset-items   y-offset-items
+                    :y-rendered-items y-rendered-items})]]]])))
 

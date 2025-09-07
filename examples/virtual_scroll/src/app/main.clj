@@ -2,7 +2,8 @@
   (:gen-class)
   (:require [hyperlith.core :as h :refer [defaction defview]]
             [hyperlith.extras.sqlite :as d]
-            [hyperlith.extras.ui.virtual-scroll :as vs]))
+            [hyperlith.extras.ui.virtual-scroll :as vs]
+            [clj-async-profiler.core :as prof]))
 
 (def row-height 20)
 
@@ -37,7 +38,7 @@
                 from   session
                 where  [= id ?sid]}
         {:sid sid})
-      first))
+    first))
 
 (defn get-tab-data [db sid tabid]
   (-> (get-session-data db sid) :tabs (get tabid)))
@@ -99,33 +100,33 @@
   (h/html [:div.row {:id (str "y" id)}
            [:div nil id] [:div nil a] [:div nil b] [:div nil c]]))
 
-(defn row-builder [db offset limit]
+(defn row-builder [db {:keys [y-offset-items y-rendered-items]}]
   (->> (d/q db
          '{select [id data]
            from   row
            offset ?offset
            limit  ?limit}
-         {:offset offset
-          :limit  limit})
-       (mapv (fn [[id row]] (Row id row)))))
+         {:offset y-offset-items
+          :limit  y-rendered-items})
+    (mapv (fn [[id row]] (Row id row)))))
 
 (defn Col [id [_a _b _c :as _data]]
   (h/html [:div {:id (str "x" id)}
            [:div nil id]]))
 
-(defn col-builder [db offset limit]
+(defn col-builder [db {:keys [x-offset-items x-rendered-items]}]
   (->> (d/q db
          '{select [id data]
            from   row
            offset ?offset
            limit  ?limit}
-         {:offset offset
-          :limit  limit})
-       (mapv (fn [[id row]] (Col id row)))))
+         {:offset x-offset-items
+          :limit  x-rendered-items})
+    (mapv (fn [[id row]] (Col id row)))))
 
 (defn row-count [db]
   (-> (d/q db '{select [[[count *]]] from row})
-      first))
+    first))
 
 (def shim-headers
   (h/html
@@ -141,30 +142,31 @@
       [:link#css {:rel "stylesheet" :type "text/css" :href css}]
       [:main#morph.main
        [:div#foo1 {:style {:height :10vh}}
-        [::vs/virtual-x#view-x
-         {:v/item-size           100
-          :v/max-rendered-items  1000
+        [::vs/virtual#view-x
+         {:v/x
+          {:item-size          100
+           :max-rendered-items 1000
+           :item-count-fn      (partial row-count db)
+           :view-size          (:width-1 tab-data)
+           :scroll-pos         (:x tab-data)}
           :v/item-fn             (partial col-builder db)
-          :v/item-count-fn       (partial row-count db)
           :v/scroll-handler-path handler-scroll-component-1
-          :v/resize-handler-path handler-resize-component-1
-          :v/view-size           (:width-1 tab-data)
-          :v/scroll-pos          (:x tab-data)}]]
+          :v/resize-handler-path handler-resize-component-1}]]
        [:div#foo2 {:style {:height :90vh}}
-        [::vs/virtual-y#view-y
-         {:v/item-size           20
-          :v/max-rendered-items  1000
+        [::vs/virtual#view-y
+         {:v/y
+          {:item-size          20
+           :max-rendered-items 1000
+           :item-count-fn      (partial row-count db)
+           :view-size          (:height-2 tab-data)
+           :scroll-pos         (:y tab-data)}
           :v/item-fn             (partial row-builder db)
-          :v/item-count-fn       (partial row-count db)
           :v/scroll-handler-path handler-scroll-component-2
-          :v/resize-handler-path handler-resize-component-2
-          :v/view-size           (:height-2 tab-data)
-          :v/scroll-pos          (:y tab-data)
-          }]]])))
+          :v/resize-handler-path handler-resize-component-2}]]])))
 
 (defn initial-table-db-state! [db]
   (let [;; chrome browsers seems to cut this off at 167771 items?
-        number-of-rows 200000 
+        number-of-rows 200000
         table-range    (range number-of-rows)]
     (d/with-write-tx [db db]
       (run! (fn [x]
@@ -217,9 +219,9 @@
 (defn -main [& _]
   (reset! app_
     (h/start-app
-      {:ctx-start      ctx-start
-       :ctx-stop       ctx-stop
-       :csrf-secret    (h/env :csrf-secret)})))
+      {:ctx-start   ctx-start
+       :ctx-stop    ctx-stop
+       :csrf-secret (h/env :csrf-secret)})))
 
 ;; Refresh app when you re-eval file
 (h/refresh-all!)
@@ -235,3 +237,10 @@
   (def db (-> @app_ :ctx :db))
 
   ,)
+
+(comment ;; Profiling
+  (prof/start)
+  (prof/stop)
+  (prof/serve-ui 7777)
+  ;; (clojure.java.browse/browse-url "http://localhost:7777/")
+  )

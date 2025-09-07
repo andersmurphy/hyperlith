@@ -2,18 +2,20 @@
   (:gen-class)
   (:require [app.qrcode :as qrcode]
             [hyperlith.core :as h :refer [defaction defview]]
-            [hyperlith.extras.sqlite :as d]
+            [hyperlith.extras.sqlite :as d]            
+            [hyperlith.extras.ui.virtual-scroll :as vs]
             [clj-async-profiler.core :as prof]
             [clojure.math :as math]))
 
-(def cell-size 32)
+(def cell-size-px 32)
 (def chunk-size 16)
+(def chunk-size-px (* cell-size-px chunk-size))
 (def board-size (->> (math/pow chunk-size 2)
                   (/ 1000000000)
                   math/sqrt
                   math/ceil
                   int))
-(def board-size-px (* cell-size chunk-size board-size))
+(def board-size-px (* cell-size-px chunk-size board-size))
 (def size (* board-size chunk-size))
 (def states
   [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14])
@@ -33,8 +35,7 @@
   (let [black         "#000000"
         white         "#FFF1E8"
         accent        "#FFA300"
-        board-size-px (str board-size-px "px")
-        max-width     (* 25 cell-size)]
+        max-width     (* 16 cell-size-px)]
     (h/static-css
       [["*, *::before, *::after"
         {:box-sizing :border-box
@@ -71,47 +72,38 @@
 
        [:.main
         {:height         :100dvh
+         :max-height     :100dvh
          :margin-inline  :auto
          :padding-block  :2dvh
-         :display        :flex
          :width          (str "min(100% - 2rem ," max-width "px)")
          :gap            :5px
+         :display        :flex
          :flex-direction :column}]
 
-       [:.view
-        {:overflow        :scroll
-         :scroll-behavior :smooth
-         :scrollbar-color (str black " transparent")
-         :overflow-anchor :none
-         :height          (str "min(100% - 2rem , " max-width "px)")}]
-
-       [:.board
-        {:background            white
-         :width                 board-size-px
-         :display               :grid
-         :aspect-ratio          "1/1"
-         :gap                   :10px
-         :grid-template-rows    (str "repeat(" board-size ", 1fr)")
-         :grid-template-columns (str "repeat(" board-size ", 1fr)")
-         :pointer-events        :none}]
+       [:.view-wrapper {:min-height (str cell-size-px "px")}]
 
        [:.chunk
         {:background            white
          :display               :grid
-         :gap                   :10px
          :grid-template-rows    (str "repeat(" chunk-size ", 1fr)")
-         :grid-template-columns (str "repeat(" chunk-size ", 1fr)")}]
+         :grid-template-columns (str "repeat(" chunk-size ", 1fr)")
+         :width                 (str chunk-size-px "px")
+         :height                (str chunk-size-px "px")}]
 
-       ["input[type=\"checkbox\"]"
-        {:appearance     :none
-         :font           :inherit
-         :font-size      :1.2rem
-         :color          :currentColor
-         :border         "0.15em solid currentColor"
-         :border-radius  :0.15em
-         :display        :grid
-         :place-content  :center
-         :pointer-events :all}]
+       (let [padding 5]
+         ["input[type=\"checkbox\"]"
+          {:width          (str (- cell-size-px (* 2 padding)) "px")
+           :height         (str (- cell-size-px (* 2 padding)) "px")
+           :padding        (str padding "px")
+           :appearance     :none
+           :font           :inherit
+           :font-size      :1.2rem
+           :color          :currentColor
+           :border         "0.15em solid currentColor"
+           :border-radius  :0.15em
+           :display        :grid
+           :place-content  :center
+           :pointer-events :all}])
 
        ["input[type=\"checkbox\"]:checked::before"
         {:content    "\"\""
@@ -239,13 +231,23 @@
         {:sid sid :new-data new-data}))))
 
 (defaction handler-scroll
-  [{:keys [sid tabid tx-batch!] {:keys [x y]} :body}]
+  [{:keys [sid tabid tx-batch!] {:keys [view-x view-y]} :body}]
   (tx-batch!
     (fn [db _]
       (update-tab-data! db sid tabid
         #(assoc %
-           :x (max (int x) 0)
-           :y (max (int y) 0))))))
+           :x (max (int view-x) 0)
+           :y (max (int view-y) 0))))))
+
+(defaction handler-resize
+  [{:keys [sid tabid tx-batch!] {:keys [view-h view-w]} :body}]
+  (when (and view-h view-w)
+    (tx-batch!
+      (fn [db _]
+        (update-tab-data! db sid tabid
+          #(assoc %
+             :height (max (int view-h) 0)
+             :width  (max (int view-w) 0)))))))
 
 (defaction handler-palette
   [{:keys [sid tabid tx-batch!] {:keys [targetid]} :body}]
@@ -322,20 +324,16 @@
     vec))
 
 (defn Chunk [chunk-id chunk-cells]
-  (let [[x y] (chunk-id->xy chunk-id)
-        x     (inc x)
-        y     (inc y)]
-    (h/html
-      [:div.chunk
-       {:id      chunk-id
-        :data-id chunk-id
-        :style   {:grid-column x :grid-row y}}
-       (into []
-         (map-indexed (fn [local-id box] (Checkbox local-id box)))
-         chunk-cells)])))
+  (h/html
+    [:div.chunk
+     {:id      chunk-id
+      :data-id chunk-id}
+     (into []
+       (map-indexed (fn [local-id box] (Checkbox local-id box)))
+       chunk-cells)]))
 
-(defn UserView [{:keys [x y] :or {x 0 y 0}} db]
-  (->> (let [[a b c d e f g h i] (xy->chunk-ids x y)]
+(defn UserView [db {:keys [x-offset-items y-offset-items]}]
+  (->> (let [[a b c d e f g h i] (xy->chunk-ids x-offset-items y-offset-items)]
          (d/q db
            '{select [id data]
              from   chunk
@@ -343,22 +341,6 @@
            {:chunk-ids [a b c d e f g h i]}))
     (mapv (fn [[id chunk]]
             (Chunk id chunk)))))
-
-(defn scroll-offset-js [n]
-  (str "Math.round((" n "/" board-size-px ")*" board-size "-1)"))
-
-(defn scroll->cell-xy-js [n]
-  (str "Math.round((" n "/" board-size-px ")*" size ")"))
-
-(def on-scroll-js
-  (str
-    "$jumpx = " (scroll->cell-xy-js "el.scrollLeft") ";"
-    "$jumpy = " (scroll->cell-xy-js "el.scrollTop") ";"
-    "let x = " (scroll-offset-js "el.scrollLeft") ";"
-    "let y = " (scroll-offset-js "el.scrollTop") ";"
-    "let change = x !== $x || y !== $y;"
-    "$x = x; $y = y;"
-    "change && @post(`" handler-scroll "`)"))
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
@@ -382,16 +364,19 @@
     [:link {:rel "icon" :type "image/png" :href icon}]
     [:meta {:content "So many checkboxes" :name "description"}]))
 
+(defn scroll->cell-xy-js [n]
+  (str "Math.round((" n "/" board-size-px ")*" size ")"))
+
 (defview handler-root
   {:path "/" :shim-headers shim-headers :br-window-size 19}
   [{:keys         [db sid tabid]
     {:strs [x y]} :query-params
     :as           _req}]
-  (let [x        (h/try-parse-long x 0)
-        y        (h/try-parse-long y 0)
-        tab-data (get-tab-data db sid tabid)
-        content  (UserView tab-data db)
-        palette  (Palette (or (:color tab-data) 1))]
+  (let [jump-x                     (h/try-parse-long x 0)
+        jump-y                     (h/try-parse-long y 0)
+        tab-data                   (get-tab-data db sid tabid)
+        {:keys [x y height width]} tab-data
+        palette                    (Palette (or (:color tab-data) 1))]
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href css}]
       [:main#morph.main
@@ -404,15 +389,35 @@
           "@post(`${evt.target.dataset.action}`);"
           "setTimeout(() => evt.target.classList.remove('pop'), 300)"
           "}")}
-       [:div#view.view
-        {;; firefox sometimes preserves scroll on refresh and we don't want that
-         :data-on-load                                   (scroll-to-xy-js x y)
-         :data-ref                                       "_view"
-         :data-on-scroll__throttle.100ms.trail.noleading on-scroll-js}
-        [:div#board.board nil content]]
+       [:div.view-wrapper
+        [::vs/virtual#view.view
+         {;; firefox sometimes preserves scroll on refresh and we don't want that
+          :data-on-load          (scroll-to-xy-js jump-x jump-y)
+          :data-ref              "_view"
+          :v/x                   {:item-size          chunk-size-px
+                                  :buffer-items       1
+                                  :max-rendered-items 3
+                                  :scroll-pos         x
+                                  :view-size          width
+                                  :item-count-fn      (fn [] board-size)}
+          :v/y                   {:item-size          chunk-size-px
+                                  :buffer-items       1
+                                  :max-rendered-items 3
+                                  :scroll-pos         y
+                                  :view-size          height
+                                  :item-count-fn      (fn [] board-size)}
+          :v/item-fn             (partial UserView db)
+          :v/scroll-handler-path handler-scroll
+          :v/resize-handler-path handler-resize}]]
        [:div.jump
-        [:h2 "X:"] [:input.jump-input {:type "number" :data-bind "jumpx"}]
-        [:h2 "Y:"] [:input.jump-input {:type "number" :data-bind "jumpy"}]
+        [:h2 "X:"]
+        [:input.jump-input
+         {:type "number" :data-bind "jumpx"
+          :data-effect (str "$jumpx = " (scroll->cell-xy-js "$view-x"))}]
+        [:h2 "Y:"]
+        [:input.jump-input
+         {:type "number" :data-bind "jumpy"
+          :data-effect (str "$jumpy = " (scroll->cell-xy-js "$view-y"))}]
         [:div.button {:data-action handler-jump}
          [:strong.pe-none "JUMP"]]
         [:div.button {:data-action       handler-share
