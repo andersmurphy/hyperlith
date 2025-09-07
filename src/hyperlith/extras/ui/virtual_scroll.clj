@@ -75,7 +75,7 @@ if (($%s !== -1) && (%s > el.scrollTop || %s < el.scrollTop || %s > el.scrollLef
 (defmethod h/html-resolve-alias ::virtual
   [_ {:keys   [id]
       :v/keys [resize-handler-path scroll-handler-path item-fn x y]
-      :as     attrs} _]
+      :as     attrs} content]
   (let [[x-threshold-low x-threshold-high x-offset-items
          x-translate x-max-size x-item-grid x-item-grid-size x-size
          x-rendered-items]
@@ -118,12 +118,14 @@ if (($%s !== -1) && (%s > el.scrollTop || %s < el.scrollTop || %s > el.scrollLef
         [:div
          {:id    (str id "-virtual-table")
           :style {:pointer-events :none
+                  :position       :relative
                   :width          x-size
                   :height         y-size}}
          [:div
           {:id (str id "-virtual-table-view")
            :style
-           {;; if width isn't specified explicitly scroll bar will become chaos
+           {:position              :absolute
+            ;; if width isn't specified explicitly scroll bar will become chaos
             :width                 x-item-grid-size
             :height                y-item-grid-size
             :display               :grid
@@ -134,5 +136,7 @@ if (($%s !== -1) && (%s > el.scrollTop || %s < el.scrollTop || %s > el.scrollLef
           (item-fn {:x-offset-items   x-offset-items
                     :x-rendered-items x-rendered-items
                     :y-offset-items   y-offset-items
-                    :y-rendered-items y-rendered-items})]]]])))
+                    :y-rendered-items y-rendered-items})]
+         ;; Mostly used for things like background SVGs.
+         content]]])))
 

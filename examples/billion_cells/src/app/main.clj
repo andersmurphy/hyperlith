@@ -2,16 +2,18 @@
   (:gen-class)
   (:require [hyperlith.core :as h :refer [defaction defview]]
             [hyperlith.extras.sqlite :as d]
-            [clojure.math :as math]))
+            [clojure.math :as math]
+            [hyperlith.extras.ui.virtual-scroll :as vs]))
 
+(def cell-size-px 32)
 (def chunk-size 16)
+(def chunk-size-px (* cell-size-px chunk-size))
 (def board-size (->> (math/pow chunk-size 2)
                   (/ 1000000000)
                   math/sqrt
                   math/ceil
                   int))
-(def cell-size 32)
-(def board-size-px (* cell-size chunk-size board-size))
+(def board-size-px (* cell-size-px chunk-size board-size))
 (def size (* board-size chunk-size))
 (def black "#000000")
 (def white "#FFF1E8")
@@ -20,7 +22,7 @@
   (let [accent        "#008751"
         other         "#FF004D"
         board-size-px (str board-size-px "px")
-        max-width (* 20 cell-size)]
+        max-width (* 16 cell-size-px)]
     (h/static-css
       [["*, *::before, *::after"
         {:box-sizing :border-box
@@ -77,36 +79,18 @@
          :gap            :5px
          :flex-direction :column}]
 
-       [:.view
-        {:position        :relative
-         :overflow        :scroll
-         :scroll-behavior :smooth
-         :scrollbar-color (str black " transparent")
-         :overflow-anchor :none
-         :width           (str "min(100% - 2rem ," max-width "px)")}]
-
-       [:.board-container
-        {:width                 board-size-px
-         :height                board-size-px
-         :position :relative}]
-
-       [:.board
-        {:position              :absolute
-         :width                 board-size-px
-         :height                board-size-px
-         :display               :grid
-         :grid-template-rows    (str "repeat(" board-size ", 1fr)")
-         :grid-template-columns (str "repeat(" board-size ", 1fr)")
-         :pointer-events        :none}]
-
        [:.board-background
-        {:width        board-size-px
-         :height       board-size-px}]
+        {:position :absolute
+         :width    board-size-px
+         :height   board-size-px
+         :z-index  -2}]
 
        [:.chunk
         {:display               :grid
          :grid-template-rows    (str "repeat(" chunk-size ", 1fr)")
-         :grid-template-columns (str "repeat(" chunk-size ", 1fr)")}]
+         :grid-template-columns (str "repeat(" chunk-size ", 1fr)")
+         :width                 (str chunk-size-px "px")
+         :height                (str chunk-size-px "px")}]
 
        [:.pop
         {;; Animation that depresses the element
@@ -144,8 +128,8 @@
        [:a {:color accent}]
 
        [:.cell
-        {:width  (str cell-size "px")
-         :height (str cell-size "px")
+        {:width  (str cell-size-px "px")
+         :height (str cell-size-px "px")
          :font-size      :1.2rem
          :display        :grid
          :overflow       :hidden
@@ -221,13 +205,23 @@
     (swap! chunk-cache assoc chunk-id new-chunk)))
 
 (defaction handler-scroll
-  [{:keys [sid tabid tx-batch!] {:keys [x y]} :body}]
+  [{:keys [sid tabid tx-batch!] {:keys [view-x view-y]} :body}]
   (tx-batch!
     (fn [db _]
       (update-tab-data! db sid tabid
         #(assoc %
-           :x (max (int x) 0)
-           :y (max (int y) 0))))))
+           :x (max (int view-x) 0)
+           :y (max (int view-y) 0))))))
+
+(defaction handler-resize
+  [{:keys [sid tabid tx-batch!] {:keys [view-h view-w]} :body}]
+  (when (and view-h view-w)
+    (tx-batch!
+      (fn [db _]
+        (update-tab-data! db sid tabid
+          #(assoc %
+             :height (max (int view-h) 0)
+             :width  (max (int view-w) 0)))))))
 
 (defn remove-focus! [sid tabid db chunk-cache]
   (let [{:keys [focus-chunk-id focus-cell-id]}
@@ -334,21 +328,16 @@
     vec))
 
 (defn Chunk [chunk-id chunk-cells sid]
-  (let [[x y] (chunk-id->xy chunk-id)
-        x     (inc x)
-        y     (inc y)]
-    (h/html
-      [:div.chunk
-       {:id      chunk-id
-        :data-id chunk-id
-        :style   {:grid-column x :grid-row y}}
-       (into []
-         (map-indexed (fn [local-id box]
-                        (Cell chunk-id local-id box sid)))
-         chunk-cells)])))
+  (h/html
+    [:div.chunk
+     {:id      chunk-id
+      :data-id chunk-id}
+     (into []
+       (map-indexed (fn [local-id box] (Cell chunk-id local-id box sid)))
+       chunk-cells)]))
 
-(defn UserView [{:keys [x y sid] :or {x 0 y 0}} db]
-  (->> (let [[a b c d e f g h i] (xy->chunk-ids x y)]
+(defn UserView [db sid {:keys [x-offset-items y-offset-items]}]
+  (->> (let [[a b c d e f g h i] (xy->chunk-ids x-offset-items y-offset-items)]
          (d/q db
            '{select [id data]
              from   chunk
@@ -357,21 +346,8 @@
     (mapv (fn [[id chunk]]
             (Chunk id chunk sid)))))
 
-(defn scroll-offset-js [n]
-  (str "Math.round((" n "/" board-size-px ")*" board-size "-1)"))
-
 (defn scroll->cell-xy-js [n]
   (str "Math.round((" n "/" board-size-px ")*" size ")"))
-
-(def on-scroll-js
-  (str
-    "$jumpx = " (scroll->cell-xy-js "el.scrollLeft") ";"
-    "$jumpy = " (scroll->cell-xy-js "el.scrollTop") ";"
-    "let x = " (scroll-offset-js "el.scrollLeft") ";"
-    "let y = " (scroll-offset-js "el.scrollTop") ";"
-    "let change = x !== $x || y !== $y;"
-    "$x = x; $y = y;"
-    "change && @post(`" handler-scroll "`)"))
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://cells.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
@@ -388,11 +364,10 @@
   [{:keys         [db sid tabid]
     {:strs [x y]} :query-params
     :as           _req}]
-  (let [x       (h/try-parse-long x 0)
-        y       (h/try-parse-long y 0)
-        user    (assoc (get-tab-data db sid tabid)
-                  :sid sid :tabid tabid)
-        content (UserView user db)]
+  (let [jump-x                     (h/try-parse-long x 0)
+        jump-y                     (h/try-parse-long y 0)
+        tab-data                   (get-tab-data db sid tabid)
+        {:keys [x y height width]} tab-data]
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href css}]
       [:main#morph.main
@@ -405,13 +380,26 @@
           "@post(`${evt.target.dataset.action}`);"
           "setTimeout(() => evt.target.classList.remove('pop'), 300)"
           "}")}
-       [:div#view.view
-        {;; firefox sometimes preserves scroll on refresh and we don't want that
-         :data-on-load                                   (scroll-to-xy-js x y)
-         :data-ref                                       "_view"
-         :data-on-scroll__throttle.100ms.trail.noleading on-scroll-js}
-        [:div.board-container
-         [:div#board.board nil content]
+       [:div.view-wrapper
+        [::vs/virtual#view
+         {;; firefox sometimes preserves scroll on refresh and we don't want that
+          :data-on-load          (scroll-to-xy-js jump-x jump-y)
+          :data-ref              "_view"
+          :v/x                   {:item-size          chunk-size-px
+                                  :buffer-items       1
+                                  :max-rendered-items 3
+                                  :scroll-pos         x
+                                  :view-size          width
+                                  :item-count-fn      (fn [] board-size)}
+          :v/y                   {:item-size          chunk-size-px
+                                  :buffer-items       1
+                                  :max-rendered-items 3
+                                  :scroll-pos         y
+                                  :view-size          height
+                                  :item-count-fn      (fn [] board-size)}
+          :v/item-fn             (partial UserView db sid)
+          :v/scroll-handler-path handler-scroll
+          :v/resize-handler-path handler-resize}
          [:div.board-background nil
           [:svg {:width "100%" :height "100%"}
            [:defs
@@ -429,7 +417,7 @@
         [:div.button {:data-action handler-jump}
          [:strong.pe-none "GO"]]
         [:div.button
-         {:data-action handler-share
+         {:data-action       handler-share
           :data-on-mousedown copy-xy-to-clipboard-js}
          [:strong.pe-none "SHARE"]]]
        [:h1 "One Billion Cells"]
