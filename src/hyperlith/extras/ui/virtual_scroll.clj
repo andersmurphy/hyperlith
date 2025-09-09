@@ -8,23 +8,29 @@
     (str id "-h")
     resize-handler-path))
 
+(defn on-scroll-js [x-signal y-signal]
+  (format "$%s = Math.floor(el.scrollLeft); $%s = Math.floor(el.scrollTop);"
+    x-signal y-signal))
+
 (defn fetch-next-page-js
-  [{:keys [id fired-signal bottom top left right scroll-handler-path]}]
+  [{:keys [x-signal y-signal fired-signal bottom top left right
+           scroll-handler-path]}]
   (let [top    (or top 0)
         bottom (or bottom "Infinity")
         left   (or left 0)
         right  (or right "Infinity")]
     (format
-      "$%s = Math.floor(el.scrollLeft); $%s = Math.floor(el.scrollTop);
-if (($%s !== -1) && (%s > el.scrollTop || %s < el.scrollTop || %s > el.scrollLeft || %s < el.scrollLeft))
+      "if (($%s !== -1) && (%s > $%s || %s < $%s || %s > $%s || %s < $%s))
     {$%s = -1; @post('%s', {retryMaxCount: Infinity});}"
-      (str id  "-x")
-      (str id  "-y")
       fired-signal
       top
+      y-signal
       bottom
+      y-signal
       left
+      x-signal
       right
+      x-signal
       fired-signal
       scroll-handler-path)))
 
@@ -86,9 +92,12 @@ if (($%s !== -1) && (%s > el.scrollTop || %s < el.scrollTop || %s > el.scrollLef
          y-translate y-max-size y-item-grid y-item-grid-size y-size
          y-rendered-items]
         (when y (virtual-scroll-logic y))
-        fired-signal     (str id "fired")
+        x-signal         (str id "-x")
+        y-signal         (str id "-y")
+        fired-signal     (str "_" id "fired")
         fetch-next-page? (fetch-next-page-js
-                           {:id                  id
+                           {:x-signal            x-signal
+                            :y-signal            y-signal
                             :fired-signal        fired-signal
                             :left                x-threshold-low
                             :right               x-threshold-high
@@ -97,21 +106,18 @@ if (($%s !== -1) && (%s > el.scrollTop || %s < el.scrollTop || %s > el.scrollLef
                             :scroll-handler-path scroll-handler-path})]
     (h/html
       [:div {;; make sure signal is initialised before data-on-load
-             :data-signals   (h/edn->json {fired-signal
-                                           (str x-offset-items y-offset-items)})
-             :style          {:width      :100%
-                              :height     :100%
-                              :max-width  x-max-size
-                              :max-height y-max-size}}
+             :data-signals (h/edn->json {fired-signal (str (random-uuid))})
+             :style        {:width      :100%
+                            :height     :100%
+                            :max-width  x-max-size
+                            :max-height y-max-size}}
        [:div (assoc attrs
                :data-on-resize__debounce.100ms__window
                (resize-js id resize-handler-path)
-               :data-on-scroll fetch-next-page?
+               :data-on-scroll (on-scroll-js x-signal y-signal)
                ;; Handles user drag scrolling
-               :data-on-load   fetch-next-page?
-               ;; Handles client going offline (and server not getting request)
-               :data-on-online__window
-               (str "$" fired-signal " = 1;" fetch-next-page?)
+               ;; (if fired, x or y change this runs)
+               :data-effect fetch-next-page?
                :style {:scroll-behavior     :smooth
                        :overscroll-behavior :contain
                        :overflow-anchor     :none
