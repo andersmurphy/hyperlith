@@ -91,13 +91,12 @@
          :height                (str chunk-size-px "px")}]
 
        (let [padding 5]
-         ["input[type=\"checkbox\"]"
+         [:.box
           {:width          (str (- cell-size-px (* 2 padding)) "px")
            :height         (str (- cell-size-px (* 2 padding)) "px")
-           :padding        (str padding "px")
-           :appearance     :none
            :font           :inherit
            :font-size      :1.2rem
+           :padding        (str padding "px")
            :color          :currentColor
            :border         "0.15em solid currentColor"
            :border-radius  :0.15em
@@ -105,7 +104,8 @@
            :place-content  :center
            :pointer-events :all}])
 
-       ["input[type=\"checkbox\"]:checked::before"
+       ;; TODO: this is slow
+       [".checked::before"
         {:content    "\"\""
          :width      "0.50em"
          :height     "0.50em"
@@ -301,14 +301,12 @@
 (defn Checkbox [local-id state]
   (let [state       (or state 0)
         checked     (not= state 0)
-        color-class (state->class state)]
+        color-class (str "checked " (state->class state))]
     (h/html
-      [:input
-       {:class       (when checked color-class)
-        :type        "checkbox"
-        :checked     checked
-        :data-id     local-id
-        :data-action handler-check}])))
+      [:div.box
+       {:class        (when checked color-class)
+        :data-id      local-id
+        :data-action  handler-check}])))
 
 (defn chunk-id->xy [chunk-id]
   [(rem chunk-id board-size)
@@ -338,7 +336,8 @@
              from   chunk
              where  [in id ?chunk-ids]}
            {:chunk-ids [a b c d e f g h i]}))
-    (mapv (fn [[id chunk]] (Chunk id chunk)))))
+    (map (fn [[id chunk]] (Chunk id chunk)))
+    (into [])))
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
