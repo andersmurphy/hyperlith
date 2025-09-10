@@ -2,10 +2,10 @@
   (:require [hyperlith.core :as h]
             [clojure.math :as math]))
 
-(defn resize-js [id resize-handler-path]
+(defn resize-js [w-signal h-signal resize-handler-path]
   (format "$%s = el.clientWidth; $%s = el.clientHeight; @post('%s');"
-    (str id "-w")
-    (str id "-h")
+    w-signal
+    h-signal
     resize-handler-path))
 
 (defn on-scroll-js [x-signal y-signal]
@@ -94,6 +94,8 @@
         (when y (virtual-scroll-logic y))
         x-signal         (str id "-x")
         y-signal         (str id "-y")
+        w-signal         (str id "-w")
+        h-signal         (str id "-h")
         fired-signal     (str "_" id "fired")
         fetch-next-page? (fetch-next-page-js
                            {:x-signal            x-signal
@@ -107,26 +109,31 @@
     (h/html
       [:div {;; make sure signal is initialised before data-on-load
              :data-signals (h/edn->json {fired-signal (str (random-uuid))})
+             :data-signals__ifmissing (h/edn->json {x-signal 0 y-signal 0})
              :style        {:width      :100%
                             :height     :100%
                             :max-width  x-max-size
                             :max-height y-max-size}}
-       [:div (assoc attrs
-               :data-on-resize__debounce.100ms__window
-               (resize-js id resize-handler-path)
-               :data-on-scroll (on-scroll-js x-signal y-signal)
-               ;; Handles user drag scrolling
-               ;; (if fired, x or y change this runs)
-               :data-effect fetch-next-page?
-               :style {:scroll-behavior     :smooth
-                       :overscroll-behavior :contain
-                       :overflow-anchor     :none
-                       :overflow-x          (when x :scroll)
-                       :overflow-y          (when y :scroll)
-                       :max-width           x-max-size
-                       :max-height          y-max-size
-                       :width               :100%
-                       :height              :100%})
+       [:div
+        (assoc attrs          
+          ;; send up initial size on load
+          :data-on-load
+          (resize-js w-signal h-signal resize-handler-path)
+          :data-on-resize__debounce.100ms__window
+          (resize-js w-signal h-signal resize-handler-path)
+          :data-on-scroll (on-scroll-js x-signal y-signal)
+          ;; Handles user drag scrolling
+          ;; (if fired, x or y change this runs)
+          :data-effect fetch-next-page?
+          :style {:scroll-behavior     :smooth
+                  :overscroll-behavior :contain
+                  :overflow-anchor     :none
+                  :overflow-x          (when x :scroll)
+                  :overflow-y          (when y :scroll)
+                  :max-width           x-max-size
+                  :max-height          y-max-size
+                  :width               :100%
+                  :height              :100%})
         [:div
          {:id    (str id "-virtual-table")
           :style {:pointer-events :none

@@ -56,26 +56,26 @@
                               :data ?new-data}]}
         {:sid sid :new-data new-data}))))
 
-(defaction handler-scroll-component-1
-  [{:keys [sid tabid tx-batch!] {:strs [x]} :query-params}]
-  (when-let [x (int (parse-long x))]
+(defaction handler-scroll-comp1
+  [{:keys [sid tabid tx-batch!] {:keys [comp1-x]} :body}]
+  (when-let [x (int comp1-x)]
     (tx-batch!
       (fn [db]
         (update-tab-data! db sid tabid
           #(assoc % :x (max x 0)))))))
 
-(defaction handler-scroll-component-2
-  [{:keys [sid tabid tx-batch!] {:strs [y]} :query-params}]
-  (when-let [y (int (parse-long y))]
+(defaction handler-scroll-comp2
+  [{:keys [sid tabid tx-batch!] {:keys [comp2-y]} :body}]
+  (when-let [y (int comp2-y)]
     (tx-batch!
       (fn [db]
         (update-tab-data! db sid tabid
           #(assoc % :y (max y 0)))))))
 
-(defaction handler-resize-component-1
-  [{:keys [sid tabid tx-batch!] {:strs [h w]} :query-params}]
-  (let [height (int (parse-long h))
-        width  (int (parse-long w))]
+(defaction handler-resize-comp1
+  [{:keys [sid tabid tx-batch!] {:keys [comp1-h comp1-w]} :body}]
+  (let [height (int comp1-h)
+        width  (int comp1-w)]
     (when (and height width)
       (tx-batch!
         (fn [db]
@@ -84,10 +84,10 @@
                :height-1 (max height 0)
                :width-1 (max width 0))))))))
 
-(defaction handler-resize-component-2
-  [{:keys [sid tabid tx-batch!] {:strs [h w]} :query-params}]
-  (let [height (int (parse-long h))
-        width  (int (parse-long w))]
+(defaction handler-resize-comp2
+  [{:keys [sid tabid tx-batch!] {:keys [comp2-h comp2-w]} :body}]
+  (let [height (int comp2-h)
+        width  (int comp2-w)]
     (when (and height width)
       (tx-batch!
         (fn [db]
@@ -141,28 +141,30 @@
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href css}]
       [:main#morph.main
-       [:div#foo1 {:style {:height :10vh}}
-        [::vs/virtual#view-x
+       [:div {:style {:height :10vh}}
+        [::vs/virtual#comp1
          {:v/x
           {:item-size          100
            :max-rendered-items 1000
+           :buffer-items       100
            :item-count-fn      (partial row-count db)
            :view-size          (:width-1 tab-data)
            :scroll-pos         (:x tab-data)}
           :v/item-fn             (partial col-builder db)
-          :v/scroll-handler-path handler-scroll-component-1
-          :v/resize-handler-path handler-resize-component-1}]]
-       [:div#foo2 {:style {:height :90vh}}
-        [::vs/virtual#view-y
+          :v/scroll-handler-path handler-scroll-comp1
+          :v/resize-handler-path handler-resize-comp1}]]
+       [:div {:style {:height :90vh}}
+        [::vs/virtual#comp2
          {:v/y
           {:item-size          20
            :max-rendered-items 1000
+           :buffer-items       100
            :item-count-fn      (partial row-count db)
            :view-size          (:height-2 tab-data)
            :scroll-pos         (:y tab-data)}
           :v/item-fn             (partial row-builder db)
-          :v/scroll-handler-path handler-scroll-component-2
-          :v/resize-handler-path handler-resize-component-2}]]])))
+          :v/scroll-handler-path handler-scroll-comp2
+          :v/resize-handler-path handler-resize-comp2}]]])))
 
 (defn initial-table-db-state! [db]
   (let [;; chrome browsers seems to cut this off at 167771 items?

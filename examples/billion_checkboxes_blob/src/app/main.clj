@@ -387,10 +387,10 @@
           "setTimeout(() => evt.target.classList.remove('pop'), 300)"
           "}")}
        [:div.view-wrapper
+        {;; firefox sometimes preserves scroll on refresh and we don't want that
+         :data-on-load (scroll-to-xy-js jump-x jump-y)}
         [::vs/virtual#view
-         {;; firefox sometimes preserves scroll on refresh and we don't want that
-          :data-on-load          (scroll-to-xy-js jump-x jump-y)
-          :data-ref              "_view"
+         {:data-ref              "_view"
           :v/x                   {:item-size          chunk-size-px
                                   :buffer-items       1
                                   :max-rendered-items 3
