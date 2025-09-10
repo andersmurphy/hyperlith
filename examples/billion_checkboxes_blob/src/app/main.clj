@@ -32,10 +32,9 @@
 (def white         "#FFF1E8")
 
 (def css
-  (let [black         "#000000"
-        white         "#FFF1E8"
-        accent        "#FFA300"
-        max-width     chunk-size-px]
+  (let [black  "#000000"
+        white  "#FFF1E8"
+        accent "#FFA300"]
     (h/static-css
       [["*, *::before, *::after"
         {:box-sizing :border-box
@@ -73,14 +72,22 @@
        [:.main
         {:height         :100dvh
          :max-height     :100dvh
-         :margin-inline  :auto
+         :width          :100dvw
+         :max-width      :100dvw
+         :padding-inline :2dvw
          :padding-block  :2dvh
-         :width          (str "min(100% - 2rem ," max-width "px)")
          :gap            :5px
          :display        :flex
          :flex-direction :column}]
 
-       [:.view-wrapper {:min-height (str cell-size-px "px")}]
+       [:.view-wrapper
+        {:min-height (str cell-size-px "px")
+         :min-width  (str cell-size-px "px")}]
+
+       [:.controls-wrapper
+        {:gap            :5px
+         :display        :flex
+         :flex-direction :column}]
 
        [:.chunk
         {:background            white
@@ -315,9 +322,10 @@
 (defn xy->chunk-id [x y]
   (+ x (* y board-size)))
 
-(defn xy->chunk-ids [x y]
-  (-> (for [x (range x (+ x 3))
-            y (range y (+ y 3))]
+(defn xy->chunk-ids
+  [{:keys [x-offset-items y-offset-items x-rendered-items y-rendered-items]}]
+  (-> (for [y (range y-offset-items (+ y-offset-items y-rendered-items))
+            x (range x-offset-items (+ x-offset-items x-rendered-items))]
         (xy->chunk-id x y))
     vec))
 
@@ -329,15 +337,15 @@
        (map-indexed (fn [local-id box] (Checkbox local-id box)))
        chunk-cells)]))
 
-(defn UserView [db {:keys [x-offset-items y-offset-items]}]
-  (->> (let [[a b c d e f g h i] (xy->chunk-ids x-offset-items y-offset-items)]
-         (d/q db
-           '{select [id data]
-             from   chunk
-             where  [in id ?chunk-ids]}
-           {:chunk-ids [a b c d e f g h i]}))
-    (map (fn [[id chunk]] (Chunk id chunk)))
-    (into [])))
+(defn UserView
+  [db offset-data]
+  (->> (xy->chunk-ids offset-data)
+    (mapv (fn [chunk-id]
+            (let [[[id chunk]] (d/q db '{select [id data]
+                                         from   chunk
+                                         where  [= id ?chunk-id]}
+                                 {:chunk-id chunk-id})]
+              (Chunk id chunk))))))
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
@@ -393,43 +401,44 @@
          {:data-ref              "_view"
           :v/x                   {:item-size          chunk-size-px
                                   :buffer-items       1
-                                  :max-rendered-items 3
+                                  :max-rendered-items 5
                                   :scroll-pos         x
                                   :view-size          width
                                   :item-count-fn      (fn [] board-size)}
           :v/y                   {:item-size          chunk-size-px
                                   :buffer-items       1
-                                  :max-rendered-items 3
+                                  :max-rendered-items 5
                                   :scroll-pos         y
                                   :view-size          height
                                   :item-count-fn      (fn [] board-size)}
           :v/item-fn             (partial UserView db)
           :v/scroll-handler-path handler-scroll
           :v/resize-handler-path handler-resize}]]
-       [:div.jump
-        [:h2 "X:"]
-        [:input.jump-input
-         {:type "number" :data-bind "jumpx"
-          :data-effect (str "$jumpx = " (scroll->cell-xy-js "$view-x"))}]
-        [:h2 "Y:"]
-        [:input.jump-input
-         {:type "number" :data-bind "jumpy"
-          :data-effect (str "$jumpy = " (scroll->cell-xy-js "$view-y"))}]
-        [:div.button {:data-action handler-jump}
-         [:strong.pe-none "JUMP"]]
-        [:div.button {:data-action       handler-share
-                      :data-on-mousedown copy-xy-to-clipboard-js}
-         [:strong.pe-none "SHARE"]]]
-       palette
-       [:h1 "One Billion Checkboxes"]
-       [:p "Built using "
-        [:a {:href "https://clojure.org/"} "Clojure"]
-        " and "
-        [:a {:href "https://data-star.dev"} "Datastar"]
-        " - "
-        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "source"]
-        " - "
-        [:a {:href "https://cells.andersmurphy.com"} " more like this"]]])))
+       [:div.controls-wrapper
+        [:div.jump
+         [:h2 "X:"]
+         [:input.jump-input
+          {:type        "number" :data-bind "jumpx"
+           :data-effect (str "$jumpx = " (scroll->cell-xy-js "$view-x"))}]
+         [:h2 "Y:"]
+         [:input.jump-input
+          {:type        "number" :data-bind "jumpy"
+           :data-effect (str "$jumpy = " (scroll->cell-xy-js "$view-y"))}]
+         [:div.button {:data-action handler-jump}
+          [:strong.pe-none "JUMP"]]
+         [:div.button {:data-action       handler-share
+                       :data-on-mousedown copy-xy-to-clipboard-js}
+          [:strong.pe-none "SHARE"]]]
+        palette
+        [:h1 "One Billion Checkboxes"]
+        [:p "Built using "
+         [:a {:href "https://clojure.org/"} "Clojure"]
+         " and "
+         [:a {:href "https://data-star.dev"} "Datastar"]
+         " - "
+         [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "source"]
+         " - "
+         [:a {:href "https://cells.andersmurphy.com"} " more like this"]]]])))
 
 (def blank-chunk
   (-> (repeat (* chunk-size chunk-size) 0)
@@ -527,7 +536,9 @@
            (fn [n]
              (future
                (let [n (mod n board-size)]
-                 (UserView {:x n :y n} db)
+                 (UserView db {:x-offset-items   n :y-offset-items   n
+                               :x-rendered-items 3 :y-rendered-items 3})
+
                  ;; we don't want to hold onto the object
                  ;; not realistic
                  nil)))
@@ -535,7 +546,11 @@
       (run! (fn [x] @x))))
 
   ;; Execution time mean : 151.256280 µs
-  (user/bench (do (UserView {:x 1 :y 1} db) nil))
+  (user/bench
+    (do
+      (UserView db {:x-offset-items   0 :y-offset-items   0
+                    :x-rendered-items 3 :y-rendered-items 3}) nil))
+  
 
   (d/table-info db :chunk)
   (d/table-list db)
@@ -598,7 +613,7 @@
                      :uri            handler-check
                      :body
                      {:csrf     "I3AAFrMG99lxoqwi87cSpn7unri5qYqJ-Vr9DLc4-s4"
-                      :parentid "0"
+                      :parentid (str (rand-int 2000))
                       :targetid (str (rand-int 200))}})))
             ;; 10000r/s
             (range 10))

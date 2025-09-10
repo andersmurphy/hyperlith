@@ -40,10 +40,6 @@
   (let [scroll-pos         (or scroll-pos 0)
         view-size          (or view-size 1000)
         max-rendered-items (or max-rendered-items 1000)
-        max-size           (* (int (/ max-rendered-items 2)) item-size)
-        visible-items      (max (int (math/ceil
-                                       (/ (min view-size max-size) item-size)))
-                             1)
         buffer-items       (int (or buffer-items
                                   ;; Default to number of items that
                                   ;; fits in 4000px as user scroll speed
@@ -53,6 +49,11 @@
                                   ;; TODO: fix if this is larger than max
                                   ;; render
                                   ))
+        max-size           (* (int (- max-rendered-items (* 2 buffer-items)))
+                             item-size)
+        visible-items      (max (int (math/ceil
+                                       (/ (min view-size max-size) item-size)))
+                             1)
         rendered-items     (+ (* 2 buffer-items) visible-items)
         total-item-count   (item-count-fn)
         offset-items       (max (min (- (math/round (/ scroll-pos item-size))
