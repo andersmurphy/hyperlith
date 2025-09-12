@@ -629,12 +629,16 @@
   
   (run! (fn [chunk-id]
           (when (= blank-chunk (-> (d/q db-write
-                                      '{select [data]
-                                        from   chunk
-                                        where  [= id ?chunk-id]}
-                                      {:chunk-id chunk-id})
-                                  first))
+                                     '{select [data]
+                                       from   chunk
+                                       where  [= id ?chunk-id]}
+                                     {:chunk-id chunk-id})
+                                 first))
             (d/q db-write '{delete-from chunk
-                            where [= id ?chunk-id]}
+                            where       [= id ?chunk-id]}
               {:chunk-id chunk-id})))
-    (range 10)))
+    (range (* board-size board-size)))
+
+  
+
+  )
