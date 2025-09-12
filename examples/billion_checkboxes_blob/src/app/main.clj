@@ -2,7 +2,7 @@
   (:gen-class)
   (:require [app.qrcode :as qrcode]
             [hyperlith.core :as h :refer [defaction defview]]
-            [hyperlith.extras.sqlite :as d]            
+            [hyperlith.extras.sqlite :as d]
             [hyperlith.extras.ui.virtual-scroll :as vs]
             [clj-async-profiler.core :as prof]
             [clojure.math :as math]))
@@ -216,8 +216,8 @@
 
 (defn get-session-data [db sid]
   (-> (d/q db '{select [data]
-                 from   session
-                 where  [= id ?sid]}
+                from   session
+                where  [= id ?sid]}
         {:sid sid})
     first))
 
@@ -236,6 +236,9 @@
                 values      [{:id   ?sid
                               :data ?new-data}]}
         {:sid sid :new-data new-data}))))
+
+(def blank-chunk
+  (-> (repeat (* chunk-size chunk-size) 0) vec))
 
 (defaction handler-scroll
   [{:keys [sid tabid tx-batch!] {:keys [view-x view-y]} :body}]
@@ -279,6 +282,17 @@
                                         from   chunk
                                         where  [= id ?chunk-id]}
                                 {:chunk-id chunk-id})
+                            first)
+                          (d/q db
+                            '{insert-into chunk
+                              values      [{id   ?chunk-id
+                                            data ?blank-chunk}]}
+                            {:chunk-id    chunk-id
+                             :blank-chunk blank-chunk})
+                          (-> (d/q db '{select [data]
+                                        from   chunk
+                                        where  [= id ?chunk-id]}
+                                {:chunk-id chunk-id})
                             first))]
               (swap! chunk-cache assoc chunk-id
                 (update chunk cell-id #(if (= 0 %) user-color 0))))))))))
@@ -308,12 +322,12 @@
 (defn Checkbox [local-id state]
   (let [state       (or state 0)
         checked     (not= state 0)
-        color-class (str "checked " (state->class state))]
+        color-class (str "checked " (get state->class state))]
     (h/html
       [:div.box
-       {:class        (when checked color-class)
-        :data-id      local-id
-        :data-action  handler-check}])))
+       {:class       (when checked color-class)
+        :data-id     local-id
+        :data-action handler-check}])))
 
 (defn chunk-id->xy [chunk-id]
   [(rem chunk-id board-size)
@@ -337,6 +351,17 @@
        (map-indexed (fn [local-id box] (Checkbox local-id box)))
        chunk-cells)]))
 
+(def empty-checks
+  (h/html
+    (into []
+      (map-indexed (fn [local-id box] (Checkbox local-id box)))
+      blank-chunk )))
+
+(defn EmptyChunk [chunk-id]
+  (h/html
+    [:div.chunk {:data-id chunk-id}
+     empty-checks]))
+
 (defn UserView
   [db offset-data]
   (->> (xy->chunk-ids offset-data)
@@ -345,7 +370,9 @@
                                          from   chunk
                                          where  [= id ?chunk-id]}
                                  {:chunk-id chunk-id})]
-              (Chunk id chunk))))))
+              (if id
+                (Chunk id chunk)
+                (EmptyChunk chunk-id)))))))
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
@@ -400,14 +427,14 @@
         [::vs/virtual#view
          {:data-ref              "_view"
           :v/x                   {:item-size          chunk-size-px
-                                  :buffer-items       1
-                                  :max-rendered-items 5
+                                  :buffer-items       2
+                                  :max-rendered-items 7
                                   :scroll-pos         x
                                   :view-size          width
                                   :item-count-fn      (fn [] board-size)}
           :v/y                   {:item-size          chunk-size-px
-                                  :buffer-items       1
-                                  :max-rendered-items 5
+                                  :buffer-items       2
+                                  :max-rendered-items 7
                                   :scroll-pos         y
                                   :view-size          height
                                   :item-count-fn      (fn [] board-size)}
@@ -440,27 +467,6 @@
          " - "
          [:a {:href "https://cells.andersmurphy.com"} " more like this"]]]])))
 
-(def blank-chunk
-  (-> (repeat (* chunk-size chunk-size) 0)
-    vec))
-
-(defn initial-board-db-state! [db]
-  (let [board-range (range board-size)]
-    (d/with-write-tx [db db]
-      (run!
-        (fn [y]
-          (run! (fn [x]
-                  (d/q db
-                    '{insert-into chunk
-                      values      [{id   ?chunk-id
-                                    data ?blank-chunk}]}
-                    {:chunk-id    (xy->chunk-id x y)
-                     :blank-chunk blank-chunk}))
-            board-range)
-          (print ".") (flush))
-        board-range)))
-  nil)
-
 (defn migrations [db]
   ;; Note: all this code must be idempotent
   ;; Create tables
@@ -468,9 +474,7 @@
   (d/q db
     ["CREATE TABLE IF NOT EXISTS chunk(id INT PRIMARY KEY, data BLOB)"])
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"])
-  (when-not (d/q db '{select [id] from chunk limit 1})
-    (initial-board-db-state! db)))
+    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"]))
 
 (defn ctx-start []
   (let [{:keys [writer reader]}
@@ -490,8 +494,8 @@
                         (run! (fn [thunk] (thunk db chunk-cache)) thunks)
                         (run! (fn [[chunk-id new-chunk]]
                                 (d/q db '{update chunk
-                                           set    {data ?new-chunk}
-                                           where  [= id ?chunk-id]}
+                                          set    {data ?new-chunk}
+                                          where  [= id ?chunk-id]}
                                   {:chunk-id  chunk-id
                                    :new-chunk new-chunk}))
                           @chunk-cache)))
@@ -507,9 +511,9 @@
 (defn -main [& _]
   (reset! app_
     (h/start-app
-      {:ctx-start      ctx-start
-       :ctx-stop       ctx-stop
-       :csrf-secret    (h/env :csrf-secret)})))
+      {:ctx-start   ctx-start
+       :ctx-stop    ctx-stop
+       :csrf-secret (h/env :csrf-secret)})))
 
 ;; Refresh app when you re-eval file
 (h/refresh-all!)
@@ -548,9 +552,9 @@
   ;; Execution time mean : 151.256280 µs
   (user/bench
     (do
-      (UserView db {:x-offset-items   0 :y-offset-items   0
-                    :x-rendered-items 3 :y-rendered-items 3}) nil))
-  
+      (UserView db {:x-offset-items   50 :y-offset-items   50
+                    :x-rendered-items 7  :y-rendered-items 7}) nil))
+
 
   (d/table-info db :chunk)
   (d/table-list db)
@@ -584,8 +588,6 @@
   (d/q db-write ["PRAGMA wal_checkpoint(PASSIVE)"])
   (d/q db-write ["PRAGMA wal_checkpoint(TRUNCATE)"])
 
-
-
   ,)
 
 (comment ;; Profiling
@@ -618,7 +620,21 @@
             ;; 10000r/s
             (range 10))
           (Thread/sleep 1))
-        (range 10000))))
+        (range 10000)))))
 
-
-  )
+(comment
+  ;; clear out empty chunks
+  (def db-write (-> @app_ :ctx :db-write))
+  (d/q db-write '{select [[[count *]]] from chunk})
+  
+  (run! (fn [chunk-id]
+          (when (= blank-chunk (-> (d/q db-write
+                                      '{select [data]
+                                        from   chunk
+                                        where  [= id ?chunk-id]}
+                                      {:chunk-id chunk-id})
+                                  first))
+            (d/q db-write '{delete-from chunk
+                            where [= id ?chunk-id]}
+              {:chunk-id chunk-id})))
+    (range 10)))
