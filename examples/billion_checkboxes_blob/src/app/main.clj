@@ -400,7 +400,7 @@
   (str "Math.round((" n "/" board-size-px ")*" size ")"))
 
 (defview handler-root
-  {:path "/" :shim-headers shim-headers :br-window-size 19}
+  {:path "/" :shim-headers shim-headers :br-window-size 21}
   [{:keys         [db sid tabid]
     {:strs [x y]} :query-params
     :as           _req}]
@@ -638,7 +638,5 @@
                             where       [= id ?chunk-id]}
               {:chunk-id chunk-id})))
     (range (* board-size board-size)))
-
-  
 
   )

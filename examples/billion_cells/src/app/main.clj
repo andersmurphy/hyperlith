@@ -5,24 +5,27 @@
             [clojure.math :as math]
             [hyperlith.extras.ui.virtual-scroll :as vs]))
 
-(def cell-size-px 32)
+(def cell-width-px (* 32 4))
+(def cell-height-px 32)
 (def chunk-size 16)
-(def chunk-size-px (* cell-size-px chunk-size))
+(def chunk-width-px (* cell-width-px chunk-size))
+(def chunk-height-px (* cell-height-px chunk-size))
 (def board-size (->> (math/pow chunk-size 2)
                   (/ 1000000000)
                   math/sqrt
                   math/ceil
                   int))
-(def board-size-px (* cell-size-px chunk-size board-size))
+(def board-width-px (* cell-width-px chunk-size board-size))
+(def board-height-px (* cell-height-px chunk-size board-size))
 (def size (* board-size chunk-size))
 (def black "#000000")
 (def white "#FFF1E8")
 
 (def css
-  (let [accent        "#008751"
-        other         "#FF004D"
-        board-size-px (str board-size-px "px")
-        max-width (* 16 cell-size-px)]
+  (let [accent          "#008751"
+        other           "#FF004D"
+        board-width-px  (str board-width-px "px")
+        board-height-px (str board-height-px "px")]
     (h/static-css
       [["*, *::before, *::after"
         {:box-sizing :border-box
@@ -72,25 +75,36 @@
 
        [:.main
         {:height         :100dvh
-         :margin-inline  :auto
+         :max-height     :100dvh
+         :width          :100dvw
+         :max-width      :100dvw
+         :padding-inline :2dvw
          :padding-block  :2dvh
-         :display        :flex
-         :width          (str "min(100% - 2rem ," max-width "px)")
          :gap            :5px
+         :display        :flex
          :flex-direction :column}]
 
        [:.board-background
         {:position :absolute
-         :width    board-size-px
-         :height   board-size-px
+         :width    board-width-px
+         :height   board-height-px
          :z-index  -2}]
+
+       [:.view-wrapper
+        {:min-width  (str cell-width-px "px")
+         :min-height (str cell-height-px "px")}]
+
+       [:.controls-wrapper
+        {:gap            :5px
+         :display        :flex
+         :flex-direction :column}]
 
        [:.chunk
         {:display               :grid
          :grid-template-rows    (str "repeat(" chunk-size ", 1fr)")
          :grid-template-columns (str "repeat(" chunk-size ", 1fr)")
-         :width                 (str chunk-size-px "px")
-         :height                (str chunk-size-px "px")}]
+         :width                 (str chunk-width-px "px")
+         :height                (str chunk-height-px "px")}]
 
        [:.pop
         {;; Animation that depresses the element
@@ -119,17 +133,17 @@
          :border        (str "0.15em solid " accent)}]
 
        [:.button
-        {:background     white
-         :font-size      :1.2rem
-         :border-radius  :0.15em
-         :border         "0.15em solid currentColor"
-         :padding        :5px}]
+        {:background    white
+         :font-size     :1.2rem
+         :border-radius :0.15em
+         :border        "0.15em solid currentColor"
+         :padding       :5px}]
 
        [:a {:color accent}]
 
        [:.cell
-        {:width  (str cell-size-px "px")
-         :height (str cell-size-px "px")
+        {:width          (str cell-width-px "px")
+         :height         (str cell-height-px "px")
          :font-size      :1.2rem
          :display        :grid
          :overflow       :hidden
@@ -194,8 +208,23 @@
         {:sid      sid
          :new-data (assoc new-data :sid sid)}))))
 
+(def blank-chunk
+  (-> (repeat (* chunk-size chunk-size) {})
+    vec))
+
 (defn update-chunk! [db chunk-cache chunk-id update-fn]
   (let [old-chunk (or (@chunk-cache chunk-id)
+                    (-> (d/q db '{select [data]
+                                  from   chunk
+                                  where  [= id ?chunk-id]}
+                          {:chunk-id chunk-id})
+                      first)
+                    (d/q db
+                      '{insert-into chunk
+                        values      [{id   ?chunk-id
+                                      data ?blank-chunk}]}
+                      {:chunk-id    chunk-id
+                       :blank-chunk blank-chunk})
                     (-> (d/q db '{select [data]
                                   from   chunk
                                   where  [= id ?chunk-id]}
@@ -262,8 +291,8 @@
                  (subs cellvalue 0 (min (count cellvalue) 20))))))))))
 
 (defn scroll-to-xy-js [x y]
-  (str "$_view.scroll(" (int (* (/ x size) board-size-px))
-    "," (int (* (/ y size) board-size-px)) ");"))
+  (str "$_view.scroll(" (int (* (/ x size) board-width-px))
+    "," (int (* (/ y size) board-height-px)) ");"))
 
 (defaction handler-jump
   [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
@@ -277,7 +306,7 @@
       [:p [:strong nil (str "X: " jumpx " Y: " jumpy)]]
       [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]]]))
 
-(defn Cell [chunk-id local-id {:keys [value focus]} sid]
+(defn Cell [local-id {:keys [value focus]} sid]
   (cond
     (and focus (= focus sid))
     (let [on-load  (str "$cellvalue = '" (or value "") "';el.focus();")
@@ -289,7 +318,6 @@
           (array-map
             :id                            id
             :data-id                       local-id
-            :data-parentid                 chunk-id
             :maxlength                     20
             :size                          10
             :type                          "text"
@@ -303,13 +331,11 @@
       [:div.focus-cell
        [:p.focus-other
         {:data-id       local-id
-         :data-parentid chunk-id
          :data-action   handler-focused}
         value]])
 
     :else (h/html [:p.cell
                    {:data-id       local-id
-                    :data-parentid chunk-id
                     :data-value    value
                     :data-action   handler-focused}
                    value])))
@@ -321,9 +347,10 @@
 (defn xy->chunk-id [x y]
   (+ x (* y board-size)))
 
-(defn xy->chunk-ids [x y]
-  (-> (for [x (range x (+ x 3))
-            y (range y (+ y 3))]
+(defn xy->chunk-ids
+  [{:keys [x-offset-items y-offset-items x-rendered-items y-rendered-items]}]
+  (-> (for [y (range y-offset-items (+ y-offset-items y-rendered-items))
+            x (range x-offset-items (+ x-offset-items x-rendered-items))]
         (xy->chunk-id x y))
     vec))
 
@@ -331,20 +358,31 @@
   (h/html
     [:div.chunk {:data-id chunk-id}
      (into []
-       (map-indexed (fn [local-id box] (Cell chunk-id local-id box sid)))
+       (map-indexed (fn [local-id box] (Cell local-id box sid)))
        chunk-cells)]))
 
-(defn UserView [db sid {:keys [x-offset-items y-offset-items]}]
-  (->> (let [[a b c d e f g h i] (xy->chunk-ids x-offset-items y-offset-items)]
-         (d/q db
-           '{select [id data]
-             from   chunk
-             where  [in id ?chunk-ids]}
-           {:chunk-ids [a b c d e f g h i]}))
-    (mapv (fn [[id chunk]] (Chunk id chunk sid)))))
+(def empty-cells
+  (h/html
+    (into []
+      (map-indexed (fn [local-id box] (Cell local-id box nil)))
+      blank-chunk)))
 
-(defn scroll->cell-xy-js [n]
-  (str "Math.round((" n "/" board-size-px ")*" size ")"))
+(defn EmptyChunk [chunk-id]
+  (h/html
+    [:div.chunk {:data-id chunk-id}
+     empty-cells]))
+
+(defn UserView
+  [db sid offset-data]
+  (->> (xy->chunk-ids offset-data)
+    (mapv (fn [chunk-id]
+            (let [[[id chunk]] (d/q db '{select [id data]
+                                         from   chunk
+                                         where  [= id ?chunk-id]}
+                                 {:chunk-id chunk-id})]
+              (if id
+                (Chunk id chunk sid)
+                (EmptyChunk chunk-id)))))))
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://cells.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
@@ -355,7 +393,7 @@
     [:meta {:content "So many cells" :name "description"}]))
 
 (defview handler-root
-  {:path     "/" :shim-headers shim-headers :br-window-size 19
+  {:path     "/" :shim-headers shim-headers :br-window-size 21
    :on-close (fn [{:keys [tx-batch! sid tabid]}]
                (tx-batch! (partial remove-focus! sid tabid)))}
   [{:keys         [db sid tabid]
@@ -373,7 +411,8 @@
           "if (evt.target.dataset.action) {"
           "evt.target.classList.add('pop');"
           "$targetid = evt.target.dataset.id;"
-          "$parentid = evt.target.dataset.parentid;"
+          "$parentid = evt.target.parentElement.dataset.id;"
+          "$gparentid = evt.target.parentElement.parentElement.dataset.id;"
           "@post(`${evt.target.dataset.action}`);"
           "setTimeout(() => evt.target.classList.remove('pop'), 300)"
           "}")}
@@ -382,15 +421,15 @@
          :data-on-load (scroll-to-xy-js jump-x jump-y)}
         [::vs/virtual#view
          {:data-ref              "_view"
-          :v/x                   {:item-size          chunk-size-px
+          :v/x                   {:item-size          chunk-width-px
                                   :buffer-items       1
-                                  :max-rendered-items 3
+                                  :max-rendered-items 5
                                   :scroll-pos         x
                                   :view-size          width
                                   :item-count-fn      (fn [] board-size)}
-          :v/y                   {:item-size          chunk-size-px
-                                  :buffer-items       1
-                                  :max-rendered-items 3
+          :v/y                   {:item-size          chunk-height-px
+                                  :buffer-items       2
+                                  :max-rendered-items 7
                                   :scroll-pos         y
                                   :view-size          height
                                   :item-count-fn      (fn [] board-size)}
@@ -401,58 +440,41 @@
           [:svg {:width "100%" :height "100%"}
            [:defs
             [:pattern#grid
-             {:width 32 :height 32 :patternUnits "userSpaceOnUse"}
+             {:width cell-width-px :height cell-height-px
+              :patternUnits "userSpaceOnUse"}
              [:rect {:x            1  :y      1
-                     :width        32 :height 32
+                     :width        cell-width-px :height cell-height-px
                      :fill         "none"
                      :stroke       black
                      :stroke-width 2}]]]
            [:rect {:width "100%" :height "100%" :fill "url(#grid)"}]]]]]
-       [:div.jump
-        [:h2 "X:"] 
-        [:input.jump-input
-         {:type "number" :data-bind "jumpx"
-          :data-effect (str "$jumpx = " (scroll->cell-xy-js "$view-x"))}]
-        [:h2 "Y:"]
-        [:input.jump-input
-         {:type "number" :data-bind "jumpy"
-          :data-effect (str "$jumpy = " (scroll->cell-xy-js "$view-y"))}]
-        [:div.button {:data-action handler-jump}
-         [:strong.pe-none "GO"]]
-        [:div.button
-         {:data-action       handler-share
-          :data-on-mousedown copy-xy-to-clipboard-js}
-         [:strong.pe-none "SHARE"]]]
-       [:h1 "One Billion Cells"]
-       [:p "Built using "
-        [:a {:href "https://clojure.org/"} "Clojure"]
-        " and "
-        [:a {:href "https://data-star.dev"} "Datastar"]
-        " - "
-        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_cells/src/app/main.clj" } "source"]
-        " - "
-        [:a {:href "https://checkboxes.andersmurphy.com"} " more like this"]]])))
-
-(def blank-chunk
-  (-> (repeat (* chunk-size chunk-size) {})
-    vec))
-
-(defn initial-board-db-state! [db]
-  (let [board-range (range board-size)]
-    (d/with-write-tx [db db]
-      (run!
-        (fn [y]
-          (run! (fn [x]
-                  (d/q db
-                    '{insert-into chunk
-                      values      [{id   ?chunk-id
-                                    data ?blank-chunk}]}
-                    {:chunk-id    (xy->chunk-id x y)
-                     :blank-chunk blank-chunk}))
-            board-range)
-          (print ".") (flush))
-        board-range)))
-  nil)
+       [:div.controls-wrapper
+        [:div.jump
+         [:h2 "X:"]
+         [:input.jump-input
+          {:type        "number" :data-bind "jumpx"
+           :data-effect (str "$jumpx = Math.round(($view-x/" board-width-px
+                          ")*" size ")")}]
+         [:h2 "Y:"]
+         [:input.jump-input
+          {:type        "number" :data-bind "jumpy"
+           :data-effect (str "$jumpy = Math.round(($view-y/" board-height-px
+                          ")*" size ")")}]
+         [:div.button {:data-action handler-jump}
+          [:strong.pe-none "GO"]]
+         [:div.button
+          {:data-action       handler-share
+           :data-on-mousedown copy-xy-to-clipboard-js}
+          [:strong.pe-none "SHARE"]]]
+        [:h1 "One Billion Cells"]
+        [:p "Built using "
+         [:a {:href "https://clojure.org/"} "Clojure"]
+         " and "
+         [:a {:href "https://data-star.dev"} "Datastar"]
+         " - "
+         [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_cells/src/app/main.clj" } "source"]
+         " - "
+         [:a {:href "https://checkboxes.andersmurphy.com"} " more like this"]]]])))
 
 (defn migrations [db]
   ;; Note: all this code must be idempotent
@@ -461,9 +483,7 @@
   (d/q db
     ["CREATE TABLE IF NOT EXISTS chunk(id INT PRIMARY KEY, data BLOB)"])
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"])
-  (when-not (d/q db '{select [id] from chunk limit 1})
-    (initial-board-db-state! db)))
+    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"]))
 
 (defn ctx-start []
   (let [{:keys [writer reader]}
@@ -520,3 +540,31 @@
   
 
   ,)
+
+(comment
+  ;; clear out empty chunks
+  (def db-write (-> @app_ :ctx :db-write))
+  (d/q db-write '{select [[[count *]]] from chunk})
+  
+  (run! (fn [chunk-id]
+          (when (= blank-chunk (-> (d/q db-write
+                                     '{select [data]
+                                       from   chunk
+                                       where  [= id ?chunk-id]}
+                                     {:chunk-id chunk-id})
+                                 first))
+            (d/q db-write '{delete-from chunk
+                            where       [= id ?chunk-id]}
+              {:chunk-id chunk-id})))
+    (range (* board-size board-size)))
+
+  )
+
+(comment
+  (+ 3 4)
+  ;; Free up space (slow)
+  ;; (time (d/q db-write ["VACUUM"]))
+  ;; Checkpoint the WAL
+  (d/q db-write ["PRAGMA wal_checkpoint(PASSIVE)"])
+  (d/q db-write ["PRAGMA wal_checkpoint(TRUNCATE)"])
+  )
