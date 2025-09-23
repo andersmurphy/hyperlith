@@ -478,7 +478,12 @@
 
 (defn ctx-start []
   (let [db-name "database-new.db"
-        _       (d/restore-from-litestream! db-name)
+        _       (d/init-litestream! db-name
+                  {:s3-access-key-id     (h/env :s3-access-key-id)
+                   :s3-access-secret-key (h/env :s3-access-secret-key)
+                   :bucket               "hyperlith"
+                   :endpoint             "https://nbg1.your-objectstorage.com"
+                   :region               "nbg1"})
         {:keys [writer reader]}
         (d/init-db! db-name
           {:pool-size 4
