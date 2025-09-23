@@ -36,9 +36,7 @@
         (q db ["pragma temp_store"])]))
 
 (defn restore-from-litestream!
-  "This is a noop if db already exists."
+  "This is a noop if db already exists. Throws error if litestream is not
+  present. You want to know if your backups are not working."
   [db-name]
-  (try
-    (proc/exec "litestream" "restore" db-name)
-    (catch Throwable _
-      (println "warning, litestream not found."))))
+  (proc/exec "litestream" "restore" db-name))
