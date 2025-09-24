@@ -11,8 +11,12 @@
   (try (json/read-str json {:key-fn keyword})
        (catch Throwable _)))
 
-(defn edn->json [edn]
-  (json/write-str edn))
+(defn edn->json [edn & {:as opts}]
+  (json/write-str edn opts))
+
+(defn edn->pretty-json [edn]
+  (with-out-str
+    (json/pprint edn :escape-unicode false)))
 
 (defn parse-json-body? [req]
   (and (= (:request-method req) :post)

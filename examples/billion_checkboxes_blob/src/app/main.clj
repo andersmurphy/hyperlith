@@ -481,9 +481,17 @@
         _       (d/init-litestream! db-name
                   {:s3-access-key-id     (h/env :s3-access-key-id)
                    :s3-access-secret-key (h/env :s3-access-secret-key)
-                   :bucket               "hyperlith"
-                   :endpoint             "https://nbg1.your-objectstorage.com"
-                   :region               "nbg1"})
+                   :config-yml
+                   (h/edn->json
+                     {:dbs
+                      [{:path db-name
+                        :replicas
+                        [{:type          "s3"
+                          :bucket        "hyperlith"
+                          :endpoint      "https://nbg1.your-objectstorage.com"
+                          :region        "nbg1"
+                          :sync-interval "1s"}]}]}
+                     :escape-slash false)})
         {:keys [writer reader]}
         (d/init-db! db-name
           {:pool-size 4
