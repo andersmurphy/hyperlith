@@ -17,9 +17,10 @@
   dev.onionpancakes/chassis {:mvn/version "1.0.365"}
 
   ;; SQLITE
-  andersmurphy/sqlite4clj 
+  andersmurphy/sqlite4clj
+  ;; {:local/root "../sqlite4clj"}
   {:git/url "https://github.com/andersmurphy/sqlite4clj"
-   :git/sha "fb0359734638772fdd967cb14a4b58c4c54fe1d2"}
+   :git/sha "c12d794bbae00419a12de274523d271d678795d5"}
   com.github.seancorfield/honeysql {:mvn/version "2.7.1325"}}
  :aliases
  {:dev
