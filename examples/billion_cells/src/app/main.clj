@@ -23,9 +23,7 @@
 
 (def css
   (let [accent          "#008751"
-        other           "#FF004D"
-        board-width-px  (str board-width-px "px")
-        board-height-px (str board-height-px "px")]
+        other           "#FF004D"]
     (h/static-css
       [["*, *::before, *::after"
         {:box-sizing :border-box
@@ -84,12 +82,6 @@
          :display        :flex
          :flex-direction :column}]
 
-       [:.board-background
-        {:position :absolute
-         :width    board-width-px
-         :height   board-height-px
-         :z-index  -2}]
-
        [:.view-wrapper
         {:min-width  (str cell-width-px "px")
          :min-height (str cell-height-px "px")}]
@@ -142,8 +134,7 @@
        [:a {:color accent}]
 
        [:.cell
-        {:width          (str cell-width-px "px")
-         :height         (str cell-height-px "px")
+        {:border         (str "1px solid " black)
          :font-size      :1.2rem
          :display        :grid
          :overflow       :hidden
@@ -153,8 +144,7 @@
 
        [:.focus-cell
         {:background  white
-         :margin-left :2px
-         :margin-top  :2px
+         :border      (str "1px solid " black)
          :position    :relative
          :font-size   :1.2rem}]
 
@@ -373,16 +363,44 @@
      empty-cells]))
 
 (defn UserView
-  [db sid offset-data]
-  (->> (xy->chunk-ids offset-data)
-    (mapv (fn [chunk-id]
-            (let [[[id chunk]] (d/q db '{select [id data]
-                                         from   chunk
-                                         where  [= id ?chunk-id]}
-                                 {:chunk-id chunk-id})]
-              (if id
-                (Chunk id chunk sid)
-                (EmptyChunk chunk-id)))))))
+  [db sid {:keys [x-offset-items y-offset-items
+                  x-rendered-items y-rendered-items] :as offset-data}]
+  {:header  (mapv (fn [x] (h/html
+                            [:div {:style {:background  black
+                                           :color       white
+                                           :height      :50px
+                                           :display     :grid
+                                           :border-inline
+                                           (str "1px solid " white)
+                                           :place-items :center}}
+                             [:h2 x]]))
+              (range x-offset-items
+                (+ x-offset-items x-rendered-items)))
+   :sidebar (mapv (fn [x] (h/html
+                            [:div {:style {:background  black
+                                           :color       white
+                                           :width       :50px
+                                           :display     :grid
+                                           :border-block
+                                           (str "1px solid " white)
+                                           :place-items :center}}
+                             [:h2 {:style {:transform "rotate(-90deg)"}}
+                              x]]))
+              (range y-offset-items
+                (+ y-offset-items y-rendered-items)))
+   :content
+   [:div {:style {:display       :grid
+                  :grid-template "subgrid/subgrid"
+                  :grid-area     "1/1/-1/-1"}}
+    (->> (xy->chunk-ids offset-data)
+      (mapv (fn [chunk-id]
+              (let [[[id chunk]] (d/q db '{select [id data]
+                                           from   chunk
+                                           where  [= id ?chunk-id]}
+                                   {:chunk-id chunk-id})]
+                (if id
+                  (Chunk id chunk sid)
+                  (EmptyChunk chunk-id))))))]})
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://cells.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
@@ -435,19 +453,7 @@
                                   :item-count-fn      (fn [] board-size)}
           :v/item-fn             (partial UserView db sid)
           :v/scroll-handler-path handler-scroll
-          :v/resize-handler-path handler-resize}
-         [:div.board-background nil
-          [:svg {:width "100%" :height "100%"}
-           [:defs
-            [:pattern#grid
-             {:width cell-width-px :height cell-height-px
-              :patternUnits "userSpaceOnUse"}
-             [:rect {:x            1  :y      1
-                     :width        cell-width-px :height cell-height-px
-                     :fill         "none"
-                     :stroke       black
-                     :stroke-width 2}]]]
-           [:rect {:width "100%" :height "100%" :fill "url(#grid)"}]]]]]
+          :v/resize-handler-path handler-resize}]]
        [:div.controls-wrapper
         [:div.jump
          [:h2 "X:"]

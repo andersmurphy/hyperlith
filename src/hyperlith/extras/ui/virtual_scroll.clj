@@ -76,26 +76,23 @@
         grid-count         (if (> remaining-items rendered-items)
                              rendered-items
                              remaining-items)
-        translate          (str translate "px")
         max-size           (str max-size "px")
-        item-grid-size     (str (* grid-count item-size) "px")
-        item-grid          (str "repeat(" grid-count "," item-size "px)")
+        item-grid          (str "min-content " translate "px"
+                             " repeat(" grid-count "," item-size
+                             "px) auto")
         size               (str (* total-item-count item-size) "px")]
     [threshold-low threshold-high offset-items
-     translate max-size item-grid item-grid-size size
-     rendered-items]))
+     max-size item-grid size rendered-items]))
 
 (defmethod h/html-resolve-alias ::virtual
   [_ {:keys   [id]
       :v/keys [resize-handler-path scroll-handler-path item-fn x y]
-      :as     attrs} content]
+      :as     attrs} _]
   (let [[x-threshold-low x-threshold-high x-offset-items
-         x-translate x-max-size x-item-grid x-item-grid-size x-size
-         x-rendered-items]
+         x-max-size x-item-grid x-size x-rendered-items]
         (when x (virtual-scroll-logic x))
         [y-threshold-low y-threshold-high y-offset-items
-         y-translate y-max-size y-item-grid y-item-grid-size y-size
-         y-rendered-items]
+         y-max-size y-item-grid y-size y-rendered-items]
         (when y (virtual-scroll-logic y))
         x-signal         (str id "-x")
         y-signal         (str id "-y")
@@ -110,17 +107,22 @@
                             :right               x-threshold-high
                             :top                 y-threshold-low
                             :bottom              y-threshold-high
-                            :scroll-handler-path scroll-handler-path})]
+                            :scroll-handler-path scroll-handler-path})
+        {:keys [header sidebar content]}
+        (item-fn {:x-offset-items   x-offset-items
+                  :x-rendered-items x-rendered-items
+                  :y-offset-items   y-offset-items
+                  :y-rendered-items y-rendered-items})]
     (h/html
       [:div {;; make sure signal is initialised before data-on-load
-             :data-signals (h/edn->json {fired-signal (str (random-uuid))})
+             :data-signals            (h/edn->json {fired-signal (str (random-uuid))})
              :data-signals__ifmissing (h/edn->json {x-signal 0 y-signal 0})
-             :style        {:width      :100%
-                            :height     :100%
-                            :max-width  x-max-size
-                            :max-height y-max-size}}
+             :style                   {:width      :100%
+                                       :height     :100%
+                                       :max-width  x-max-size
+                                       :max-height y-max-size}}
        [:div
-        (assoc attrs          
+        (assoc attrs
           ;; send up initial size on load
           :data-on-load
           (resize-js w-signal h-signal resize-handler-path)
@@ -133,34 +135,36 @@
           :style {:scroll-behavior     :smooth
                   :overscroll-behavior :contain
                   :overflow-anchor     :none
-                  :overflow-x          (when x :scroll)
-                  :overflow-y          (when y :scroll)
+                  :overflow            :scroll
                   :max-width           x-max-size
                   :max-height          y-max-size
                   :width               :100%
                   :height              :100%})
-        [:div
-         {:id    (str id "-virtual-table")
-          :style {:pointer-events :none
-                  :position       :relative
-                  :width          x-size
-                  :height         y-size}}
-         [:div
-          {:id (str id "-virtual-table-view")
-           :style
-           {:position              :absolute
-            ;; if width isn't specified explicitly scroll bar will become chaos
-            :width                 x-item-grid-size
-            :height                y-item-grid-size
-            :display               :grid
-            :grid-template-columns x-item-grid
-            :grid-template-rows    y-item-grid
-            :transform
-            (str "translate(" (or x-translate 0) "," (or y-translate 0) ")")}}
-          (item-fn {:x-offset-items   x-offset-items
-                    :x-rendered-items x-rendered-items
-                    :y-offset-items   y-offset-items
-                    :y-rendered-items y-rendered-items})]
-         ;; Mostly used for things like background SVGs.
-         content]]])))
+        [:div {:id    (str id "-virtual-table")
+               :style {:position      :relative
+                       :width         x-size
+                       :height        y-size
+                       :display       :grid
+                       :grid-template (str y-item-grid "/" x-item-grid)}}
+         [:div {:id    (str id "-virtual-header")
+                :style {:display       :grid
+                        :grid-template "subgrid/subgrid"
+                        :position      :sticky
+                        :top           0
+                        :grid-column   "3/-1"
+                        :grid-row      1}}
+          header]
+         [:div {:id    (str id "-virtual-sidebar")
+                :style {:display       :grid
+                        :grid-template "subgrid/subgrid"
+                        :position      :sticky
+                        :left          0
+                        :grid-row      "3/-1"
+                        :grid-column   1}}
+          sidebar]
+         [:div {:id    (str id "-virtual-content")
+                :style {:display       :grid
+                        :grid-template "subgrid/subgrid"
+                        :grid-area      "3/3/-2/-2"}}
+          content]]]])))
 

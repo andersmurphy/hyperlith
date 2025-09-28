@@ -364,15 +364,15 @@
 
 (defn UserView
   [db offset-data]
-  (->> (xy->chunk-ids offset-data)
-    (mapv (fn [chunk-id]
-            (let [[[id chunk]] (d/q db '{select [id data]
-                                         from   chunk
-                                         where  [= id ?chunk-id]}
-                                 {:chunk-id chunk-id})]
-              (if id
-                (Chunk id chunk)
-                (EmptyChunk chunk-id)))))))
+  {:content (->> (xy->chunk-ids offset-data)
+              (mapv (fn [chunk-id]
+                      (let [[[id chunk]] (d/q db '{select [id data]
+                                                   from   chunk
+                                                   where  [= id ?chunk-id]}
+                                           {:chunk-id chunk-id})]
+                        (if id
+                          (Chunk id chunk)
+                          (EmptyChunk chunk-id))))))})
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
