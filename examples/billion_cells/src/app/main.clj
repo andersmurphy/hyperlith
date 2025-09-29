@@ -373,7 +373,7 @@
                                            :border-inline
                                            (str "1px solid " white)
                                            :place-items :center}}
-                             [:h2 x]]))
+                             [:h2 nil x]]))
               (range x-offset-items
                 (+ x-offset-items x-rendered-items)))
    :sidebar (mapv (fn [x] (h/html
