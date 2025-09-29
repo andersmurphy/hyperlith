@@ -152,7 +152,8 @@
                         :position      :sticky
                         :top           0
                         :grid-column   "3/-1"
-                        :grid-row      1}}
+                        :grid-row      1
+                        :z-index       5}}
           header]
          [:div {:id    (str id "-virtual-sidebar")
                 :style {:display       :grid
@@ -160,7 +161,8 @@
                         :position      :sticky
                         :left          0
                         :grid-row      "3/-1"
-                        :grid-column   1}}
+                        :grid-column   1
+                        :z-index       5}}
           sidebar]
          [:div {:id    (str id "-virtual-content")
                 :style {:display       :grid
