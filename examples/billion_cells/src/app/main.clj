@@ -365,7 +365,8 @@
 (defn UserView
   [db sid {:keys [x-offset-items y-offset-items
                   x-rendered-items y-rendered-items] :as offset-data}]
-  {:header  (mapv (fn [x] (h/html
+  {:corner (h/html [:div {:style {:background white}}])
+   :header  (mapv (fn [x] (h/html
                             [:div {:style {:background  black
                                            :color       white
                                            :height      :50px
@@ -389,18 +390,19 @@
               (range y-offset-items
                 (+ y-offset-items y-rendered-items)))
    :content
-   [:div {:style {:display       :grid
-                  :grid-template "subgrid/subgrid"
-                  :grid-area     "1/1/-1/-1"}}
-    (->> (xy->chunk-ids offset-data)
-      (mapv (fn [chunk-id]
-              (let [[[id chunk]] (d/q db '{select [id data]
-                                           from   chunk
-                                           where  [= id ?chunk-id]}
-                                   {:chunk-id chunk-id})]
-                (if id
-                  (Chunk id chunk sid)
-                  (EmptyChunk chunk-id))))))]})
+   (h/html
+     [:div {:style {:display       :grid
+                    :grid-template "subgrid/subgrid"
+                    :grid-area     "1/1/-1/-1"}}
+      (->> (xy->chunk-ids offset-data)
+        (mapv (fn [chunk-id]
+                (let [[[id chunk]] (d/q db '{select [id data]
+                                             from   chunk
+                                             where  [= id ?chunk-id]}
+                                     {:chunk-id chunk-id})]
+                  (if id
+                    (Chunk id chunk sid)
+                    (EmptyChunk chunk-id))))))])})
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://cells.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 

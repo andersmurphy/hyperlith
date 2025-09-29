@@ -108,7 +108,7 @@
                             :top                 y-threshold-low
                             :bottom              y-threshold-high
                             :scroll-handler-path scroll-handler-path})
-        {:keys [header sidebar content]}
+        {:keys [header sidebar content corner]}
         (item-fn {:x-offset-items   x-offset-items
                   :x-rendered-items x-rendered-items
                   :y-offset-items   y-offset-items
@@ -146,6 +146,16 @@
                        :height        y-size
                        :display       :grid
                        :grid-template (str y-item-grid "/" x-item-grid)}}
+         [:div {:id    (str id "-virtual-corner")
+                :style {:display       :grid
+                        :grid-template "subgrid/subgrid"
+                        :position      :sticky
+                        :top           0
+                        :left          0
+                        :grid-column   1
+                        :grid-row      1
+                        :z-index       6}}
+          corner]
          [:div {:id    (str id "-virtual-header")
                 :style {:display       :grid
                         :grid-template "subgrid/subgrid"
@@ -167,6 +177,6 @@
          [:div {:id    (str id "-virtual-content")
                 :style {:display       :grid
                         :grid-template "subgrid/subgrid"
-                        :grid-area      "3/3/-2/-2"}}
+                        :grid-area     "3/3/-2/-2"}}
           content]]]])))
 
