@@ -478,7 +478,7 @@
 
 (defn ctx-start []
   (let [db-name "database-new.db"
-        _       (d/init-litestream! db-name
+        _       (d/restore-then-replicate! db-name
                   {:s3-access-key-id     (h/env :s3-access-key-id)
                    :s3-access-secret-key (h/env :s3-access-secret-key)
                    :config-yml

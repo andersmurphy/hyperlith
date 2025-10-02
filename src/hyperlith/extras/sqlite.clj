@@ -10,7 +10,8 @@
    with-read-tx
    with-write-tx]
   [sqlite4clj.litestream
-   init-litestream!])
+   restore-then-replicate!
+   restore-to-path!])
 
 (defmacro q [db [query-type query :as string-query] & [params]]
   (if (string? query-type)
