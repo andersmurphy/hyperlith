@@ -346,7 +346,8 @@
 (defn Chunk [chunk-id chunk-cells]
   (h/html
     [:div.chunk
-     {:data-id chunk-id}
+     {:id      (str "chunk-" chunk-id)
+      :data-id chunk-id}
      (into []
        (map-indexed (fn [local-id box] (Checkbox local-id box)))
        chunk-cells)]))
@@ -359,7 +360,10 @@
 
 (defn EmptyChunk [chunk-id]
   (h/html
-    [:div.chunk {:data-id chunk-id}
+    [:div.chunk
+     {:id                (str "chunk-" chunk-id)
+      :data-ignore-morph true
+      :data-id           chunk-id}
      empty-checks]))
 
 (defn UserView
