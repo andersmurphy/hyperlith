@@ -329,10 +329,6 @@
         :data-id     local-id
         :data-action handler-check}])))
 
-(defn chunk-id->xy [chunk-id]
-  [(rem chunk-id board-size)
-   (quot chunk-id board-size)])
-
 (defn xy->chunk-id [x y]
   (+ x (* y board-size)))
 

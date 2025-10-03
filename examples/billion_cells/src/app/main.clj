@@ -330,10 +330,6 @@
                     :data-action   handler-focused}
                    value])))
 
-(defn chunk-id->xy [chunk-id]
-  [(rem chunk-id board-size)
-   (quot chunk-id board-size)])
-
 (defn xy->chunk-id [x y]
   (+ x (* y board-size)))
 
@@ -346,7 +342,8 @@
 
 (defn Chunk [chunk-id chunk-cells sid]
   (h/html
-    [:div.chunk {:data-id chunk-id}
+    [:div.chunk {:id      (str "chunk-" chunk-id)
+                 :data-id chunk-id}
      (into []
        (map-indexed (fn [local-id box] (Cell local-id box sid)))
        chunk-cells)]))
@@ -359,7 +356,9 @@
 
 (defn EmptyChunk [chunk-id]
   (h/html
-    [:div.chunk {:data-id chunk-id}
+    [:div.chunk {:id                (str "chunk-" chunk-id)
+                 :data-ignore-morph true
+                 :data-id           chunk-id}
      empty-cells]))
 
 (defn UserView
