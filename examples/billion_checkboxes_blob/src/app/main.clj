@@ -573,10 +573,9 @@
 
   (d/table-info db :chunk)
   (d/table-list db)
-
   (d/q db '{select [[[count *]]] from session})
 
-  ;; (+ 7784 3249 500)
+  ;; (+ 7784 3249 4545)
 
   ,)
 
@@ -630,7 +629,7 @@
                      :uri            handler-check
                      :body
                      {:csrf     "I3AAFrMG99lxoqwi87cSpn7unri5qYqJ-Vr9DLc4-s4"
-                      :parentid (str (rand-int 2000))
+                      :parentid (str (rand-int 10))
                       :targetid (str (rand-int 200))}})))
             ;; 10000r/s
             (range 10))

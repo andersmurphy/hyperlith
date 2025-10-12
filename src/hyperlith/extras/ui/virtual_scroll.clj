@@ -3,14 +3,12 @@
             [clojure.math :as math]))
 
 (defn resize-js [w-signal h-signal resize-handler-path]
-  (format "$%s = el.clientWidth; $%s = el.clientHeight; @post('%s');"
-    w-signal
-    h-signal
-    resize-handler-path))
+  (str "$"w-signal" = el.clientWidth;$"h-signal" = el.clientHeight;"
+    "@post('"resize-handler-path"');"))
 
 (defn on-scroll-js [x-signal y-signal]
-  (format "$%s = Math.floor(el.scrollLeft); $%s = Math.floor(el.scrollTop);"
-    x-signal y-signal))
+  (str "$"x-signal"= Math.floor(el.scrollLeft);"
+    "$"y-signal"= Math.floor(el.scrollTop);"))
 
 (defn fetch-next-page-js
   [{:keys [x-signal y-signal fired-signal bottom top left right
@@ -19,20 +17,13 @@
         bottom (or bottom "Infinity")
         left   (or left 0)
         right  (or right "Infinity")]
-    (format
-      "if (($%s !== -1) && (%s > $%s || %s < $%s || %s > $%s || %s < $%s))
-    {$%s = -1; @post('%s', {retryMaxCount: Infinity});}"
-      fired-signal
-      top
-      y-signal
-      bottom
-      y-signal
-      left
-      x-signal
-      right
-      x-signal
-      fired-signal
-      scroll-handler-path)))
+    (str "if (($"fired-signal" !== -1) && ("
+      top" > $"y-signal
+      " || "bottom" < $"y-signal
+      " || "left" > $"x-signal
+      " || "right" < $"x-signal"))
+    {$"fired-signal" = -1; @post('"scroll-handler-path
+      "', {retryMaxCount: Infinity});}")))
 
 (defn virtual-scroll-logic
   [{:keys [item-size max-rendered-items item-count-fn scroll-pos
