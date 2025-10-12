@@ -11,19 +11,17 @@
     "$"y-signal"= Math.floor(el.scrollTop);"))
 
 (defn fetch-next-page-js
-  [{:keys [x-signal y-signal fired-signal bottom top left right
+  [{:keys [x-signal y-signal bottom top left right
            scroll-handler-path]}]
   (let [top    (or top 0)
         bottom (or bottom "Infinity")
         left   (or left 0)
         right  (or right "Infinity")]
-    (str "if (($"fired-signal" !== -1) && ("
-      top" > $"y-signal
+    (str "if (("top" > $"y-signal
       " || "bottom" < $"y-signal
       " || "left" > $"x-signal
-      " || "right" < $"x-signal"))
-    {$"fired-signal" = -1; @post('"scroll-handler-path
-      "', {retryMaxCount: Infinity});}")))
+      " || "right" < $"x-signal")) {" "@post('"scroll-handler-path
+      "', {retryMaxCount: Infinity}); el.removeAttribute('data-effect')}")))
 
 (defn virtual-scroll-logic
   [{:keys [item-size max-rendered-items item-count-fn scroll-pos
@@ -89,11 +87,9 @@
         y-signal         (str id "-y")
         w-signal         (str id "-w")
         h-signal         (str id "-h")
-        fired-signal     (str "_" id "fired")
         fetch-next-page? (fetch-next-page-js
                            {:x-signal            x-signal
                             :y-signal            y-signal
-                            :fired-signal        fired-signal
                             :left                x-threshold-low
                             :right               x-threshold-high
                             :top                 y-threshold-low
@@ -105,9 +101,7 @@
                   :y-offset-items   y-offset-items
                   :y-rendered-items y-rendered-items})]
     (h/html
-      [:div {;; make sure signal is initialised before data-on-load
-             :data-signals            (h/edn->json {fired-signal (str (random-uuid))})
-             :data-signals__ifmissing (h/edn->json {x-signal 0 y-signal 0})
+      [:div {:data-signals__ifmissing (h/edn->json {x-signal 0 y-signal 0})
              :style                   {:width      :100%
                                        :height     :100%
                                        :max-width  x-max-size
@@ -121,7 +115,6 @@
           (resize-js w-signal h-signal resize-handler-path)
           :data-on-scroll (on-scroll-js x-signal y-signal)
           ;; Handles user drag scrolling
-          ;; (if fired, x or y change this runs)
           :data-effect fetch-next-page?
           :style {:scroll-behavior     :smooth
                   :overscroll-behavior :contain
