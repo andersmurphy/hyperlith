@@ -384,7 +384,7 @@
                                            :border-block
                                            (str "1px solid " white)
                                            :place-items :center}}
-                             [:h2 x]]))
+                             [:h2 nil x]]))
               (range (* y-offset-items chunk-size)
                 (* (+ y-offset-items y-rendered-items) chunk-size)))
    :content
