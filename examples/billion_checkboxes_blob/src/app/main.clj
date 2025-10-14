@@ -90,12 +90,11 @@
          :flex-direction :column}]
 
        [:.chunk
-        {:background            white
-         :display               :grid
-         :grid-template-rows    (str "repeat(" chunk-size ", 1fr)")
-         :grid-template-columns (str "repeat(" chunk-size ", 1fr)")
-         :width                 (str chunk-size-px "px")
-         :height                (str chunk-size-px "px")}]
+        {:background    white
+         :display       :grid
+         :grid-template "subgrid/subgrid"
+         :grid-column   (str "span " chunk-size)
+         :grid-row      (str "span " chunk-size)}]
 
        (let [padding 5]
          [:.box
@@ -432,13 +431,15 @@
                                   :max-rendered-items 7
                                   :scroll-pos         x
                                   :view-size          width
-                                  :item-count-fn      (fn [] board-size)}
+                                  :item-count-fn      (fn [] board-size)
+                                  :chunk-size         chunk-size}
           :v/y                   {:item-size          chunk-size-px
                                   :buffer-items       2
                                   :max-rendered-items 7
                                   :scroll-pos         y
                                   :view-size          height
-                                  :item-count-fn      (fn [] board-size)}
+                                  :item-count-fn      (fn [] board-size)
+                                  :chunk-size         chunk-size}
           :v/item-fn             (partial UserView db)
           :v/scroll-handler-path handler-scroll
           :v/resize-handler-path handler-resize}]]

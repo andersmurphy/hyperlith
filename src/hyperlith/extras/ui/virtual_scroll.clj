@@ -25,8 +25,9 @@
 
 (defn virtual-scroll-logic
   [{:keys [item-size max-rendered-items item-count-fn scroll-pos
-           view-size buffer-items]}]
-  (let [scroll-pos         (or scroll-pos 0)
+           view-size buffer-items chunk-size]}]
+  (let [chunk-size         (or chunk-size 1)
+        scroll-pos         (or scroll-pos 0)
         view-size          (or view-size 1000)
         max-rendered-items (or max-rendered-items 1000)
         buffer-items       (int (or buffer-items
@@ -59,29 +60,32 @@
         threshold-high     (if (> remaining-items rendered-items)
                              (* (- (+ offset-items rendered-items)
                                   visible-items threshold-items)
-                                item-size)
+                               item-size)
                              "Infinity")
         translate          (* offset-items item-size)
         grid-count         (if (> remaining-items rendered-items)
                              rendered-items
                              remaining-items)
         max-size           (str max-size "px")
-        item-grid          (str "min-content " translate "px"
-                             " repeat(" grid-count "," item-size
+        item-grid          (str "min-content min-content" 
+                             " repeat(" (* chunk-size grid-count) ","
+                             (int (/ item-size chunk-size))
                              "px) auto")
         size               (str (* total-item-count item-size) "px")]
     [threshold-low threshold-high offset-items
-     max-size item-grid size rendered-items]))
+     max-size item-grid size rendered-items translate]))
 
 (defmethod h/html-resolve-alias ::virtual
   [_ {:keys   [id]
       :v/keys [resize-handler-path scroll-handler-path item-fn x y]
       :as     attrs} _]
   (let [[x-threshold-low x-threshold-high x-offset-items
-         x-max-size x-item-grid x-size x-rendered-items]
+         x-max-size x-item-grid x-size x-rendered-items
+         x-translate]
         (when x (virtual-scroll-logic x))
         [y-threshold-low y-threshold-high y-offset-items
-         y-max-size y-item-grid y-size y-rendered-items]
+         y-max-size y-item-grid y-size y-rendered-items
+         y-translate]
         (when y (virtual-scroll-logic y))
         x-signal         (str id "-x")
         y-signal         (str id "-y")
@@ -149,6 +153,11 @@
                         :grid-row      1
                         :z-index       5}}
           header]
+         [:div {:id    (str id "-virtual-translate")
+                :style {:grid-column 2
+                        :grid-row    2
+                        :width       (str x-translate "px")
+                        :height      (str y-translate "px")}}]
          [:div {:id    (str id "-virtual-sidebar")
                 :style {:display       :grid
                         :grid-template "subgrid/subgrid"

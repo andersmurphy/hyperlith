@@ -92,11 +92,11 @@
          :flex-direction :column}]
 
        [:.chunk
-        {:display               :grid
-         :grid-template-rows    (str "repeat(" chunk-size ", 1fr)")
-         :grid-template-columns (str "repeat(" chunk-size ", 1fr)")
-         :width                 (str chunk-width-px "px")
-         :height                (str chunk-height-px "px")}]
+        {:background    white
+         :display       :grid
+         :grid-template "subgrid/subgrid"
+         :grid-column   (str "span " chunk-size)
+         :grid-row      (str "span " chunk-size)}]
 
        [:.pop
         {;; Animation that depresses the element
@@ -368,26 +368,25 @@
    :header  (mapv (fn [x] (h/html
                             [:div {:style {:background  black
                                            :color       white
-                                           :height      :50px
+                                           :height      :40px
                                            :display     :grid
                                            :border-inline
                                            (str "1px solid " white)
                                            :place-items :center}}
                              [:h2 nil x]]))
-              (range x-offset-items
-                (+ x-offset-items x-rendered-items)))
+              (range (* x-offset-items chunk-size)
+                (* (+ x-offset-items x-rendered-items) chunk-size)))
    :sidebar (mapv (fn [x] (h/html
                             [:div {:style {:background  black
                                            :color       white
-                                           :width       :50px
+                                           :width       :100px
                                            :display     :grid
                                            :border-block
                                            (str "1px solid " white)
                                            :place-items :center}}
-                             [:h2 {:style {:transform "rotate(-90deg)"}}
-                              x]]))
-              (range y-offset-items
-                (+ y-offset-items y-rendered-items)))
+                             [:h2 x]]))
+              (range (* y-offset-items chunk-size)
+                (* (+ y-offset-items y-rendered-items) chunk-size)))
    :content
    (h/html
      [:div {:style {:display       :grid
@@ -445,13 +444,15 @@
                                   :max-rendered-items 5
                                   :scroll-pos         x
                                   :view-size          width
-                                  :item-count-fn      (fn [] board-size)}
+                                  :item-count-fn      (fn [] board-size)
+                                  :chunk-size         chunk-size}
           :v/y                   {:item-size          chunk-height-px
                                   :buffer-items       2
                                   :max-rendered-items 7
                                   :scroll-pos         y
                                   :view-size          height
-                                  :item-count-fn      (fn [] board-size)}
+                                  :item-count-fn      (fn [] board-size)
+                                  :chunk-size         chunk-size}
           :v/item-fn             (partial UserView db sid)
           :v/scroll-handler-path handler-scroll
           :v/resize-handler-path handler-resize}]]
