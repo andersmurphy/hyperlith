@@ -262,7 +262,8 @@
 (defaction handler-palette
   [{:keys [sid tabid tx-batch!] {:keys [targetid]} :body}]
   (let [color (parse-long targetid)]
-    (when (< 0 color (count states))
+    ;; 0 is an empty color (used for clearing)
+    (when (<= 0 color (dec (count states)))
       (tx-batch!
         (fn [db _]
           (update-tab-data! db sid tabid #(assoc % :color color)))))))
