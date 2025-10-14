@@ -493,8 +493,15 @@
     ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"]))
 
 (defn ctx-start []
-  (let [{:keys [writer reader]}
-        (d/init-db! "database-new.db"
+  (let [db-name "cells.db"
+        _       (d/restore-then-replicate! db-name
+                  {:s3-access-key-id     (h/env :s3-access-key-id)
+                   :s3-access-secret-key (h/env :s3-access-secret-key)
+                   :bucket               "hyperlith"
+                   :endpoint             "https://nbg1.your-objectstorage.com"
+                   :region               "nbg1"})
+        {:keys [writer reader]}
+        (d/init-db! db-name
           {:pool-size 4
            :pragma    {:foreign_keys false}})]
     ;; Run migrations
