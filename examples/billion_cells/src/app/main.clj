@@ -411,9 +411,14 @@
     [:meta {:content "So many cells" :name "description"}]))
 
 (defview handler-root
-  {:path     "/" :shim-headers shim-headers :br-window-size 21
-   :on-close (fn [{:keys [tx-batch! sid tabid]}]
-               (tx-batch! (partial remove-focus! sid tabid)))}
+  {:path              "/" :shim-headers shim-headers :br-window-size 21
+   :on-close          (fn [{:keys [tx-batch! sid tabid]}]
+               (tx-batch! (partial remove-focus! sid tabid)))
+   :render-on-connect false
+   :on-open           (fn [{:keys [tx-batch!]}]
+                        ;; This will trigger a batch on new user connect
+                        ;; But not actually update the database
+                        (tx-batch! (fn [& _] nil)))}
   [{:keys         [db sid tabid]
     {:strs [x y]} :query-params
     :as           _req}]

@@ -1,25 +1,26 @@
 (ns hyperlith.core
-  (:require [hyperlith.impl.namespaces :refer [import-vars]]
-            [hyperlith.impl.session :refer [wrap-session]]
-            [hyperlith.impl.json :refer [wrap-parse-json-body]]
-            [hyperlith.impl.params :refer [wrap-query-params]]
+  (:require [clojure.core.async :as a]
+            [hyperlith.impl.assets]
+            [hyperlith.impl.batch]
             [hyperlith.impl.blocker :refer [wrap-blocker]]
-            [hyperlith.impl.datastar :as ds]
-            [hyperlith.impl.util :as u]
-            [hyperlith.impl.error :as er]
+            [hyperlith.impl.codec :as codec]
             [hyperlith.impl.crypto :as crypto]
             [hyperlith.impl.css]
-            [hyperlith.impl.http]
-            [hyperlith.impl.html :as h]
-            [hyperlith.impl.router :as router]
-            [hyperlith.impl.assets]
-            [hyperlith.impl.trace]
+            [hyperlith.impl.datastar :as ds]
             [hyperlith.impl.env]
-            [hyperlith.impl.batch]
-            [clojure.core.async :as a]
-            [org.httpkit.server :as hk]
-            [hyperlith.impl.codec :as codec])
-  (:import (java.util.concurrent Executors)))
+            [hyperlith.impl.error :as er]
+            [hyperlith.impl.html :as h]
+            [hyperlith.impl.http]
+            [hyperlith.impl.json :refer [wrap-parse-json-body]]
+            [hyperlith.impl.namespaces :refer [import-vars]]
+            [hyperlith.impl.params :refer [wrap-query-params]]
+            [hyperlith.impl.router :as router]
+            [hyperlith.impl.session :refer [wrap-session]]
+            [hyperlith.impl.trace]
+            [hyperlith.impl.util :as u]
+            [org.httpkit.server :as hk])
+  (:import [java.net ServerSocket]
+           (java.util.concurrent Executors)))
 
 ;; Make futures use virtual threads
 (set-agent-send-executor!
@@ -110,11 +111,22 @@
   (when-let [<refresh-ch @refresh-ch_]
     (a/>!! <refresh-ch :refresh-event)))
 
+(defn throw-if-port-in-use! [port]
+  (try
+    (with-open [_ (ServerSocket. 8080)])
+    (catch Throwable _
+      (throw
+        (ex-info
+          (str "Port "port
+            " already in use! Server might already be runnin!")
+          {:port port})))))
+
 (defn start-app
   [{:keys [port ctx-start ctx-stop csrf-secret
            max-refresh-ms on-error]
     :or   {port     8080
-           on-error er/default-on-error}}]
+           on-error er/default-on-error}}]  
+  (throw-if-port-in-use! 8080)
   (let [<refresh-ch    (a/chan (a/dropping-buffer 1))
         _              (reset! refresh-ch_ <refresh-ch)
         ctx            (ctx-start)

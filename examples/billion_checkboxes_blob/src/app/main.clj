@@ -400,7 +400,12 @@
   (str "Math.round((" n "/" board-size-px ")*" size ")"))
 
 (defview handler-root
-  {:path "/" :shim-headers shim-headers :br-window-size 21}
+  {:path              "/" :shim-headers shim-headers :br-window-size 21
+   :render-on-connect false
+   :on-open           (fn [{:keys [tx-batch!]}]
+                        ;; This will trigger a batch on new user connect
+                        ;; But not actually update the database
+                        (tx-batch! (fn [& _] nil)))}
   [{:keys         [db sid tabid]
     {:strs [x y]} :query-params
     :as           _req}]
@@ -539,7 +544,6 @@
   (do (-main) nil)
   ;; (clojure.java.browse/browse-url "https://localhost:3030/")
 
-
   ;; stop server
   ((@app_ :stop))
 
@@ -550,8 +554,8 @@
 (comment
   (def db (-> @app_ :ctx :db))
   (d/pragma-check db)
-
-  ;; Execution time mean : 148.516131 ms
+  
+  ;; Execution time mean : 120.912096 ms
   (user/bench
     (->> (mapv
            (fn [n]
@@ -566,7 +570,7 @@
            (range 0 4000))
       (run! (fn [x] @x))))
 
-  ;; Execution time mean : 151.256280 µs
+  ;; Execution time mean : 115.908730 µs
   (user/bench
     (do
       (UserView db {:x-offset-items   50 :y-offset-items   50
@@ -642,7 +646,7 @@
   ;; clear out empty chunks
   (def db-write (-> @app_ :ctx :db-write))
   (d/q db-write '{select [[[count *]]] from chunk})
-  
+
   (run! (fn [chunk-id]
           (when (= blank-chunk (-> (d/q db-write
                                      '{select [data]
