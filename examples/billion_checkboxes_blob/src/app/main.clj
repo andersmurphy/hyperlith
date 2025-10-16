@@ -481,7 +481,9 @@
   (d/q db
     ["CREATE TABLE IF NOT EXISTS chunk(id INT PRIMARY KEY, data BLOB)"])
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"]))
+    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"])
+  (d/q db
+    ["CREATE VIRTUAL TABLE IF NOT EXISTS chunk_rtree USING rtree_i32(id, minX, maxX, minY, maxY, +data BLOB)"]))
 
 (defn ctx-start []
   (let [db-name "database-new.db"
@@ -660,3 +662,42 @@
     (range (* board-size board-size)))
 
   )
+
+(comment
+  ;; rtree migration
+
+  (defn chunk-id->xy [chunk-id]
+    [(rem chunk-id board-size)
+     (quot chunk-id board-size)])
+
+  (user/bench
+    (d/q db-write
+      ["SELECT id FROM chunk_rtree
+ WHERE minX>=41 AND maxX<=47
+   AND minY>=41 AND maxY<=47"]))
+
+  (user/bench
+    (->> (xy->chunk-ids
+           {:x-offset-items   41 :y-offset-items   41
+            :x-rendered-items 7  :y-rendered-items 7})
+      (mapv (fn [chunk-id]
+              (d/q db-write '{select [id]
+                              from   chunk
+                              where  [= id ?chunk-id]}
+                {:chunk-id chunk-id})))))
+
+  (chunk-id->xy 81098)
+
+  (def db-write (-> @app_ :ctx :db-write))
+
+  (->> (d/q db-write '{select [id data] from chunk})
+    (run!
+      (fn [[id data]]
+        (let [[x y] (chunk-id->xy id)]
+          (d/q db-write
+            '{insert-into chunk_rtree
+              values      [{id   ?chunk-id
+                            minX ?x maxX ?x
+                            minY ?y maxY ?y
+                            data ?data}]}
+            {:chunk-id id :x x :y y :data data}))))))
