@@ -562,12 +562,12 @@
              (future
                (let [n (mod n board-size)]
                  (UserView db {:x-offset-items   n :y-offset-items   n
-                               :x-rendered-items 3 :y-rendered-items 3})
+                               :x-rendered-items 7 :y-rendered-items 7})
 
                  ;; we don't want to hold onto the object
                  ;; not realistic
                  nil)))
-           (range 0 4000))
+           (range 0 100))
       (run! (fn [x] @x))))
 
   ;; Execution time mean : 115.908730 µs

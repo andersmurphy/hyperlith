@@ -3,7 +3,8 @@
   (:require [hyperlith.core :as h :refer [defaction defview]]
             [hyperlith.extras.sqlite :as d]
             [clojure.math :as math]
-            [hyperlith.extras.ui.virtual-scroll :as vs]))
+            [hyperlith.extras.ui.virtual-scroll :as vs]
+            [clojure.string :as str]))
 
 (def cell-width-px (* 32 4))
 (def cell-height-px 32)
@@ -489,6 +490,11 @@
          " - "
          [:a {:href "https://checkboxes.andersmurphy.com"} " more like this"]]]])))
 
+(defn prep-chunk-fts [chunk]
+  (->> (flatten chunk)
+    (mapv :value)
+    (str/join " ")))
+
 (defn migrations [db]
   ;; Note: all this code must be idempotent
   ;; Create tables
@@ -496,7 +502,9 @@
   (d/q db
     ["CREATE TABLE IF NOT EXISTS chunk(id INT PRIMARY KEY, data BLOB)"])
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"]))
+    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"])
+  (d/q db
+    ["CREATE VIRTUAL TABLE IF NOT EXISTS chunk_fts USING fts5(data, content='chunk', content_rowid='id');"]))
 
 (defn ctx-start []
   (let [db-name "cells.db"
@@ -506,10 +514,12 @@
                    :bucket               "hyperlith"
                    :endpoint             "https://nbg1.your-objectstorage.com"
                    :region               "nbg1"})
-        {:keys [writer reader]}
+        {:keys [writer reader] :as db-obj}
         (d/init-db! db-name
           {:pool-size 4
            :pragma    {:foreign_keys false}})]
+    (d/create-function db-obj "prep_chunk_fts" #'prep-chunk-fts
+      {:deterministic? true})
     ;; Run migrations
     (migrations writer)
     {:db        reader
@@ -587,4 +597,20 @@
   ;; Checkpoint the WAL
   (d/q db-write ["PRAGMA wal_checkpoint(PASSIVE)"])
   (d/q db-write ["PRAGMA wal_checkpoint(TRUNCATE)"])
+  )
+
+(comment
+
+  (def db-write (-> @app_ :ctx :db-write))
+
+  (count
+    (d/q db-write ["select * from chunk_fts where chunk_fts match 'cool'"]))
+  
+  (d/q db-write ["select count(*) from chunk_fts"])
+
+  (d/q db-write
+    ["INSERT INTO chunk_fts(chunk_fts) VALUES('delete-all')"])
+  (d/q db-write
+    ["insert into chunk_fts(rowid, data) select id, prep_chunk_fts(data) from chunk"])
+
   )
