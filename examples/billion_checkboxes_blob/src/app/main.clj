@@ -499,13 +499,14 @@
                           :region        "nbg1"
                           :sync-interval "1s"}]}]}
                      :escape-slash false)})
-        {:keys [writer reader]}
+        {:keys [writer reader] :as db-obj}
         (d/init-db! db-name
           {:pool-size 4
            :pragma    {:foreign_keys false}})]
     ;; Run migrations
     (migrations writer)
-    {:db        reader
+    {:db-obj    db-obj
+     :db        reader
      :db-read   reader
      :db-write  writer
      :tx-batch! (h/batch!
@@ -555,13 +556,14 @@
   (def db (-> @app_ :ctx :db))
   (d/pragma-check db)
   
-  ;; Execution time mean : 120.912096 ms
+  ;; Execution time mean : 78.177554 ms
+  ;; Execution time mean : 34.990452 ms
   (user/bench
     (->> (mapv
            (fn [n]
              (future
                (let [n (mod n board-size)]
-                 (UserView db {:x-offset-items   n :y-offset-items   n
+                 (UserView db {:x-offset-items   0 :y-offset-items   0
                                :x-rendered-items 7 :y-rendered-items 7})
 
                  ;; we don't want to hold onto the object
@@ -569,11 +571,12 @@
                  nil)))
            (range 0 100))
       (run! (fn [x] @x))))
-
-  ;; Execution time mean : 115.908730 µs
+  
+  ;; Execution time mean : 2.424361 ms
+  ;; Execution time mean : 1.159274 ms
   (user/bench
     (do
-      (UserView db {:x-offset-items   50 :y-offset-items   50
+      (UserView db {:x-offset-items   0 :y-offset-items   0
                     :x-rendered-items 7  :y-rendered-items 7}) nil))
 
 
@@ -581,14 +584,11 @@
   (d/table-list db)
   (d/q db '{select [[[count *]]] from session})
 
-  ;; (+ 7784 3249 4545)
+  ;; (+ 17209)
 
   ,)
 
 (comment
-  (user/bench
-    (d/q db
-      ["SELECT chunk_id, JSON_GROUP_ARRAY(state) AS chunk_cells FROM cell WHERE chunk_id IN (?, ?, ?, ?, ?, ?, ?, ?, ?)  GROUP BY chunk_id" 1978 3955 5932 1979 3956 5933 1980 3957 5934]))
 
   (def tab-state (-> @app_ :ctx :tab))
 

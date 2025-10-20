@@ -522,7 +522,8 @@
       {:deterministic? true})
     ;; Run migrations
     (migrations writer)
-    {:db        reader
+    {:db-obj    db-obj
+     :db        reader
      :db-read   reader
      :db-write  writer
      :tx-batch! (h/batch!
@@ -566,7 +567,7 @@
 
   (def db (-> @app_ :ctx :db))
   (d/q db '{select [[[count *]]] from session})
-  ;; 4897
+  (+ 7698)
   
 
   ,)
@@ -591,7 +592,7 @@
   )
 
 (comment
-  (+ 3 4)
+  (def db-write (-> @app_ :ctx :db-write))
   ;; Free up space (slow)
   ;; (time (d/q db-write ["VACUUM"]))
   ;; Checkpoint the WAL
@@ -614,3 +615,4 @@
     ["insert into chunk_fts(rowid, data) select id, prep_chunk_fts(data) from chunk"])
 
   )
+
