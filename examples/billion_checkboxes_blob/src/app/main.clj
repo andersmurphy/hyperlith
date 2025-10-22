@@ -400,7 +400,7 @@
   (str "Math.round((" n "/" board-size-px ")*" size ")"))
 
 (defview handler-root
-  {:path              "/" :shim-headers shim-headers :br-window-size 21
+  {:path              "/" :shim-headers shim-headers :br-window-size 24
    :render-on-connect false
    :on-open           (fn [{:keys [tx-batch!]}]
                         ;; This will trigger a batch on new user connect
@@ -611,6 +611,7 @@
   ,)
 
 (comment ;; Profiling
+  
   (prof/start)
   (prof/stop)
   (prof/serve-ui 7777)

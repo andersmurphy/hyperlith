@@ -412,7 +412,7 @@
     [:meta {:content "So many cells" :name "description"}]))
 
 (defview handler-root
-  {:path              "/" :shim-headers shim-headers :br-window-size 21
+  {:path              "/" :shim-headers shim-headers :br-window-size 24
    :on-close          (fn [{:keys [tx-batch! sid tabid]}]
                (tx-batch! (partial remove-focus! sid tabid)))
    :render-on-connect false
@@ -604,7 +604,11 @@
 
   (def db-write (-> @app_ :ctx :db-write))
 
+  
+  (d/q db-write ["select data from chunk"])
+
   (count
+
     (d/q db-write ["select * from chunk_fts where chunk_fts match 'cool'"]))
   
   (d/q db-write ["select count(*) from chunk_fts"])
