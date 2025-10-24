@@ -21,6 +21,7 @@
    :connect-src     [self]
    :style-src       [self unsafe-inline]
    :style-src-elem  [self unsafe-inline]
+   ;; https://andersmurphy.com (e.g: for embedding in iframe blog)
    :frame-ancestors [none]})
 
 (defn csp-data->str [csp-data]

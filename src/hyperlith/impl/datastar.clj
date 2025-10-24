@@ -10,6 +10,7 @@
             [hyperlith.impl.error :as er]
             [hyperlith.impl.json :as json]
             [hyperlith.impl.router :as router]
+            [hyperlith.impl.cpu-pool :as cp]
             [org.httpkit.server :as hk]
             [clojure.string :as str]
             [clojure.core.async :as a]))
@@ -18,16 +19,16 @@
   (static-asset
     {:body         (util/load-resource "datastar.js.map")
      :content-type "text/javascript"
-     :compress?        true}))
+     :compress?    true}))
 
 (def datastar
-  (static-asset 
+  (static-asset
     {:body
      (-> (util/load-resource "datastar.js") slurp
        ;; Make sure we point to the right source map
        (str/replace "datastar.js.map" datastar-source-map))
      :content-type "text/javascript"
-     :compress?        true}))
+     :compress?    true}))
 
 (defn patch-elements [event-id elements]
   (str "event: datastar-patch-elements"
@@ -91,7 +92,7 @@
                      [:body
                       [:div {:data-signals-csrf  csrf-cookie-js
                              :data-signals-tabid tabid-js}]
-                      [:div {:data-on-load on-load-js
+                      [:div {:data-on-load           on-load-js
                              ;; Reconnect when the user comes online after
                              ;; being offline. Closes any existing connection
                              ;; from this div.
@@ -133,20 +134,20 @@
            :status  204})))))
 
 (defn render-handler
-  [path render-fn & {:keys [on-close on-open br-window-size
+  [path render-fn & {:keys                     [on-close on-open br-window-size
                             render-on-connect] :as _opts
-                     :or   {;; Window size can be tuned to trade memory
-                            ;; for reduced bandwidth and compute.
-                            ;; The right window size can significantly improve
-                            ;; compression of highly variable streams of data.
-                            ;; (br/window-size->kb 18) => 262KB
-                            br-window-size 18
-                            ;; If false does not render on connect  waits for
-                            ;; next batch. Note this means you should do
-                            ;; something on connect to trigger a batch.
-                            ;; Otherwise the user will not see anything
-                            ;; until a batch is triggered.
-                            render-on-connect true}}]
+                     :or                       {;; Window size can be tuned to trade memory
+                                                ;; for reduced bandwidth and compute.
+                                                ;; The right window size can significantly improve
+                                                ;; compression of highly variable streams of data.
+                                                ;; (br/window-size->kb 18) => 262KB
+                                                br-window-size    18
+                                                ;; If false does not render on connect  waits for
+                                                ;; next batch. Note this means you should do
+                                                ;; something on connect to trigger a batch.
+                                                ;; Otherwise the user will not see anything
+                                                ;; until a batch is triggered.
+                                                render-on-connect true}}]
   (router/add-route! [:post path]
     (fn handler [req]
       (let [;; Dropping buffer is used here as we don't want a slow handler
@@ -173,19 +174,22 @@
 
                      [<ch]
                      ([_]
-                      (when-some ;; stop in case of error
-                          [new-view (er/try-on-error (render-fn req))]
-                        (let [new-view-str  (h/html->str new-view)
-                              ;; This is a very fast hash 
-                              new-view-hash (Integer/toHexString
-                                              (hash new-view-str))]
-                          ;; only send an event if the view has changed
-                          (when (not= last-view-hash new-view-hash)
-                            (->> (patch-elements
-                                   new-view-hash new-view-str)
-                              (br/compress-stream out br)
-                              (send! ch)))
-                          (recur new-view-hash))))
+                      (some-> ;; stop in case of error
+                        (cp/on-cpu-pool ;; CPU work on real threads
+                          (when-some ;; stop in case of error
+                              [new-view (er/try-on-error (render-fn req))]
+                            (let [new-view-str  (h/html->str new-view)
+                                  ;; This is a very fast hash
+                                  new-view-hash (Integer/toHexString
+                                                  (hash new-view-str))]
+                              ;; only send an event if the view has changed
+                              (when (not= last-view-hash new-view-hash)
+                                (->> (patch-elements
+                                       new-view-hash new-view-str)
+                                  (br/compress-stream out br)
+                                  (send! ch)))
+                              new-view-hash)))
+                        recur))
                      ;; we want work cancelling to have higher priority
                      :priority true))
                  ;; Close channel on error or when thread stops

@@ -555,29 +555,30 @@
 (comment
   (def db (-> @app_ :ctx :db))
   (d/pragma-check db)
-  
+
   ;; Execution time mean : 78.177554 ms
   ;; Execution time mean : 34.990452 ms
   (user/bench
     (->> (mapv
            (fn [n]
              (future
-               (let [n (mod n board-size)]
-                 (UserView db {:x-offset-items   0 :y-offset-items   0
-                               :x-rendered-items 7 :y-rendered-items 7})
+               (CPU
+                 (let [n (mod n board-size)]
+                   (UserView db {:x-offset-items   0 :y-offset-items   0
+                                 :x-rendered-items 7 :y-rendered-items 7})
 
-                 ;; we don't want to hold onto the object
-                 ;; not realistic
-                 nil)))
+                   ;; we don't want to hold onto the object
+                   ;; not realistic
+                   nil))))
            (range 0 100))
       (run! (fn [x] @x))))
-  
+
   ;; Execution time mean : 2.424361 ms
   ;; Execution time mean : 1.159274 ms
   (user/bench
     (do
       (UserView db {:x-offset-items   0 :y-offset-items   0
-                    :x-rendered-items 7  :y-rendered-items 7}) nil))
+                    :x-rendered-items 7 :y-rendered-items 7}) nil))
 
 
   (d/table-info db :chunk)
@@ -611,7 +612,7 @@
   ,)
 
 (comment ;; Profiling
-  
+
   (prof/start)
   (prof/stop)
   (prof/serve-ui 7777)

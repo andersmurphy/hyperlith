@@ -1,7 +1,8 @@
 (ns hyperlith.impl.batch
   (:require [clojure.core.async :as a]
             [hyperlith.impl.util :as util]
-            [hyperlith.impl.error :as er]))
+            [hyperlith.impl.error :as er]
+            [hyperlith.impl.cpu-pool :as cp]))
 
 (defn batch!
   "Wraps side-effecting function in a queue and batch mechanism. The
@@ -23,7 +24,8 @@
             (let [;; Timer is started before task to prevent task duration
                   ;; from affecting interval (unless it exceeds interval).
                   <new-t (a/timeout run-every-ms)]
-              (er/try-on-error (effect-fn batch))
+              (cp/on-cpu-pool ;; CPU work on real threads
+                (er/try-on-error (effect-fn batch)))
               (recur <new-t []))
 
             ;; Add to batch

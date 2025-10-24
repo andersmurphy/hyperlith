@@ -124,12 +124,12 @@
 
 (defview render-home-embed {:path "/embed" :shim-headers shim-headers}
   [{:keys [board-cache _sid] :as _req}]
-    (h/html
-      [:link#css {:rel "stylesheet" :type "text/css" :href css}]
-      [:main#morph.main
-       [:h1 "Game of Life (multiplayer)"]
-       [:p "Built with ❤️ using Clojure and Datastar 🚀"]
-       @board-cache]))
+  (h/html
+    [:link#css {:rel "stylesheet" :type "text/css" :href css}]
+    [:main#morph.main
+     [:h1 "Game of Life (multiplayer)"]
+     [:p "Built with ❤️ using Clojure and Datastar 🚀"]
+     @board-cache]))
 
 (defn next-gen-board [current-board]
   (game/next-gen-board
@@ -167,11 +167,10 @@
 
 (defonce app_ (atom nil))
 
-(defn start-app [port]
+(defn -main [& _]
   (reset! app_
     (h/start-app
-      {:port           port
-       :max-refresh-ms 200
+      {:max-refresh-ms 200
        :ctx-start      ctx-start
        :ctx-stop       (fn [{:keys [game-stop]}] (game-stop))
        :csrf-secret    (h/env :csrf-secret)})))
@@ -180,9 +179,9 @@
 (h/refresh-all!)
 
 (comment
-  (start-app 8080)
+  (do (-main) nil)
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
-  
+
   ;; stop server
   ((@app_ :stop))
 
