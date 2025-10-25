@@ -292,7 +292,7 @@
 (defaction handler-share
   [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
   (h/html
-    [:div.toast {:data-on-load__delay.3s "el.remove()"}
+    [:div.toast {:data-on:load__delay.3s "el.remove()"}
      [:div.button
       [:p [:strong nil (str "X: " jumpx " Y: " jumpy)]]
       [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]]]))
@@ -312,10 +312,10 @@
             :maxlength                     20
             :size                          10
             :type                          "text"
-            :data-on-load                  on-load
-            :data-preserve-attr            "data-on-load"
+            :data-on:load                  on-load
+            :data-preserve-attr            "data-on:load"
             :data-bind                     "cellvalue"
-            :data-on-input__debounce.200ms on-input)]]))
+            :data-on:input__debounce.200ms on-input)]]))
 
     focus
     (h/html
@@ -430,7 +430,7 @@
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href css}]
       [:main#morph.main
-       {:data-on-mousedown
+       {:data-on:mousedown
         (str
           "if (evt.target.dataset.action) {"
           "evt.target.classList.add('pop');"
@@ -442,7 +442,7 @@
           "}")}
        [:div.view-wrapper
         {;; firefox sometimes preserves scroll on refresh and we don't want that
-         :data-on-load (scroll-to-xy-js jump-x jump-y)}
+         :data-on:load (scroll-to-xy-js jump-x jump-y)}
         [::vs/virtual#view
          {:data-ref              "_view"
           :v/x                   {:item-size          chunk-width-px
@@ -478,7 +478,7 @@
           [:strong.pe-none "GO"]]
          [:div.button
           {:data-action       handler-share
-           :data-on-mousedown copy-xy-to-clipboard-js}
+           :data-on:mousedown copy-xy-to-clipboard-js}
           [:strong.pe-none "SHARE"]]]
         [:h1 "One Billion Cells"]
         [:p "Built using "

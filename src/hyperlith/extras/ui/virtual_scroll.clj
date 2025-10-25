@@ -113,11 +113,11 @@
        [:div
         (assoc attrs
           ;; send up initial size on load
-          :data-on-load
+          :data-init
           (resize-js w-signal h-signal resize-handler-path)
-          :data-on-resize__debounce.100ms__window
+          :data-on:resize__debounce.100ms__window
           (resize-js w-signal h-signal resize-handler-path)
-          :data-on-scroll (on-scroll-js x-signal y-signal)
+          :data-on:scroll (on-scroll-js x-signal y-signal)
           ;; Handles user drag scrolling
           :data-effect fetch-next-page?
           :style {:scroll-behavior     :smooth

@@ -103,7 +103,7 @@
 (defn board [snapshot]
   (let [view (board-state snapshot)]
     (h/html
-      [:div {:data-on-pointerdown
+      [:div {:data-on:pointerdown
              (str "@post(`" handler-tap-cell "?id=${evt.target.dataset.id}`)")}
        [:div.board nil view]])))
 

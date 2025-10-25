@@ -58,7 +58,7 @@
      {:id        star-id
       :style     {:left (str x "%") :top (str y "%")}
       :draggable "true"
-      :data-on-dragstart
+      :data-on:dragstart
       "evt.dataTransfer.setData('text/plain', evt.target.id)"}
      "⭐"]))
 
@@ -92,8 +92,8 @@
      [:div.board nil (stars db)
       [:div.dropzone
        {:style            {:left :55% :top :55%}
-        :data-on-dragover "evt.preventDefault()"
-        :data-on-drop
+        :data-on:dragover "evt.preventDefault()"
+        :data-on:drop
         (str "evt.preventDefault(); @post(`"
           handler-user-move-star-to-dropzone "?id=${evt.dataTransfer.getData('text/plain')}`)")}
        "🚀"]]

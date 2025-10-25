@@ -90,13 +90,13 @@
                       [:meta {:name    "viewport"
                               :content "width=device-width, initial-scale=1.0"}]]
                      [:body
-                      [:div {:data-signals-csrf  csrf-cookie-js
-                             :data-signals-tabid tabid-js}]
-                      [:div {:data-on-load           on-load-js
+                      [:div {:data-signals:csrf  csrf-cookie-js
+                             :data-signals:tabid tabid-js}]
+                      [:div {:data-init           on-load-js
                              ;; Reconnect when the user comes online after
                              ;; being offline. Closes any existing connection
                              ;; from this div.
-                             :data-on-online__window on-load-js}]
+                             :data-on:online__window on-load-js}]
                       [:noscript "Your browser does not support JavaScript!"]
                       [:main {:id "morph"}]]]])
                h/html->str)]
@@ -201,8 +201,8 @@
 
 (defn patch-signals [signals]
   (h/html [:div {:data-signals (json/edn->json signals)
-                 :data-on-load "el.remove()"}]))
+                 :data-init "el.remove()"}]))
 
 (defn execute-expr [expr]
-  (h/html [:div {:data-on-load (str expr ";el.remove()")}]))
+  (h/html [:div {:data-init (str expr ";el.remove()")}]))
 

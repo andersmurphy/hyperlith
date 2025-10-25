@@ -87,7 +87,7 @@ Work sharing is the term I'm using for sharing renders between connected users. 
 
 The simplest way to do this is to recalculate and cache values after after a batch has been run.
 
-#### Use `data-on-pointerdown/mous` over  `data-on-click`
+#### Use `data-on:pointerdown/mousedown` over  `data-on:click`
 
 This is a small one but can make even the slowest of networks feel much snappier.
 

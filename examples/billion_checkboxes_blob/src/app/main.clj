@@ -309,7 +309,7 @@
 (defaction handler-share
   [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
   (h/html
-    [:div.toast {:data-on-mousedown "el.remove()"}
+    [:div.toast {:data-on:mousedown "el.remove()"}
      [:div.toast-card
       [:p [:strong nil (str "X: " jumpx " Y: " jumpy)]]
       [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]
@@ -417,7 +417,7 @@
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href css}]
       [:main#morph.main
-       {:data-on-mousedown
+       {:data-on:mousedown
         (str
           "if (evt.target.dataset.action) {"
           "evt.target.classList.add('pop');"
@@ -427,8 +427,6 @@
           "setTimeout(() => evt.target.classList.remove('pop'), 300)"
           "}")}
        [:div.view-wrapper
-        {;; firefox sometimes preserves scroll on refresh and we don't want that
-         :data-on-load (scroll-to-xy-js jump-x jump-y)}
         [::vs/virtual#view
          {:data-ref              "_view"
           :v/x                   {:item-size          chunk-size-px
@@ -449,6 +447,8 @@
           :v/scroll-handler-path handler-scroll
           :v/resize-handler-path handler-resize}]]
        [:div.controls-wrapper
+        {;; firefox sometimes preserves scroll on refresh and we don't want that
+         :data-init (scroll-to-xy-js jump-x jump-y)}
         [:div.jump
          [:h2 "X:"]
          [:input.jump-input
@@ -461,7 +461,7 @@
          [:div.button {:data-action handler-jump}
           [:strong.pe-none "JUMP"]]
          [:div.button {:data-action       handler-share
-                       :data-on-mousedown copy-xy-to-clipboard-js}
+                       :data-on:mousedown copy-xy-to-clipboard-js}
           [:strong.pe-none "SHARE"]]]
         palette
         [:h1 "One Billion Checkboxes"]

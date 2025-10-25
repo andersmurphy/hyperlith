@@ -41,10 +41,10 @@
   [{:keys [db] :as _req}]
   (h/html
     [:link#css {:rel "stylesheet" :type "text/css" :href css}]
-    [:main#morph.main {:data-signals-x__ifmissing 0
-                       :data-signals-y__ifmissing 0}
+    [:main#morph.main {:data-signals:x__ifmissing 0
+                       :data-signals:y__ifmissing 0}
      [:div.cursor-area
-      {:data-on-mousemove__debounce.100ms
+      {:data-on:mousemove__debounce.100ms
        (str "$x = evt.clientX; $y = evt.clientY; @post('"
          handle-user-cursor-position
          "')")}

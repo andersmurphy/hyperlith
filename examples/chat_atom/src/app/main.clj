@@ -51,7 +51,7 @@
      [:div.chat
       [:input {:type "text" :data-bind "message"}]
       [:button
-       {:data-on-click (str "@post('" handler-send-message "')")} "send"]]
+       {:data-on:click (str "@post('" handler-send-message "')")} "send"]]
      (messages db)]))
 
 (defn ctx-start []
