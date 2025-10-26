@@ -88,13 +88,22 @@
         {:gap            :5px
          :display        :flex
          :flex-direction :column}]
-
+       
        [:.chunk
-        {:background    white
-         :display       :grid
-         :grid-template "subgrid/subgrid"
-         :grid-column   (str "span " chunk-size)
-         :grid-row      (str "span " chunk-size)}]
+        {:background               white
+         :display                  :grid
+         :grid-template-rows
+         (str "repeat("chunk-size","cell-size-px"px)")
+         :grid-template-columns
+         (str "repeat("chunk-size","cell-size-px"px)")
+         :grid-column              (str "span " chunk-size)
+         :grid-row                 (str "span " chunk-size)
+         ;; For how subgrid and contain interact see:
+         ;; https://github.com/w3c/csswg-drafts/issues/7091
+         :content-visibility       :auto
+         :contain                  :strict
+         :contain-intrinsic-height (str (* chunk-size cell-size-px)"px")
+         :contain-intrinsic-width  (str (* chunk-size cell-size-px)"px")}]
 
        (let [padding 5]
          [:.box
@@ -342,8 +351,9 @@
 (defn Chunk [chunk-id chunk-cells]
   (h/html
     [:div.chunk
-     {:id      (str "chunk-" chunk-id)
-      :data-id chunk-id}
+     {:id          (str "chunk-" chunk-id)
+      :data-ignore true
+      :data-id     chunk-id}
      (into []
        (map-indexed (fn [local-id box] (Checkbox local-id box)))
        chunk-cells)]))
@@ -359,6 +369,7 @@
     [:div.chunk
      {:id                (str "chunk-" chunk-id)
       :data-ignore-morph true
+      :data-ignore       true
       :data-id           chunk-id}
      empty-checks]))
 
@@ -562,14 +573,13 @@
     (->> (mapv
            (fn [n]
              (future
-               (CPU
-                 (let [n (mod n board-size)]
-                   (UserView db {:x-offset-items   0 :y-offset-items   0
-                                 :x-rendered-items 7 :y-rendered-items 7})
+               (let [n (mod n board-size)]
+                 (UserView db {:x-offset-items   0 :y-offset-items   0
+                               :x-rendered-items 7 :y-rendered-items 7})
 
-                   ;; we don't want to hold onto the object
-                   ;; not realistic
-                   nil))))
+                 ;; we don't want to hold onto the object
+                 ;; not realistic
+                 nil)))
            (range 0 100))
       (run! (fn [x] @x))))
 

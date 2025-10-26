@@ -443,7 +443,7 @@
        [:div.view-wrapper
         {;; firefox sometimes preserves scroll on refresh and we don't want that
          :data-on:load (scroll-to-xy-js jump-x jump-y)}
-        [::vs/virtual#view
+        [::vs/virtual-table#view
          {:data-ref              "_view"
           :v/x                   {:item-size          chunk-width-px
                                   :buffer-items       1
