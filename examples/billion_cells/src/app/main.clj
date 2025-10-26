@@ -93,11 +93,20 @@
          :flex-direction :column}]
 
        [:.chunk
-        {:background    white
-         :display       :grid
-         :grid-template "subgrid/subgrid"
-         :grid-column   (str "span " chunk-size)
-         :grid-row      (str "span " chunk-size)}]
+        {:background               white
+         :display                  :grid
+         :grid-template-rows
+         (str "repeat("chunk-size","cell-height-px"px)")
+         :grid-template-columns
+         (str "repeat("chunk-size","cell-width-px"px)")
+         :grid-column              (str "span " chunk-size)
+         :grid-row                 (str "span " chunk-size)
+         ;; For how subgrid and contain interact see:
+         ;; https://github.com/w3c/csswg-drafts/issues/7091
+         :content-visibility       :auto
+         :contain                  :strict
+         :contain-intrinsic-height (str (* chunk-size cell-height-px)"px")
+         :contain-intrinsic-width  (str (* chunk-size cell-width-px)"px")}]
 
        [:.pop
         {;; Animation that depresses the element
@@ -343,8 +352,9 @@
 
 (defn Chunk [chunk-id chunk-cells sid]
   (h/html
-    [:div.chunk {:id      (str "chunk-" chunk-id)
-                 :data-id chunk-id}
+    [:div.chunk {:id          (str "chunk-" chunk-id)
+                 :data-id     chunk-id
+                 :data-ignore true}
      (into []
        (map-indexed (fn [local-id box] (Cell local-id box sid)))
        chunk-cells)]))
@@ -359,6 +369,7 @@
   (h/html
     [:div.chunk {:id                (str "chunk-" chunk-id)
                  :data-ignore-morph true
+                 :data-ignore       true
                  :data-id           chunk-id}
      empty-cells]))
 
