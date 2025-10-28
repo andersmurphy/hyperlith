@@ -52,7 +52,7 @@
                                   (- total-item-count rendered-items))
                              0)
         remaining-items    (- total-item-count offset-items)
-        ;; If a buffer item is one scroll will be triggered at 50%
+        ;; If buffer item is one scroll will be triggered at 50%
         threshold-items    (* 0.5 buffer-items)
         threshold-low      (if (not= offset-items 0)
                              (* (+ offset-items threshold-items) item-size)
@@ -82,11 +82,11 @@
       :as     attrs} _]
   (let [[x-threshold-low x-threshold-high x-offset-items
          x-max-size x-item-grid x-size x-rendered-items
-         x-translate x-view-size]
+         x-translate]
         (when x (virtual-scroll-logic x))
         [y-threshold-low y-threshold-high y-offset-items
          y-max-size y-item-grid y-size y-rendered-items
-         y-translate y-view-size]
+         y-translate]
         (when y (virtual-scroll-logic y))
         x-signal         (str id "-x")
         y-signal         (str id "-y")
@@ -136,8 +136,7 @@
                        :width         x-size
                        :height        y-size
                        :display       :grid
-                       :grid-template (str y-item-grid "/" x-item-grid)
-                       :contain       :strict}}
+                       :grid-template (str y-item-grid "/" x-item-grid)}}
          [:div {:id    (str id "-virtual-corner")
                 :style {:display       :grid
                         :grid-template "subgrid/subgrid"
@@ -161,8 +160,7 @@
                 :style {:grid-column 2
                         :grid-row    2
                         :width       (str x-translate "px")
-                        :height      (str y-translate "px")
-                        :contain     :strict}}]
+                        :height      (str y-translate "px")}}]
          [:div {:id    (str id "-virtual-sidebar")
                 :style {:display       :grid
                         :grid-template "subgrid/subgrid"
@@ -232,24 +230,26 @@
                   :width               :100%
                   :height              :100%})
         [:div {:id    (str id "-virtual-table")
-               :style {:position       :relative
-                       :width          x-size
-                       :height         y-size
-                       :contain        :strict
-                       :pointer-events :none}}
+               :style {:position                 :relative
+                       :width                    x-size
+                       :height                   y-size                       
+                       :contain                  :strict
+                       :pointer-events           :none}}
          ;; Separate translate div to avoid recalculating style of grid
          [:div {:id    (str id "-virtual-translate")
-                :style {:position :absolute
-                        :contain  :strict
-                        :width    x-view-size
-                        :height   y-view-size
+                :style {:position                 :absolute
+                        :contain                  :strict
+                        :width                    x-view-size
+                        :height                   y-view-size
                         :transform
                         (str "translate("x-translate"px,"y-translate"px)")}}
           [:div
            {:id    (str id "-virtual-view")
-            :style {:display :grid
+            :style {:display                  :grid
                     :grid-template
                     (str y-item-grid "/" x-item-grid)
-                    :contain :strict}}
+                    :width                    x-view-size
+                    :height                   y-view-size
+                    :contain                  :strict}}
            content]]]]])))
 
