@@ -30,7 +30,7 @@
 (defn secret-key->hmac-sha256-keyspec [secret-key]
   (SecretKeySpec/new (String/.getBytes secret-key) "HmacSha256"))
 
-(defn hmac-md5
+(defn hmac-sha256
   "Used for quick stateless csrf token generation."
   [key-spec data]
   (-> (doto (Mac/getInstance "HmacSha256")
@@ -46,6 +46,6 @@
                         (String/.getBytes (str data)))]
     (-> (doto (MessageDigest/getInstance "SHA256")
           (MessageDigest/.update bytes))
-        (MessageDigest/.digest)
-        bytes->base64
-        (subs 10))))
+      (MessageDigest/.digest)
+      bytes->base64
+      (subs 10))))

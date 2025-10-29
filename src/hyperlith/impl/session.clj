@@ -18,7 +18,7 @@
   [handler csrf-secret]
   (let [;; Only create the spec once.
         csrf-keyspec (crypto/secret-key->hmac-sha256-keyspec csrf-secret)
-        sid->csrf    (fn sid->csrf [sid] (crypto/hmac-md5 csrf-keyspec sid))]
+        sid->csrf    (fn sid->csrf [sid] (crypto/hmac-sha256 csrf-keyspec sid))]
     (fn [req]
       (let [body (:body req)
             sid  (get-sid req)]

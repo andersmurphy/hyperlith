@@ -423,7 +423,7 @@
     [:meta {:content "So many cells" :name "description"}]))
 
 (defview handler-root
-  {:path              "/" :shim-headers shim-headers :br-window-size 24
+  {:path              "/" :shim-headers shim-headers :br-window-size 21
    :on-close          (fn [{:keys [tx-batch! sid tabid]}]
                (tx-batch! (partial remove-focus! sid tabid)))
    :render-on-connect false

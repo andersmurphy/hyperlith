@@ -118,14 +118,14 @@
       (throw
         (ex-info
           (str "Port "port
-            " already in use! Server might already be runnin!")
+            " already in use! Server might already be running!")
           {:port port})))))
 
 (defn start-app
   [{:keys [port ctx-start ctx-stop csrf-secret
            max-refresh-ms on-error]
     :or   {port     8080
-           on-error er/default-on-error}}]  
+           on-error er/default-on-error}}]
   (throw-if-port-in-use! 8080)
   (let [<refresh-ch    (a/chan (a/dropping-buffer 1))
         _              (reset! refresh-ch_ <refresh-ch)
@@ -138,25 +138,25 @@
                              ;; This can be desirable if you are batching
                              ;; updates/changes already.
                              <refresh-ch)
-                           a/mult)
+                         a/mult)
         wrap-ctx       (fn [handler]
                          (fn [req]
                            (handler
                              (-> (assoc req
                                    :hyperlith.core/refresh-mult refresh-mult)
-                                 (u/merge ctx)))))
+                               (u/merge ctx)))))
         ;; Middleware make for messy error stacks.
         wrapped-router (-> router/router
-                           wrap-ctx
-                           ;; Wrap error here because req params/body/session
-                           ;; have been handled (and provide useful context).
-                           er/wrap-error
-                           ;; The handlers after this point do not throw errors
-                           ;; are robust/lenient.
-                           wrap-query-params
-                           (wrap-session csrf-secret)
-                           wrap-parse-json-body
-                           wrap-blocker)
+                         wrap-ctx
+                         ;; Wrap error here because req params/body/session
+                         ;; have been handled (and provide useful context).
+                         er/wrap-error
+                         ;; The handlers after this point do not throw errors
+                         ;; are robust/lenient.
+                         wrap-query-params
+                         (wrap-session csrf-secret)
+                         wrap-parse-json-body
+                         wrap-blocker)
         stop-server    (hk/run-server wrapped-router {:port port})]
     {:wrapped-router wrapped-router
      :ctx            ctx
