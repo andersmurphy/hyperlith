@@ -2,43 +2,48 @@
   (:require [hyperlith.core :as h]))
 
 (defn on-intersect-top-js
-  [{:keys [handler-path idx a-ref b-ref table-ref
+  [{:keys [translate-$ post-$ idx a-ref b-ref table-ref
            c-ref translate prev-intersect]}]
-  (str "$_translate = "
+  (str
+    "$"translate-$" = "
     (if (= prev-intersect "top")
       (str translate" + $"c-ref".clientHeight;")
       (str "$"table-ref".clientHeight - ($"a-ref".clientHeight + $"
         b-ref".clientHeight + "translate");"))
-    "@post(`"handler-path"?idx="idx
-    "&translate=${$_translate}&intersect=top`)"))
+    "$"post-$" = `?idx="idx"&translate=${$"translate-$"}&intersect=top`"))
 
 (defn on-intersect-bottom-js
-  [{:keys [handler-path idx a-ref table-ref b-ref c-ref
+  [{:keys [translate-$ post-$ idx a-ref table-ref b-ref c-ref
            translate prev-intersect]}]
-  (str "$_translate = "
+  (str
+    "$"translate-$" = "
     (if (or (= prev-intersect "bottom") (nil? prev-intersect))
       (str translate" + $"a-ref".clientHeight;")
       (str "$"table-ref".clientHeight - ($"b-ref".clientHeight + $"
         c-ref".clientHeight + "translate");"))
-    "@post(`"handler-path"?idx="idx
-    "&translate=${$_translate}&intersect=bottom`)"))
+    "$"post-$" = `?idx="idx"&translate=${$"translate-$"}&intersect=bottom`"))
 
-(defn on-jump-js
-  [{:keys [handler-path scroll-ref a-ref top-ref bottom-ref]}]
-  (str "$"top-ref".remove();$"bottom-ref".remove();"
-    "@post(`"handler-path"?y=${Math.floor($"scroll-ref
-    ".scrollTop - $"a-ref".clientHeight)}&intersect=jump`)"))
+(defn on-intersect-jump-js [{:keys [post-$ scroll-ref a-ref]}]
+  (str
+    "$"post-$" = `?y=${Math.floor($"scroll-ref
+    ".scrollTop - $"a-ref".clientHeight)}&intersect=jump`"))
 
-;; TODO: make it so only one intersect can be triggered in a given frame
-;; TODO: then top/bottom refs can be removed
+(defn post-effect-js [post-$ handler-path]
+  (str
+    "if ($"post-$") {"
+    "@post(`"handler-path"${$"post-$"}`);"
+    "$"post-$" = ''"
+    "}"))
 
 (defmethod h/html-resolve-alias ::virtual
   [_ {:keys                               [id]
-      :v/keys                             [handler-path item-fn item-count-fn approx-item-height]
+      :v/keys
+      [handler-path item-fn item-count-fn approx-item-height
+       max-rendered-items]
       {:keys [translate idx intersect y]} :v/handler-data
       :as                                 attrs} _]
   (assert (and id handler-path item-fn item-count-fn
-            approx-item-height))
+               approx-item-height max-rendered-items))
   (let [total-item-count (item-count-fn)
         size             (* approx-item-height total-item-count)
         y                (max (or y 0) 0)
@@ -47,10 +52,10 @@
           [(int (* (/ y size) total-item-count)) y nil]
           [idx translate intersect])
         offset           (or idx 0)
-        limit            60
+        limit            max-rendered-items
         translate        (max (or translate 0) 0)
         [offset translate intersect]
-        (if (> (int (/ limit 3)) offset) [0 0 nil]
+        (if (> (int (/ limit 3)) offset) [0 0 "bottom"]
             [offset translate intersect])
         items            (vec (item-fn {:offset offset :limit limit}))
         item-count       (count items)
@@ -59,13 +64,13 @@
         a                (subvec items 0 chunk-size)
         b                (subvec items chunk-size (* 2 chunk-size))
         c                (subvec items (* 2 chunk-size) item-count)
-        a-ref            (str "_" id "-virtual-a-ref")
-        b-ref            (str "_" id "-virtual-b-ref")
-        c-ref            (str "_" id "-virtual-c-ref")
-        table-ref        (str "_" id "-virtual-table-ref")
-        scroll-ref       (str "_" id "-virtual-scroll-ref")
-        top-ref          (str "_" id "-virtual-top-ref")
-        bottom-ref       (str "_" id "-virtual-bottom-ref")]
+        a-ref            (str "_" id "-virtual-a-sig")
+        b-ref            (str "_" id "-virtual-b-sig")
+        c-ref            (str "_" id "-virtual-c-sig")
+        table-ref        (str "_" id "-virtual-table-sig")
+        scroll-ref       (str "_" id "-virtual-scroll-sig")
+        post-$           (str "_" id "-virtual-post-sig")
+        translate-$      (str "_" id "-virtual-translate-sig")]
     [:div (assoc attrs
             :style {:scroll-behavior     :smooth
                     :overscroll-behavior :contain
@@ -75,7 +80,9 @@
                     :width               :100%
                     :height              :100%}
             :data-ref scroll-ref)
-     [:div {:id       (str id "-virtual-table")
+     [:div {:id          (str id "-virtual-table")
+            :data-ref    table-ref
+            :data-effect (post-effect-js post-$ handler-path)
             :style
             {:pointer-events        :none
              :display               :grid
@@ -84,27 +91,27 @@
              :grid-template-rows
              (if (= intersect "top")
                (str "auto min-content min-content min-content "translate"px")
-               (str translate"px min-content min-content min-content auto"))}
-            :data-ref table-ref}
-      [:div {:id    (str id "-virtual-top")
+               (str translate"px min-content min-content min-content auto"))}}
+      [:div {;; Make the idx part of the id to tell morph/datastar that this
+             ;; is not the same intersect div even if it's contents and position
+             ;; are the same. This ensures it fires when there's a new page.
+             :id    (str id "-"idx"-virtual-top")
              :style {:height :100%}
-             :data-on-intersect__debounce.100ms
+             :data-on-intersect__once__debounce.100ms
              (when-not (= offset 0)
-               (on-jump-js
-                 {:handler-path handler-path
-                  :scroll-ref   scroll-ref
-                  :a-ref        a-ref
-                  :top-ref      top-ref
-                  :bottom-ref   bottom-ref}))}]
+               (on-intersect-jump-js
+                 {:post-$     post-$
+                  :scroll-ref scroll-ref
+                  :a-ref      a-ref}))}]
       [:div (assoc {;; content hash to make morph more efficient
                     :id (str id "-" (hash a))}
               :data-ref a-ref)
-       [:div {:style    {:position :relative :top :50%}
-              :data-ref top-ref
+       [:div {:style {:position :relative :top :50%}
               :data-on-intersect__once
               (when-not (= offset 0)
                 (on-intersect-top-js
-                  {:handler-path   handler-path
+                  {:post-$         post-$
+                   :translate-$    translate-$
                    :idx            (- offset (count c))
                    :a-ref          a-ref
                    :b-ref          b-ref
@@ -120,12 +127,12 @@
       [:div {;; content hash to make morph more efficient
              :id       (str id "-" (hash c))
              :data-ref c-ref}
-       [:div {:style    {:position :relative :top :50%}
-              :data-ref bottom-ref
+       [:div {:style {:position :relative :top :50%}
               :data-on-intersect__once
               (when-not (>= (+ offset limit) total-item-count)
                 (on-intersect-bottom-js
-                  {:handler-path   handler-path
+                  {:post-$         post-$
+                   :translate-$    translate-$
                    :idx            (+ offset (count a))
                    :a-ref          a-ref
                    :b-ref          b-ref
@@ -134,13 +141,18 @@
                    :translate      translate
                    :prev-intersect intersect}))}]
        c]
-      [:div {:id    (str id "-virtual-bottom")
+      [:div {;; Make the idx part of the id to tell morph/datastar that this
+             ;; is not the same intersect div even if it's contents and position
+             ;; are the same. This ensures it fires when there's a new page.
+             :id    (str id "-"idx"-virtual-bottom")
              :style {:height :100%}
-             :data-on-intersect__debounce.100ms
+             :data-on-intersect__once__debounce.100ms
              (when-not (>= (+ offset limit) total-item-count)
-               (on-jump-js
-                 {:handler-path handler-path
-                  :scroll-ref   scroll-ref
-                  :a-ref        a-ref
-                  :top-ref      top-ref
-                  :bottom-ref   bottom-ref}))}]]]))
+               (on-intersect-jump-js
+                 {:post-$     post-$
+                  :scroll-ref scroll-ref
+                  :a-ref      a-ref}))}]]]))
+
+;; TODO: add x/y axis headers/sidebar
+;; TODO: Read up more on intersection observer API
+;; TODO: sometimes double jump. Is debounce better?

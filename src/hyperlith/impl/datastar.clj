@@ -92,7 +92,7 @@
                      [:body
                       [:div {:data-signals:csrf  csrf-cookie-js
                              :data-signals:tabid tabid-js}]
-                      [:div {:data-init           on-load-js
+                      [:div {:data-init              on-load-js
                              ;; Reconnect when the user comes online after
                              ;; being offline. Closes any existing connection
                              ;; from this div.
@@ -134,20 +134,20 @@
            :status  204})))))
 
 (defn render-handler
-  [path render-fn & {:keys                     [on-close on-open br-window-size
-                            render-on-connect] :as _opts
-                     :or                       {;; Window size can be tuned to trade memory
-                                                ;; for reduced bandwidth and compute.
-                                                ;; The right window size can significantly improve
-                                                ;; compression of highly variable streams of data.
-                                                ;; (br/window-size->kb 18) => 262KB
-                                                br-window-size    18
-                                                ;; If false does not render on connect  waits for
-                                                ;; next batch. Note this means you should do
-                                                ;; something on connect to trigger a batch.
-                                                ;; Otherwise the user will not see anything
-                                                ;; until a batch is triggered.
-                                                render-on-connect true}}]
+  [path render-fn &
+   {:keys [on-close on-open br-window-size render-on-connect] :as _opts
+    :or   {;; Window size can be tuned to trade memory
+           ;; for reduced bandwidth and compute.
+           ;; The right window size can significantly improve
+           ;; compression of highly variable streams of data.
+           ;; (br/window-size->kb 18) => 262KB
+           br-window-size    18
+           ;; If false does not render on connect  waits for
+           ;; next batch. Note this means you should do
+           ;; something on connect to trigger a batch.
+           ;; Otherwise the user will not see anything
+           ;; until a batch is triggered.
+           render-on-connect true}}]
   (router/add-route! [:post path]
     (fn handler [req]
       (let [;; Dropping buffer is used here as we don't want a slow handler
@@ -201,7 +201,7 @@
 
 (defn patch-signals [signals]
   (h/html [:div {:data-signals (json/edn->json signals)
-                 :data-init "el.remove()"}]))
+                 :data-init    "el.remove()"}]))
 
 (defn execute-expr [expr]
   (h/html [:div {:data-init (str expr ";el.remove()")}]))
