@@ -2,38 +2,33 @@
   (:require [hyperlith.core :as h]))
 
 (defn on-intersect-top-js
-  [{:keys [translate-$ post-$ idx a-ref b-ref table-ref
+  [{:keys [handler-path idx a-ref b-ref table-ref
            c-ref translate prev-intersect]}]
-  (str
-    "$"translate-$" = "
-    (if (= prev-intersect "top")
-      (str translate" + $"c-ref".clientHeight;")
-      (str "$"table-ref".clientHeight - ($"a-ref".clientHeight + $"
-        b-ref".clientHeight + "translate");"))
-    "$"post-$" = `?idx="idx"&translate=${$"translate-$"}&intersect=top`"))
+  (let [prev-intersect (if (= prev-intersect "jump") "bottom" prev-intersect)]
+    (str
+      "@post(`"handler-path"?idx="idx"&translate=${"
+      (if (= prev-intersect "top")
+        (str translate" + $"c-ref".clientHeight")
+        (str "$"table-ref".clientHeight - ($"a-ref".clientHeight + $"
+             b-ref".clientHeight + "translate")"))
+      "}&intersect=top`)")))
 
 (defn on-intersect-bottom-js
-  [{:keys [translate-$ post-$ idx a-ref table-ref b-ref c-ref
+  [{:keys [handler-path idx a-ref table-ref b-ref c-ref
            translate prev-intersect]}]
-  (str
-    "$"translate-$" = "
-    (if (or (= prev-intersect "bottom") (nil? prev-intersect))
-      (str translate" + $"a-ref".clientHeight;")
-      (str "$"table-ref".clientHeight - ($"b-ref".clientHeight + $"
-        c-ref".clientHeight + "translate");"))
-    "$"post-$" = `?idx="idx"&translate=${$"translate-$"}&intersect=bottom`"))
+  (let [prev-intersect (if (= prev-intersect "jump") "bottom" prev-intersect)]
+    (str
+      "@post(`"handler-path"?idx="idx"&translate=${"
+      (if (or (= prev-intersect "bottom") (nil? prev-intersect))
+        (str translate" + $"a-ref".clientHeight")
+        (str "$"table-ref".clientHeight - ($"b-ref".clientHeight + $"
+             c-ref".clientHeight + "translate")"))
+      "}&intersect=bottom`)")))
 
-(defn on-intersect-jump-js [{:keys [post-$ scroll-ref a-ref]}]
+(defn on-intersect-jump-js [{:keys [handler-path scroll-ref a-ref]}]
   (str
-    "$"post-$" = `?y=${Math.floor($"scroll-ref
-    ".scrollTop - $"a-ref".clientHeight)}&intersect=jump`"))
-
-(defn post-effect-js [post-$ handler-path]
-  (str
-    "if ($"post-$") {"
-    "@post(`"handler-path"${$"post-$"}`);"
-    "$"post-$" = ''"
-    "}"))
+    "@post(`"handler-path"?y=${Math.floor($"scroll-ref
+    ".scrollTop)}&intersect=jump`)"))
 
 (defmethod h/html-resolve-alias ::virtual
   [_ {:keys                               [id]
@@ -47,10 +42,10 @@
   (let [total-item-count (item-count-fn)
         size             (* approx-item-height total-item-count)
         y                (max (or y 0) 0)
-        [idx translate intersect]
+        [idx translate]
         (if (= intersect "jump")
-          [(int (* (/ y size) total-item-count)) y nil]
-          [idx translate intersect])
+          [(int (* (/ y size) total-item-count)) y]
+          [idx translate])
         offset           (or idx 0)
         limit            max-rendered-items
         translate        (max (or translate 0) 0)
@@ -64,13 +59,11 @@
         a                (subvec items 0 chunk-size)
         b                (subvec items chunk-size (* 2 chunk-size))
         c                (subvec items (* 2 chunk-size) item-count)
-        a-ref            (str "_" id "-virtual-a-sig")
-        b-ref            (str "_" id "-virtual-b-sig")
-        c-ref            (str "_" id "-virtual-c-sig")
-        table-ref        (str "_" id "-virtual-table-sig")
-        scroll-ref       (str "_" id "-virtual-scroll-sig")
-        post-$           (str "_" id "-virtual-post-sig")
-        translate-$      (str "_" id "-virtual-translate-sig")]
+        a-ref            (str "_" id "-virtual-a-ref")
+        b-ref            (str "_" id "-virtual-b-ref")
+        c-ref            (str "_" id "-virtual-c-ref")
+        table-ref        (str "_" id "-virtual-table-ref")
+        scroll-ref       (str "_" id "-virtual-scroll-ref")]
     [:div (assoc attrs
             :style {:scroll-behavior     :smooth
                     :overscroll-behavior :contain
@@ -82,7 +75,6 @@
             :data-ref scroll-ref)
      [:div {:id          (str id "-virtual-table")
             :data-ref    table-ref
-            :data-effect (post-effect-js post-$ handler-path)
             :style
             {:pointer-events        :none
              :display               :grid
@@ -100,9 +92,9 @@
              :data-on-intersect__once__debounce.100ms
              (when-not (= offset 0)
                (on-intersect-jump-js
-                 {:post-$     post-$
-                  :scroll-ref scroll-ref
-                  :a-ref      a-ref}))}]
+                 {:handler-path handler-path
+                  :scroll-ref   scroll-ref
+                  :a-ref        a-ref}))}]
       [:div (assoc {;; content hash to make morph more efficient
                     :id (str id "-" (hash a))}
               :data-ref a-ref)
@@ -110,8 +102,7 @@
               :data-on-intersect__once
               (when-not (= offset 0)
                 (on-intersect-top-js
-                  {:post-$         post-$
-                   :translate-$    translate-$
+                  {:handler-path handler-path
                    :idx            (- offset (count c))
                    :a-ref          a-ref
                    :b-ref          b-ref
@@ -131,8 +122,7 @@
               :data-on-intersect__once
               (when-not (>= (+ offset limit) total-item-count)
                 (on-intersect-bottom-js
-                  {:post-$         post-$
-                   :translate-$    translate-$
+                  {:handler-path handler-path
                    :idx            (+ offset (count a))
                    :a-ref          a-ref
                    :b-ref          b-ref
@@ -149,10 +139,13 @@
              :data-on-intersect__once__debounce.100ms
              (when-not (>= (+ offset limit) total-item-count)
                (on-intersect-jump-js
-                 {:post-$     post-$
-                  :scroll-ref scroll-ref
-                  :a-ref      a-ref}))}]]]))
+                 {:handler-path handler-path
+                  :scroll-ref   scroll-ref
+                  :a-ref        a-ref}))}]]]))
 
 ;; TODO: add x/y axis headers/sidebar
 ;; TODO: Read up more on intersection observer API
-;; TODO: sometimes double jump. Is debounce better?
+;; TODO: jump is not aligning with the top grid, this is causing a shift.
+;; This is because a_ref can have large variance in height
+
+;; when we jump, delay loading the view, measure A change translate

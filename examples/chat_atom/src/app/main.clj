@@ -79,7 +79,7 @@
        :v/item-fn            (partial messages db)
        :v/item-count-fn      (partial get-message-count db)
        :v/approx-item-height 100
-       :v/max-rendered-items 60}]]))
+       :v/max-rendered-items 100}]]))
 
 (defn ctx-start []
   (let [db_ (atom {:messages []})]
