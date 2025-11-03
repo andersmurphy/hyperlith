@@ -70,9 +70,12 @@ rm /etc/caddy/Caddyfile
 cat > /etc/caddy/Caddyfile << EOD
 example.andersmurphy.com {
   header -Server
+
+  handle_errors 5xx {
+     abort
+  }
   reverse_proxy localhost:8080 {
-    lb_try_duration 30s
-    lb_try_interval 1s
+    
   }
 }
 EOD
