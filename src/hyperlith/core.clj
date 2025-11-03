@@ -122,8 +122,7 @@
           {:port port})))))
 
 (defn start-app
-  [{:keys [port ctx-start ctx-stop csrf-secret
-           max-refresh-ms on-error]
+  [{:keys [port ctx-start ctx-stop csrf-secret on-error]
     :or   {port     8080
            on-error er/default-on-error}}]
   (throw-if-port-in-use! 8080)
@@ -131,13 +130,7 @@
         _              (reset! refresh-ch_ <refresh-ch)
         ctx            (ctx-start)
         _              (reset! er/on-error_ on-error)
-        refresh-mult   (-> (if max-refresh-ms
-                             (ds/throttle <refresh-ch max-refresh-ms)
-                             ;; If you don't set a max-refresh-ms
-                             ;; there will be no throttle on the render.
-                             ;; This can be desirable if you are batching
-                             ;; updates/changes already.
-                             <refresh-ch)
+        refresh-mult   (-> <refresh-ch
                          a/mult)
         wrap-ctx       (fn [handler]
                          (fn [req]

@@ -43,15 +43,6 @@
     "\ndata: elements " (str/replace elements "\n" "\ndata: elements ")
     "\n\n\n"))
 
-(defn throttle [<in-ch msec]
-  (let [;; No buffer on the out-ch as the in-ch should be buffered
-        <out-ch (a/chan)]
-    (util/thread
-      (util/while-some [event (a/<!! <in-ch)]
-        (a/>!! <out-ch event)
-        (Thread/sleep ^long msec)))
-    <out-ch))
-
 (defn send! [ch event]
   (hk/send! ch {:status  200
                 :headers (assoc default-headers

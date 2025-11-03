@@ -170,8 +170,7 @@
 (defn -main [& _]
   (reset! app_
     (h/start-app
-      {:max-refresh-ms 200
-       :ctx-start      ctx-start
+      {:ctx-start      ctx-start
        :ctx-stop       (fn [{:keys [game-stop]}] (game-stop))
        :csrf-secret    (h/env :csrf-secret)})))
 
