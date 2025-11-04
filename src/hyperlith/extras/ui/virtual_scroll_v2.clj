@@ -154,7 +154,3 @@
 
 ;; TODO: add x/y axis headers/sidebar
 ;; TODO: Read up more on intersection observer API
-;; TODO: jump is not aligning with the top grid, this is causing a shift.
-;; This is because a_ref can have large variance in height
-
-;; when we jump, delay loading the view, measure A change translate
