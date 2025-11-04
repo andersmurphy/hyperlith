@@ -25,10 +25,15 @@
              c-ref".clientHeight + "translate")"))
       "}&intersect=bottom`)")))
 
-(defn on-intersect-jump-js [{:keys [handler-path scroll-ref a-ref]}]
+(defn on-intersect-jump-js [{:keys [handler-path scroll-ref a-ref
+                                    b-ref c-ref]}]
   (str
+    ;; Use the average of all three containers to offset
+    ;; the translation so that jumps centre the view.
     "@post(`"handler-path"?y=${Math.floor($"scroll-ref
-    ".scrollTop)}&intersect=jump`)"))
+    ".scrollTop - ($"a-ref".clientHeight + $"
+    b-ref".clientHeight + $"
+    c-ref".clientHeight) / 3)}&intersect=jump`)"))
 
 (defmethod h/html-resolve-alias ::virtual
   [_ {:keys                               [id]
@@ -73,8 +78,8 @@
                     :width               :100%
                     :height              :100%}
             :data-ref scroll-ref)
-     [:div {:id          (str id "-virtual-table")
-            :data-ref    table-ref
+     [:div {:id       (str id "-virtual-table")
+            :data-ref table-ref
             :style
             {:pointer-events        :none
              :display               :grid
@@ -94,7 +99,9 @@
                (on-intersect-jump-js
                  {:handler-path handler-path
                   :scroll-ref   scroll-ref
-                  :a-ref        a-ref}))}]
+                  :a-ref        a-ref
+                  :b-ref        b-ref
+                  :c-ref        c-ref}))}]
       [:div (assoc {;; content hash to make morph more efficient
                     :id (str id "-" (hash a))}
               :data-ref a-ref)
@@ -102,7 +109,7 @@
               :data-on-intersect__once
               (when-not (= offset 0)
                 (on-intersect-top-js
-                  {:handler-path handler-path
+                  {:handler-path   handler-path
                    :idx            (- offset (count c))
                    :a-ref          a-ref
                    :b-ref          b-ref
@@ -122,7 +129,7 @@
               :data-on-intersect__once
               (when-not (>= (+ offset limit) total-item-count)
                 (on-intersect-bottom-js
-                  {:handler-path handler-path
+                  {:handler-path   handler-path
                    :idx            (+ offset (count a))
                    :a-ref          a-ref
                    :b-ref          b-ref
@@ -141,7 +148,9 @@
                (on-intersect-jump-js
                  {:handler-path handler-path
                   :scroll-ref   scroll-ref
-                  :a-ref        a-ref}))}]]]))
+                  :a-ref        a-ref
+                  :b-ref        b-ref
+                  :c-ref        c-ref}))}]]]))
 
 ;; TODO: add x/y axis headers/sidebar
 ;; TODO: Read up more on intersection observer API
