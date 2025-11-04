@@ -53,6 +53,7 @@
           [idx translate])
         offset           (or idx 0)
         limit            max-rendered-items
+        max-height       (int (* (/ max-rendered-items 3) approx-item-height))
         translate        (max (or translate 0) 0)
         [offset translate intersect]
         (if (> (int (/ limit 3)) offset) [0 0 "bottom"]
@@ -75,6 +76,7 @@
                     :overflow-anchor     :none
                     :overflow-y          :auto
                     :overflow-x          :auto
+                    :max-height          (str max-height "px")
                     :width               :100%
                     :height              :100%}
             :data-ref scroll-ref)
