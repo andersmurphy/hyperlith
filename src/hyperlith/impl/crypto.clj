@@ -1,7 +1,5 @@
 (ns hyperlith.impl.crypto
-  (:import [javax.crypto Mac]
-           [javax.crypto.spec SecretKeySpec]
-           [java.security SecureRandom]
+  (:import [java.security SecureRandom]
            [java.security MessageDigest]
            [java.util Base64 Base64$Encoder]))
 
@@ -26,17 +24,6 @@
 (def new-uid
   "Allows uid implementation to be changed if need be."
   random-unguessable-uid)
-
-(defn secret-key->hmac-sha256-keyspec [secret-key]
-  (SecretKeySpec/new (String/.getBytes secret-key) "HmacSha256"))
-
-(defn hmac-sha256
-  "Used for quick stateless csrf token generation."
-  [key-spec data]
-  (-> (doto (Mac/getInstance "HmacSha256")
-        (.init key-spec))
-    (.doFinal (String/.getBytes data))
-    bytes->base64))
 
 (defn digest
   "Short digest, compact but with a higher collision rate."

@@ -74,9 +74,10 @@
       {:timeout 1
        :headers
        {"accept-encoding" "br"
-        "cookie"       "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY; __Host-csrf=3UsG62ic9wLsg9EVQhGupw"
-        "content-type" "application/json"}
-       :body    "{\"csrf\":\"3UsG62ic9wLsg9EVQhGupw\"}"}))
+        "cookie"       "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY"
+        "content-type" "application/json"
+        "sec-fetch-site" "same-origin"}
+       }))
 
   (-> @capture parse-captured-response)
 

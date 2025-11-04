@@ -171,8 +171,7 @@
   (reset! app_
     (h/start-app
       {:ctx-start      ctx-start
-       :ctx-stop       (fn [{:keys [game-stop]}] (game-stop))
-       :csrf-secret    (h/env :csrf-secret)})))
+       :ctx-stop       (fn [{:keys [game-stop]}] (game-stop))})))
 
 ;; Refresh app when you re-eval file
 (h/refresh-all!)

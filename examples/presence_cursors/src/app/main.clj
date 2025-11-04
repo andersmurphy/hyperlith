@@ -58,8 +58,7 @@
 (defn -main [& _]
   (h/start-app
     {:ctx-start       ctx-start
-     :ctx-stop        (fn [_db] nil)
-     :csrf-secret    (h/env :csrf-secret)}))
+     :ctx-stop        (fn [_db] nil)}))
 
 ;; Refresh app when you re-eval file
 (h/refresh-all!)
@@ -83,12 +82,12 @@
     (wrapped-router
       {:headers
        {"accept-encoding" "br"
-        "cookie"          "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY; __Host-csrf=3UsG62ic9wLsg9EVQhGupw"
-        "content-type"    "application/json"}
+        "cookie"          "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY"
+        "content-type"    "application/json"
+        "sec-fetch-site" "same-origin"}
        :request-method :post
        :uri            handle-user-cursor-position
-       :body           {:csrf "3UsG62ic9wLsg9EVQhGupw"
-                        :x    (rand-nth (range 1 400 20))
+       :body           {:x    (rand-nth (range 1 400 20))
                         :y    (rand-nth (range 1 400 20))}}))
 
   ,)

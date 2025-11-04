@@ -20,7 +20,7 @@ Hyperlith only uses a subset of Datastar's feartures. If you want a production r
 
 **Q:** *Why do I get 403 when running the examples locally in Chrome or Safari?*
 
-**A:** *The session and csrf cookies use `Secure` this means that these cookies won't be set on localhost when using chrome or safari (as they require HTTPS) . If you want to use Chrome or Safari for local development you can run `caddy run` to start a local https proxy on https://localhost:3030. The local `caddyfile` can be [found here](https://github.com/andersmurphy/hyperlith/blob/master/Caddyfile). The goal is for development to be as close to production as possible, and Hyperlith is designed to be run behind a reverse proxy.*
+**A:** *The session  use `Secure` this means that these cookies won't be set on localhost when using chrome or safari (as they require HTTPS) . If you want to use Chrome or Safari for local development you can run `caddy run` to start a local https proxy on https://localhost:3030. The local `caddyfile` can be [found here](https://github.com/andersmurphy/hyperlith/blob/master/Caddyfile). The goal is for development to be as close to production as possible, and Hyperlith is designed to be run behind a reverse proxy.*
 
 ## Rational (more like a collection of opinions)
 
@@ -54,7 +54,7 @@ My suspicion is websocket approaches in this space like Phoenix Liveview haven't
 
 #### Signals are only for ephemeral client side state
 
-Signals should only be used for ephemeral client side state. Things like: the current value of a text input, whether a popover is visible, current csrf token, input validation errors. Signals can be controlled on the client via expressions, or from the backend via `patch-signals`.
+Signals should only be used for ephemeral client side state. Things like: the current value of a text input, whether a popover is visible, input validation errors. Signals can be controlled on the client via expressions, or from the backend via `patch-signals`.
 
 #### Signals in elements should be declared __ifmissing
 
@@ -103,7 +103,7 @@ Hyperlith uses a simple unguessable random uid for managing sessions. This shoul
 
 #### CSRF
 
-Double submit cookie pattern is used for CSRF.
+Uses `Sec-Fetch-Site` to ensure none get requests are from the same origin.
 
 #### Rendering an initial shim
 

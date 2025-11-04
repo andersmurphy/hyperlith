@@ -1,6 +1,5 @@
 (ns hyperlith.impl.datastar
   (:require [hyperlith.impl.assets :refer [static-asset]]
-            [hyperlith.impl.session :refer [csrf-cookie-js]]
             [hyperlith.impl.headers
              :refer [default-headers strict-transport]]
             [hyperlith.impl.util :as util]
@@ -81,8 +80,7 @@
                       [:meta {:name    "viewport"
                               :content "width=device-width, initial-scale=1.0"}]]
                      [:body
-                      [:div {:data-signals:csrf  csrf-cookie-js
-                             :data-signals:tabid tabid-js}]
+                      [:div {:data-signals:tabid tabid-js}]
                       [:div {:data-init              on-load-js
                              ;; Reconnect when the user comes online after
                              ;; being offline. Closes any existing connection

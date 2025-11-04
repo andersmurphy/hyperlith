@@ -563,8 +563,7 @@
   (reset! app_
     (h/start-app
       {:ctx-start      ctx-start
-       :ctx-stop       ctx-stop
-       :csrf-secret    (h/env :csrf-secret)})))
+       :ctx-stop       ctx-stop})))
 
 ;; Refresh app when you re-eval file
 (h/refresh-all!)

@@ -117,8 +117,7 @@
 (defn -main [& _]
   (h/start-app
     {:ctx-start    ctx-start
-     :ctx-stop     (fn [_] nil)
-     :csrf-secret    (h/env :csrf-secret)}))
+     :ctx-stop     (fn [_] nil)}))
 
 ;; Refresh app when you re-eval file
 (h/refresh-all!)

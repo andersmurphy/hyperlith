@@ -546,8 +546,7 @@
   (reset! app_
     (h/start-app
       {:ctx-start   ctx-start
-       :ctx-stop    ctx-stop
-       :csrf-secret (h/env :csrf-secret)})))
+       :ctx-stop    ctx-stop})))
 
 ;; Refresh app when you re-eval file
 (h/refresh-all!)
@@ -641,13 +640,13 @@
               (-> (wrapped-router
                     {:headers
                      {"accept-encoding" "br"
-                      "cookie"          "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY; __Host-csrf=I3AAFrMG99lxoqwi87cSpn7unri5qYqJ-Vr9DLc4-s4"
-                      "content-type"    "application/json"}
+                      "cookie"          "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY"
+                      "content-type"    "application/json"
+                      "sec-fetch-site"  "same-origin"}
                      :request-method :post
                      :uri            handler-check
                      :body
-                     {:csrf     "I3AAFrMG99lxoqwi87cSpn7unri5qYqJ-Vr9DLc4-s4"
-                      :parentid (str (rand-int 10))
+                     {:parentid (str (rand-int 10))
                       :targetid (str (rand-int 200))}})))
             ;; 10000r/s
             (range 10))
