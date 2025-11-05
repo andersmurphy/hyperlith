@@ -78,7 +78,7 @@
        :v/handler-data       (get-in @db [tabid :virtual])
        :v/item-fn            (partial messages db)
        :v/item-count-fn      (partial get-message-count db)
-       :v/approx-item-height 100
+       :v/min-item-size      100
        :v/max-rendered-items 100}]]))
 
 (defn ctx-start []
