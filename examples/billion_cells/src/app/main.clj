@@ -309,7 +309,9 @@
 (defn Cell [local-id {:keys [value focus]} sid]
   (cond
     (and focus (= focus sid))
-    (let [on-load  (str "$cellvalue = '" (or value "") "';el.focus();")
+    (let [on-load  (str "$cellvalue = '"
+                     ;; Probably something cleaner can be done here
+                     (or (h/url-encode value) "")"';el.focus();")
           on-input (str "@post('" handler-save-cell "')")
           id     (str "focus-" local-id)]
       (h/html
@@ -322,6 +324,9 @@
             :size                          10
             :type                          "text"
             :data-init                     on-load
+            ;; prevents data-init firing multiple times
+            ;; (even if the value changes)
+            :data-preserve-attr            "data-init"
             :data-bind                     "cellvalue"
             :data-on:input__debounce.200ms on-input)]]))
 
