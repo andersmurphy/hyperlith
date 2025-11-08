@@ -10,7 +10,7 @@
       (if (= prev-intersect "top")
         (str translate" + $"c-ref".clientHeight")
         (str "$"table-ref".clientHeight - ($"a-ref".clientHeight + $"
-             b-ref".clientHeight + "translate")"))
+          b-ref".clientHeight + "translate")"))
       "}&intersect=top`)")))
 
 (defn on-intersect-bottom-js
@@ -22,18 +22,18 @@
       (if (or (= prev-intersect "bottom") (nil? prev-intersect))
         (str translate" + $"a-ref".clientHeight")
         (str "$"table-ref".clientHeight - ($"b-ref".clientHeight + $"
-             c-ref".clientHeight + "translate")"))
+          c-ref".clientHeight + "translate")"))
       "}&intersect=bottom`)")))
 
 (defn on-intersect-jump-js [{:keys [handler-path scroll-ref a-ref
-                                    b-ref c-ref]}]
+                                    b-ref c-ref item-count a-count]}]
   (str
     ;; Use the average of all three containers to offset
     ;; the translation so that jumps centre the view.
     "@post(`"handler-path"?y=${Math.floor($"scroll-ref
-    ".scrollTop - ($"a-ref".clientHeight + $"
+    ".scrollTop - (($"a-ref".clientHeight + $"
     b-ref".clientHeight + $"
-    c-ref".clientHeight) / 3)}&intersect=jump`)"))
+    c-ref".clientHeight) /"item-count")*"a-count")}&intersect=jump`)"))
 
 (defn chunk-items [item-fn offset limit]
   (let [items      (vec (item-fn {:offset offset :limit limit}))
@@ -45,12 +45,12 @@
      (subvec items (* 2 chunk-size) item-count)]))
 
 (defmethod h/html-resolve-alias ::virtual
-  [_ {:keys                                        [id]
+  [_ {:keys                               [id]
       :v/keys
       [handler-path item-fn item-count-fn min-item-size
        max-rendered-items]
       {:keys [translate idx intersect y]} :v/handler-data
-      :as                                          attrs} _]
+      :as                                 attrs} _]
   (assert (and id handler-path item-fn item-count-fn
             min-item-size max-rendered-items))
   (let [total-item-count (item-count-fn)
@@ -68,6 +68,7 @@
         (if (> (int (/ limit 3)) offset) [0 0 "bottom"]
             [offset translate intersect])
         [a b c]          (chunk-items item-fn offset limit)
+        item-count       (+ (count a) (count b) (count c))
         a-ref            (str "_" id "-v-a-ref")
         b-ref            (str "_" id "-v-b-ref")
         c-ref            (str "_" id "-v-c-ref")
@@ -78,7 +79,11 @@
                             :scroll-ref   scroll-ref
                             :a-ref        a-ref
                             :b-ref        b-ref
-                            :c-ref        c-ref})]
+                            :c-ref        c-ref
+                            ;; a is always full size.
+                            ;; c can be less when near end of list.
+                            :item-count   item-count
+                            :a-count      (count a)})]
     [:div (assoc attrs
             :style {:scroll-behavior     :smooth
                     :overscroll-behavior :contain
@@ -143,3 +148,4 @@
              (when-not (>= (+ offset limit) total-item-count) on-jump)}]]]))
 
 ;; TODO: add x/y axis headers/sidebar
+
