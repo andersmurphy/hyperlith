@@ -262,10 +262,10 @@
 
 (defaction handler-focused
   [{:keys                       [sid tx-batch! tabid]
-    {:keys [targetid parentid]} :body}]
-  (when (and targetid parentid)
-    (let [cell-id  (int (parse-long targetid))
-          chunk-id (int (parse-long parentid))]
+    {:strs [id chunk-id]} :query-params}]
+  (when (and id chunk-id)
+    (let [cell-id  (int (parse-long id))
+          chunk-id (int (parse-long chunk-id))]
       (when (>= (dec (* chunk-size chunk-size)) cell-id 0)
         (tx-batch! (partial remove-focus! sid tabid))
         (tx-batch!
@@ -279,10 +279,11 @@
 
 (defaction handler-save-cell
   [{:keys                                 [tx-batch!]
-    {:keys [targetid parentid cellvalue]} :body}]
-  (when (and targetid parentid)
-    (let [cell-id  (int (parse-long targetid))
-          chunk-id (int (parse-long parentid))]
+    {:strs [id chunk-id]} :query-params
+    {:keys [cellvalue]} :body}]
+  (when (and id chunk-id)
+    (let [cell-id  (int (parse-long id))
+          chunk-id (int (parse-long chunk-id))]
       (when (>= (dec (* chunk-size chunk-size)) cell-id 0)
         (tx-batch!
           (fn [db chunk-cache]
@@ -306,20 +307,21 @@
       [:p [:strong nil (str "X: " jumpx " Y: " jumpy)]]
       [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]]]))
 
-(defn Cell [local-id {:keys [value focus]} sid]
+(defn Cell [chunk-id local-id {:keys [value focus]} sid]
   (cond
     (and focus (= focus sid))
     (let [on-load  (str "$cellvalue = '"
                      ;; Probably something cleaner can be done here
                      (or (h/url-encode value) "")"';el.focus();")
-          on-input (str "@post('" handler-save-cell "')")
+          on-input (str "@post('"
+                     handler-save-cell"?id="local-id"&chunk-id="chunk-id
+                     "')")
           id     (str "focus-" local-id)]
       (h/html
         [:div.focus-cell
          [:input.focus-user
           (array-map
             :id                            id
-            :data-id                       local-id
             :maxlength                     20
             :size                          10
             :type                          "text"
@@ -334,14 +336,13 @@
     (h/html
       [:div.focus-cell
        [:p.focus-other
-        {:data-id       local-id
-         :data-action   handler-focused}
+        {:data-action (str handler-focused"?id="local-id"&chunk-id="chunk-id)}
         value]])
 
     :else (h/html [:p.cell
-                   {:data-id       local-id
-                    :data-value    value
-                    :data-action   handler-focused}
+                   {:data-value    value
+                    :data-action
+                    (str handler-focused"?id="local-id"&chunk-id="chunk-id)}
                    value])))
 
 (defn xy->chunk-id [x y]
@@ -356,25 +357,23 @@
 
 (defn Chunk [chunk-id chunk-cells sid]
   (h/html
-    [:div.chunk {:id          (str "chunk-" chunk-id)
-                 :data-id     chunk-id}
+    [:div.chunk {:id          (str "chunk-" chunk-id)}
      (into []
-       (map-indexed (fn [local-id box] (Cell local-id box sid)))
+       (map-indexed (fn [local-id box] (Cell chunk-id local-id box sid)))
        chunk-cells)]))
 
-(def empty-cells
+(defn empty-cells [chunk-id]
   (h/html
     (into []
-      (map-indexed (fn [local-id box] (Cell local-id box nil)))
+      (map-indexed (fn [local-id box] (Cell chunk-id local-id box nil)))
       blank-chunk)))
 
 (defn EmptyChunk [chunk-id]
   (h/html
     [:div.chunk {:id                (str "chunk-" chunk-id)
                  :data-ignore-morph true
-                 :data-ignore       true
-                 :data-id           chunk-id}
-     empty-cells]))
+                 :data-ignore       true}
+     (empty-cells chunk-id)]))
 
 (defn UserView
   [db sid {:keys [x-offset-items y-offset-items
@@ -448,9 +447,6 @@
         (str
           "if (evt.target.dataset.action) {"
           "evt.target.classList.add('pop');"
-          "$targetid = evt.target.dataset.id;"
-          "$parentid = evt.target.parentElement.dataset.id;"
-          "$gparentid = evt.target.parentElement.parentElement.dataset.id;"
           "@post(`${evt.target.dataset.action}`);"
           "setTimeout(() => evt.target.classList.remove('pop'), 300)"
           "}")}

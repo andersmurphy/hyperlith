@@ -268,8 +268,8 @@
              :width  (max (int view-w) 0)))))))
 
 (defaction handler-palette
-  [{:keys [sid tabid tx-batch!] {:keys [targetid]} :body}]
-  (let [color (parse-long targetid)]
+  [{:keys [sid tabid tx-batch!] {:strs [id]} :query-params}]
+  (let [color (parse-long id)]
     ;; 0 is an empty color (used for clearing)
     (when (<= 0 color (dec (count states)))
       (tx-batch!
@@ -278,11 +278,11 @@
 
 (defaction handler-check
   [{:keys                       [sid tx-batch! db tabid]
-    {:keys [targetid parentid]} :body}]
-  (when (and targetid parentid)
+    {:strs [chunk-id id]} :query-params}]
+  (when (and id chunk-id)
     (let [user-color (or (:color (get-tab-data db sid tabid)) 1)
-          cell-id    (int (parse-long targetid))
-          chunk-id   (int (parse-long parentid))]
+          cell-id    (int (parse-long id))
+          chunk-id   (int (parse-long chunk-id))]
       (when (>= (dec (* chunk-size chunk-size)) cell-id 0)
         (tx-batch!
           (fn [db chunk-cache]
@@ -328,15 +328,14 @@
            jumpx "&y=" jumpy)
          {:dark black :light white})]]]))
 
-(defn Checkbox [local-id state]
+(defn Checkbox [chunk-id local-id state]
   (let [state       (or state 0)
         checked     (not= state 0)
         color-class (str "checked " (get state->class state))]
     (h/html
       [:div.box
        {:class       (when checked color-class)
-        :data-id     local-id
-        :data-action handler-check}])))
+        :data-action (str handler-check"?chunk-id="chunk-id"&id="local-id)}])))
 
 (defn xy->chunk-id [x y]
   (+ x (* y board-size)))
@@ -352,26 +351,24 @@
   (h/html
     [:div.chunk
      {:id          (str "chunk-" chunk-id)
-      :data-ignore true
-      :data-id     chunk-id}
+      :data-ignore true}
      (into []
-       (map-indexed (fn [local-id box] (Checkbox local-id box)))
+       (map-indexed (fn [local-id box] (Checkbox chunk-id local-id box)))
        chunk-cells)]))
 
-(def empty-checks
+(defn empty-checks [chunk-id]
   (h/html
     (into []
-      (map-indexed (fn [local-id box] (Checkbox local-id box)))
-      blank-chunk )))
+      (map-indexed (fn [local-id box] (Checkbox chunk-id local-id box)))
+      blank-chunk)))
 
 (defn EmptyChunk [chunk-id]
   (h/html
     [:div.chunk
      {:id                (str "chunk-" chunk-id)
       :data-ignore-morph true
-      :data-ignore       true
-      :data-id           chunk-id}
-     empty-checks]))
+      :data-ignore       true}
+     (empty-checks chunk-id)]))
 
 (defn UserView
   [db offset-data]
@@ -392,8 +389,7 @@
     [:div.palette nil
      (mapv (fn [state]
              (h/html [:div.palette-item
-                      {:data-id     state
-                       :data-action handler-palette
+                      {:data-action (str handler-palette"?id="state)
                        :class
                        (str (state->class state)
                          (when (= current-selected state)
@@ -432,8 +428,6 @@
         (str
           "if (evt.target.dataset.action) {"
           "evt.target.classList.add('pop');"
-          "$targetid = evt.target.dataset.id;"
-          "$parentid = evt.target.parentElement.dataset.id;"
           "@post(`${evt.target.dataset.action}`);"
           "setTimeout(() => evt.target.classList.remove('pop'), 300)"
           "}")}

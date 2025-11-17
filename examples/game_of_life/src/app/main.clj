@@ -65,14 +65,6 @@
         {:background :purple
          :transition cell-transition}]])))
 
-(defn board-state [db]
-  (into []
-    (comp
-      (map-indexed
-        (fn [id color-class]
-          (h/html [:div.tile {:class color-class :data-id id}]))))
-    (:board db)))
-
 (defn fill-cell [board color id]
   (if ;; crude overflow check
       (<= 0 id (dec (* board-size board-size)))
@@ -94,6 +86,15 @@
       (fn [db]
         (swap! db fill-cross (parse-long id) sid)))))
 
+(defn board-state [db]
+  (into []
+    (comp
+      (map-indexed
+        (fn [id color-class]
+          (h/html [:div.tile {:class color-class
+                              :data-action (str handler-tap-cell"?id="id)}]))))
+    (:board db)))
+
 (def shim-headers
   (h/html
     [:link#css {:rel "stylesheet" :type "text/css" :href css}]
@@ -103,8 +104,7 @@
 (defn board [snapshot]
   (let [view (board-state snapshot)]
     (h/html
-      [:div {:data-on:pointerdown
-             (str "@post(`" handler-tap-cell "?id=${evt.target.dataset.id}`)")}
+      [:div {:data-on:pointerdown "@post(`${evt.target.dataset.action}`)"}
        [:div.board nil view]])))
 
 (defview render-home {:path "/" :shim-headers shim-headers}
@@ -178,7 +178,7 @@
 
 (comment
   (do (-main) nil)
-  ;; (clojure.java.browse/browse-url "http://localhost:8080/")
+  ;; (clojure.java.browse/browse-url "https://localhost:3030/")
 
   ;; stop server
   ((@app_ :stop))
