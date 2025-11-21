@@ -5,7 +5,8 @@
             [hyperlith.extras.sqlite :as d]
             [hyperlith.extras.ui.virtual-scroll :as vs]
             [clj-async-profiler.core :as prof]
-            [clojure.math :as math]))
+            [clojure.math :as math]
+            [hyperlith.impl.engine :as engine]))
 
 (def cell-size-px 32)
 (def chunk-size 16)
@@ -100,7 +101,6 @@
          :grid-row                 (str "span " chunk-size)
          ;; For how subgrid and contain interact see:
          ;; https://github.com/w3c/csswg-drafts/issues/7091
-         :content-visibility       :auto
          :contain                  :strict
          :contain-intrinsic-height (str (* chunk-size cell-size-px)"px")
          :contain-intrinsic-width  (str (* chunk-size cell-size-px)"px")}]
@@ -249,62 +249,66 @@
   (-> (repeat (* chunk-size chunk-size) 0) vec))
 
 (defaction handler-scroll
-  [{:keys [sid tabid tx-batch!] {:keys [view-x view-y]} :body}]
-  (tx-batch!
-    (fn [db _]
+  [{:keys [sid tabid tx!] {:keys [view-x view-y]} :body}]
+  (tx!
+    (fn [db]
       (update-tab-data! db sid tabid
         #(assoc %
            :x (max (int view-x) 0)
            :y (max (int view-y) 0))))))
 
 (defaction handler-resize
-  [{:keys [sid tabid tx-batch!] {:keys [view-h view-w]} :body}]
+  [{:keys [sid tabid tx!] {:keys [view-h view-w]} :body}]
   (when (and view-h view-w)
-    (tx-batch!
-      (fn [db _]
+    (tx!
+      (fn [db]
         (update-tab-data! db sid tabid
           #(assoc %
              :height (max (int view-h) 0)
              :width  (max (int view-w) 0)))))))
 
 (defaction handler-palette
-  [{:keys [sid tabid tx-batch!] {:strs [id]} :query-params}]
+  [{:keys [sid tabid tx!] {:strs [id]} :query-params}]
   (let [color (parse-long id)]
     ;; 0 is an empty color (used for clearing)
     (when (<= 0 color (dec (count states)))
-      (tx-batch!
-        (fn [db _]
+      (tx!
+        (fn [db]
           (update-tab-data! db sid tabid #(assoc % :color color)))))))
 
 (defaction handler-check
-  [{:keys                       [sid tx-batch! db tabid]
-    {:strs [chunk-id id]} :query-params}]
+  [{:keys                 [sid tx! tabid]
+    {:strs [chunk-id id]} :query-params :as req}]
   (when (and id chunk-id)
-    (let [user-color (or (:color (get-tab-data db sid tabid)) 1)
-          cell-id    (int (parse-long id))
-          chunk-id   (int (parse-long chunk-id))]
+    (let [cell-id  (int (parse-long id))
+          chunk-id (int (parse-long chunk-id))]
       (when (>= (dec (* chunk-size chunk-size)) cell-id 0)
-        (tx-batch!
-          (fn [db chunk-cache]
-            (let [chunk (or (@chunk-cache chunk-id)
-                          (-> (d/q db '{select [data]
-                                        from   chunk
-                                        where  [= id ?chunk-id]}
-                                {:chunk-id chunk-id})
-                            first)
-                          (d/q db
-                            '{insert-into chunk
-                              values      [{id   ?chunk-id
-                                            data ?blank-chunk}]}
-                            {:chunk-id    chunk-id
-                             :blank-chunk blank-chunk})
-                          (-> (d/q db '{select [data]
-                                        from   chunk
-                                        where  [= id ?chunk-id]}
-                                {:chunk-id chunk-id})
-                            first))]
-              (swap! chunk-cache assoc chunk-id
-                (update chunk cell-id #(if (= 0 %) user-color 0))))))))))
+        (tx!
+          (fn [db]
+            (let [user-color (or (:color (get-tab-data db sid tabid)) 1)
+                  chunk      (or
+                               (-> (d/q db '{select [data]
+                                             from   chunk
+                                             where  [= id ?chunk-id]}
+                                     {:chunk-id chunk-id})
+                                first)
+                              (d/q db
+                                '{insert-into chunk
+                                  values      [{id   ?chunk-id
+                                                data ?blank-chunk}]}
+                                {:chunk-id    chunk-id
+                                 :blank-chunk blank-chunk})
+                              (-> (d/q db '{select [data]
+                                            from   chunk
+                                            where  [= id ?chunk-id]}
+                                    {:chunk-id chunk-id})
+                                first))
+                  new-chunk  (update chunk cell-id #(if (= 0 %) user-color 0))]
+              (d/q db '{update chunk
+                        set    {data ?new-chunk}
+                        where  [= id ?chunk-id]}
+                {:chunk-id  chunk-id
+                 :new-chunk new-chunk}))))))))
 
 (defn scroll-to-xy-js [x y]
   (str
@@ -312,11 +316,11 @@
     "," (int (* (/ y size) board-size-px)) ");"))
 
 (defaction handler-jump
-  [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
+  [{:keys [_sid _tabid _tx!] {:keys [jumpx jumpy]} :body}]
   (h/execute-expr (scroll-to-xy-js jumpx jumpy)))
 
 (defaction handler-share
-  [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
+  [{:keys [_sid _tabid _tx!] {:keys [jumpx jumpy]} :body}]
   (h/html
     [:div.toast {:data-on:mousedown "el.remove()"}
      [:div.toast-card
@@ -407,12 +411,7 @@
   (str "Math.round((" n "/" board-size-px ")*" size ")"))
 
 (defview handler-root
-  {:path              "/" :shim-headers shim-headers :br-window-size 21
-   :render-on-connect false
-   :on-open           (fn [{:keys [tx-batch!]}]
-                        ;; This will trigger a batch on new user connect
-                        ;; But not actually update the database
-                        (tx-batch! (fn [& _] nil)))}
+  {:path "/" :shim-headers shim-headers}
   [{:keys         [db sid tabid]
     {:strs [x y]} :query-params
     :as           _req}]
@@ -489,50 +488,26 @@
     ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"]))
 
 (defn ctx-start []
-  (let [db-name "database-new.db"
-        _       (d/restore-then-replicate! db-name
-                  {:s3-access-key-id     (h/env :s3-access-key-id)
-                   :s3-access-secret-key (h/env :s3-access-secret-key)
-                   :config-yml
-                   (h/edn->json
-                     {:dbs
-                      [{:path db-name
-                        :replicas
-                        [{:type          "s3"
-                          :bucket        "hyperlith"
-                          :endpoint      "https://nbg1.your-objectstorage.com"
-                          :region        "nbg1"
-                          :sync-interval "1s"}]}]}
-                     :escape-slash false)})
-        {:keys [writer reader] :as db-obj}
-        (d/init-db! db-name
-          {:pool-size 4
-           :pragma    {:foreign_keys false}})]
-    ;; Run migrations
-    (migrations writer)
-    {:db-obj    db-obj
-     :db        reader
-     :db-read   reader
-     :db-write  writer
-     :tx-batch! (h/batch!
-                  (fn [thunks]
-                    #_{:clj-kondo/ignore [:unresolved-symbol]}
-                    (let [chunk-cache (atom {})]
-                      (d/with-write-tx [db writer]
-                        (run! (fn [thunk] (thunk db chunk-cache)) thunks)
-                        (run! (fn [[chunk-id new-chunk]]
-                                (d/q db '{update chunk
-                                          set    {data ?new-chunk}
-                                          where  [= id ?chunk-id]}
-                                  {:chunk-id  chunk-id
-                                   :new-chunk new-chunk}))
-                          @chunk-cache)))
-                    (h/refresh-all!))
-                  {:run-every-ms 100})}))
+  (let [db-name "database-new.db"]
+    (engine/start! db-name
+      {:migrations migrations
+       :litestream
+       {:s3-access-key-id     (h/env :s3-access-key-id)
+        :s3-access-secret-key (h/env :s3-access-secret-key)
+        :config-yml
+        (h/edn->json
+          {:dbs
+           [{:path db-name
+             :replicas
+             [{:type          "s3"
+               :bucket        "hyperlith"
+               :endpoint      "https://nbg1.your-objectstorage.com"
+               :region        "nbg1"
+               :sync-interval "1s"}]}]}
+          :escape-slash false)}})))
 
 (defn ctx-stop [ctx]
-  (.close (:db-write ctx))
-  (.close (:db-read ctx)))
+  )
 
 (defonce app_ (atom nil))
 
@@ -541,9 +516,6 @@
     (h/start-app
       {:ctx-start   ctx-start
        :ctx-stop    ctx-stop})))
-
-;; Refresh app when you re-eval file
-(h/refresh-all!)
 
 (comment
   (do (-main) nil)
@@ -638,14 +610,14 @@
                       "content-type"    "application/json"
                       "sec-fetch-site"  "same-origin"}
                      :request-method :post
-                     :uri            handler-check
-                     :body
-                     {:parentid (str (rand-int 10))
-                      :targetid (str (rand-int 200))}})))
+                     :uri handler-check
+                     :query-params {"id" (str (rand-int 200))
+                                    "chunk-id" (str (rand-int 10))}})))
             ;; 10000r/s
             (range 10))
           (Thread/sleep 1))
-        (range 10000)))))
+        (range 10000))))
+  ,)
 
 (comment
   ;; clear out empty chunks

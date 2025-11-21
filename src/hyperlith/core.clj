@@ -1,7 +1,5 @@
 (ns hyperlith.core
-  (:require [clojure.core.async :as a]
-            [hyperlith.impl.assets]
-            [hyperlith.impl.batch]
+  (:require [hyperlith.impl.assets]
             [hyperlith.impl.blocker :refer [wrap-blocker]]
             [hyperlith.impl.codec :as codec]
             [hyperlith.impl.crypto :as crypto]
@@ -82,10 +80,7 @@
   ;; JSON
   [hyperlith.impl.json
    json->edn
-   edn->json]
-  ;; BATCH
-  [hyperlith.impl.batch
-   batch!])
+   edn->json])
 
 (defonce ^:private refresh-ch_ (atom nil))
 
@@ -107,10 +102,6 @@
          (ds/render-handler ~path (var ~sym-fn) ~opts)
          (def ~sym ~path))))
 
-(defn refresh-all! [& _opts]
-  (when-let [<refresh-ch @refresh-ch_]
-    (a/>!! <refresh-ch :refresh-event)))
-
 (defn throw-if-port-in-use! [port]
   (try
     (with-open [_ (ServerSocket. 8080)])
@@ -126,17 +117,12 @@
     :or   {port     8080
            on-error er/default-on-error}}]
   (throw-if-port-in-use! 8080)
-  (let [<refresh-ch    (a/chan (a/dropping-buffer 1))
-        _              (reset! refresh-ch_ <refresh-ch)
-        ctx            (ctx-start)
+  (let [ctx            (ctx-start)
         _              (reset! er/on-error_ on-error)
-        refresh-mult   (-> <refresh-ch
-                         a/mult)
         wrap-ctx       (fn [handler]
                          (fn [req]
                            (handler
-                             (-> (assoc req
-                                   :hyperlith.core/refresh-mult refresh-mult)
+                             (-> req
                                (u/merge ctx)))))
         ;; Middleware make for messy error stacks.
         wrapped-router (-> router/router
@@ -155,5 +141,4 @@
      :ctx            ctx
      :stop           (fn stop [& [opts]]
                        (stop-server opts)
-                       (ctx-stop ctx)
-                       (a/close! <refresh-ch))}))
+                       (ctx-stop ctx))}))

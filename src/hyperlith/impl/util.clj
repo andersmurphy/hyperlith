@@ -25,6 +25,14 @@
   (persistent! (reduce-kv assoc! (transient (or m1 {})) m2)))
 
 (defmacro thread
+  "Starts a thread. Conveys bindings."
+  [& body]
+  `(Thread/.start
+     (Thread/new
+     (bound-fn* ;; binding conveyance
+       (fn [] ~@body)))))
+
+(defmacro virtual-thread
   "Starts a virtual thread. Conveys bindings."
   [& body]
   `(Thread/startVirtualThread

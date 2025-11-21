@@ -2,7 +2,6 @@
  :deps
  {org.clojure/clojure    {:mvn/version "1.12.2"}
   org.clojure/data.json  {:mvn/version "2.5.1"}
-  org.clojure/core.async {:mvn/version "1.7.701"}
 
   ;; HTTP
   http-kit/http-kit {:mvn/version "2.9.0-beta1"}
@@ -18,9 +17,9 @@
 
   ;; SQLITE
   andersmurphy/sqlite4clj
-   ;; {:local/root "../sqlite4clj"}
+  ;; {:local/root "../sqlite4clj"}
   {:git/url "https://github.com/andersmurphy/sqlite4clj"
-   :git/sha "2b1110e92c7d430879aceb00bd276ad7ebe40aa2"}
+   :git/sha "22c891fa2963786d9112169c578615e6f265b520"}
   com.github.seancorfield/honeysql {:mvn/version "2.7.1325"}}
  :aliases
  {:dev
