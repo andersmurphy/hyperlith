@@ -58,21 +58,17 @@
         batch      (ArrayList/new 20000)]
     (util/virtual-thread ;; Virtual thread for cheap blocking
       (while true
-        ;; Adaptive batching of actions        
-        (println "=======")
-        (time
-          (do
-            (ArrayList/.clear batch)
-            (ArrayList/.add batch (BlockingQueue/.take |queue))
-            (BlockingQueue/.drainTo |queue batch)))
-        (time
-          (d/with-write-tx [tx writer]
-            @(run-batch-on-pool! cpu-pool
-               (fn [thunk] (thunk tx))
-               batch)))
+        ;; Adaptive batching of actions
+        (do
+          (ArrayList/.clear batch)
+          (ArrayList/.add batch (BlockingQueue/.take |queue))
+          (BlockingQueue/.drainTo |queue batch))
+        (d/with-write-tx [tx writer]
+          @(run-batch-on-pool! cpu-pool
+             (fn [thunk] (thunk tx))
+             batch))
         ;; Update views
-        (time
-          (let [conns @connections_]
+        (let [conns @connections_]
           (->> conns
             (into []
               (comp
@@ -83,7 +79,7 @@
                        (d/with-conn [tx reader]
                          (run-batch-on-pool! cpu-pool
                            (fn [thunk] (thunk tx)) thunk-batch))))))
-            (run! deref))))))
+            (run! deref)))))
     {:tx!   (fn [thunk]
               (BlockingQueue/.add |queue thunk))
      :stop! nil}))
