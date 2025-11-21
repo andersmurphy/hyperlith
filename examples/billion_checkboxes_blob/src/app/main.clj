@@ -614,9 +614,10 @@
                      :query-params {"id" (str (rand-int 200))
                                     "chunk-id" (str (rand-int 10))}})))
             ;; 10000r/s
-            (range 10))
-          (Thread/sleep 1))
-        (range 10000))))
+            (range 100))
+          (Thread/sleep 10))
+        (range 1000))))
+  
   ,)
 
 (comment

@@ -54,45 +54,43 @@
            :pragma    pragma})
         _          (migrations writer)
         cpu-pool   (Executors/newFixedThreadPool core-count)
-        |queue     (ArrayBlockingQueue/new 20000)
-        batch      (ArrayList/new 20000)]
+        |queue     (ArrayBlockingQueue/new 10000)
+        batch      (ArrayList/new 10000)]
     (util/virtual-thread ;; Virtual thread for cheap blocking
       (while true
-        ;; Adaptive batching of actions
-        (do
-          (ArrayList/.clear batch)
-          (ArrayList/.add batch (BlockingQueue/.take |queue))
-          (BlockingQueue/.drainTo |queue batch))
-        (d/with-write-tx [tx writer]
-          @(run-batch-on-pool! cpu-pool
-             (fn [thunk] (thunk tx))
-             batch))
-        ;; Update views
-        (let [conns @connections_]
-          (->> conns
-            (into []
-              (comp
-                (map (fn [[_ v]] v))
-                (partition-all (int (/ (count conns) core-count)))
-                (map (fn [thunk-batch]
-                       ;; Use the same connection per batch
-                       (d/with-conn [tx reader]
-                         (run-batch-on-pool! cpu-pool
-                           (fn [thunk] (thunk tx)) thunk-batch))))))
-            (run! deref)))))
-    {:tx!   (fn [thunk]
-              (BlockingQueue/.add |queue thunk))
+        (if (= (count |queue) 0)
+          (Thread/sleep 1) ;; let other v threads run
+          (do
+            ;; Adaptive batching of actions
+            ;; drainTo is not blocking
+            (BlockingQueue/.drainTo |queue batch)
+            (d/with-write-tx [tx writer]
+              @(run-batch-on-pool! cpu-pool
+                 (fn [thunk] (thunk tx))
+                 batch))
+            ;; Update views
+            (let [conns @connections_]
+              (->> conns
+                (into []
+                  (comp
+                    (map (fn [[_ v]] v))
+                    (partition-all (int (/ (count conns) core-count)))
+                    (map (fn [thunk-batch]
+                           ;; Use the same connection per batch
+                           (d/with-conn [tx reader]
+                             (run-batch-on-pool! cpu-pool
+                               (fn [thunk] (thunk tx)) thunk-batch))))))
+                (run! deref)))
+            (ArrayList/.clear batch)))))
+    {:tx!   (fn [thunk] (BlockingQueue/.put |queue thunk))
      :stop! nil}))
-  
-;; TODO; fix weird check behaviour
+
 ;; TODO: max fps (to protect the browser)
 ;; TODO: only send on change
-;; TODO: connection close batch?
 ;; TODO: refactor examples
 ;; TODO: update readme
 ;; TODO: benchmark new vs old
 ;; TODO: profile new vs old
-;; TODO: pray
 ;; TODO: check errors
 ;; TODO: error handling
 
