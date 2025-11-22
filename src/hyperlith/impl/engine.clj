@@ -9,9 +9,9 @@
              Executors ExecutorService)
            (java.util ArrayList)))
 
-(defmacro run-batch-on-pool! [pool f batch]
+(defmacro on-pool! [pool & body]
   `(ExecutorService/.submit ~pool ^Callable
-     (fn [] (run! ~f ~batch))))
+     (fn [] ~@body)))
 
 (def connections_ (atom {}))
 
@@ -64,10 +64,9 @@
             ;; Adaptive batching of actions
             ;; drainTo is not blocking
             (BlockingQueue/.drainTo |queue batch)
-            (d/with-write-tx [tx writer]
-              @(run-batch-on-pool! cpu-pool
-                 (fn [thunk] (thunk tx))
-                 batch))
+            (d/with-write-tx [db writer]
+              @(on-pool! cpu-pool
+                   (run! (fn [thunk] (thunk db)) batch)))
             ;; Update views
             (let [conns @connections_]
               (->> conns
@@ -75,11 +74,11 @@
                   (comp
                     (map (fn [[_ v]] v))
                     (partition-all (int (/ (count conns) core-count)))
-                    (map (fn [thunk-batch]
-                           ;; Use the same connection per batch
-                           (d/with-conn [tx reader]
-                             (run-batch-on-pool! cpu-pool
-                               (fn [thunk] (thunk tx)) thunk-batch))))))
+                    (map (fn [conn-batch]
+                           ;; Use the same connection per thread batch
+                           (d/with-conn [db reader]
+                             (on-pool! cpu-pool
+                               (run! (fn [conn] (conn db)) conn-batch)))))))
                 (run! deref)))
             (ArrayList/.clear batch)))))
     {:tx!   (fn [thunk] (BlockingQueue/.put |queue thunk))
