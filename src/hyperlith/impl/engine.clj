@@ -44,7 +44,8 @@
                (.close br)))))))
 
 (defn start!
-  [db-name {:keys [migrations litestream pragma]}]
+  [db-name {:keys [migrations litestream pragma cache-write-fn]
+            :or   {cache-write-fn (fn [_db _cache] nil)}}]
   (let [core-count (Runtime/.availableProcessors (Runtime/getRuntime))
         _          (when litestream
                      (l/restore-then-replicate! db-name litestream))
@@ -66,7 +67,9 @@
             (BlockingQueue/.drainTo |queue batch)
             (d/with-write-tx [db writer]
               @(on-pool! cpu-pool
-                   (run! (fn [thunk] (thunk db)) batch)))
+                 (let [cache (atom {})]
+                   (run! (fn [thunk] (thunk db)) batch)
+                   (cache-write-fn db cache))))
             ;; Update views
             (let [conns @connections_]
               (->> conns

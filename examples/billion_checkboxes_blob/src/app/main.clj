@@ -491,6 +491,14 @@
   (let [db-name "database-new.db"]
     (engine/start! db-name
       {:migrations migrations
+       :cache-write-fn (fn [db cache]
+                         (run! (fn [[chunk-id new-chunk]]
+                                (d/q db '{update chunk
+                                          set    {data ?new-chunk}
+                                          where  [= id ?chunk-id]}
+                                  {:chunk-id  chunk-id
+                                   :new-chunk new-chunk}))
+                          @cache))
        :litestream
        {:s3-access-key-id     (h/env :s3-access-key-id)
         :s3-access-secret-key (h/env :s3-access-secret-key)
