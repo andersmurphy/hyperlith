@@ -133,7 +133,7 @@
                        (patch-elements new-view-hash new-view-str))
                      ;; new-view-hash
                      )))))
-           (tx! (fn [_tx!] nil))
+           (tx! (fn [_tx! _cache] nil))
            (when on-open (on-open req)))
          :on-close (fn hk-on-close [_ _]
                      (when on-close (on-close req)))}))))

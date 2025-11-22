@@ -21,7 +21,7 @@
     ;; LZ77 window size (0, 10-24) (default: 24)
     ;; window size is (pow(2, NUM) - 16)
     (.setWindow (or window-size 24))
-    (.setQuality (or quality 5))))
+    (.setQuality (or quality 3))))
 
 (defn compress [data & {:as opts}]
   (-> (if (string? data) (String/.getBytes data "UTF-8") ^byte/1 data)

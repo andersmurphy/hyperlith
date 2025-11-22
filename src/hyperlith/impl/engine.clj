@@ -28,7 +28,7 @@
   (swap! connections_ assoc
     ch (let [out (br/byte-array-out-stream)
              br  (br/compress-out-stream out
-                   :window-size 18)]
+                   :window-size 24)]
          (fn engine-connection [db]
            (try
              (if (hk/open? ch)
@@ -37,10 +37,8 @@
                  (send! ch))
                ;; Clean up connection
                (do (swap! connections_ dissoc ch)
-                   (.close out)
                    (.close br)))
              (catch Throwable _
-               (.close out)
                (.close br)))))))
 
 (defn start!
@@ -65,10 +63,10 @@
             ;; Adaptive batching of actions
             ;; drainTo is not blocking
             (BlockingQueue/.drainTo |queue batch)
-            (d/with-write-tx [db writer]
-              @(on-pool! cpu-pool
+            @(on-pool! cpu-pool
+               (d/with-write-tx [db writer]
                  (let [cache (atom {})]
-                   (run! (fn [thunk] (thunk db)) batch)
+                   (run! (fn [thunk] (thunk db cache)) batch)
                    (cache-write-fn db cache))))
             ;; Update views
             (let [conns @connections_]
@@ -79,8 +77,8 @@
                     (partition-all (int (/ (count conns) core-count)))
                     (map (fn [conn-batch]
                            ;; Use the same connection per thread batch
-                           (d/with-conn [db reader]
-                             (on-pool! cpu-pool
+                           (on-pool! cpu-pool
+                             (d/with-conn [db reader]
                                (run! (fn [conn] (conn db)) conn-batch)))))))
                 (run! deref)))
             (ArrayList/.clear batch)))))

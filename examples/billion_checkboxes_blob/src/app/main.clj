@@ -251,7 +251,7 @@
 (defaction handler-scroll
   [{:keys [sid tabid tx!] {:keys [view-x view-y]} :body}]
   (tx!
-    (fn [db]
+    (fn [db _]
       (update-tab-data! db sid tabid
         #(assoc %
            :x (max (int view-x) 0)
@@ -261,7 +261,7 @@
   [{:keys [sid tabid tx!] {:keys [view-h view-w]} :body}]
   (when (and view-h view-w)
     (tx!
-      (fn [db]
+      (fn [db _]
         (update-tab-data! db sid tabid
           #(assoc %
              :height (max (int view-h) 0)
@@ -273,42 +273,38 @@
     ;; 0 is an empty color (used for clearing)
     (when (<= 0 color (dec (count states)))
       (tx!
-        (fn [db]
+        (fn [db _]
           (update-tab-data! db sid tabid #(assoc % :color color)))))))
 
 (defaction handler-check
-  [{:keys                 [sid tx! tabid]
-    {:strs [chunk-id id]} :query-params :as req}]
+  [{:keys                       [sid tx! tabid]
+    {:strs [chunk-id id]} :query-params}]
   (when (and id chunk-id)
-    (let [cell-id  (int (parse-long id))
-          chunk-id (int (parse-long chunk-id))]
+    (let [cell-id    (int (parse-long id))
+          chunk-id   (int (parse-long chunk-id))]
       (when (>= (dec (* chunk-size chunk-size)) cell-id 0)
         (tx!
-          (fn [db]
+          (fn [db chunk-cache]
             (let [user-color (or (:color (get-tab-data db sid tabid)) 1)
-                  chunk      (or
-                               (-> (d/q db '{select [data]
-                                             from   chunk
-                                             where  [= id ?chunk-id]}
-                                     {:chunk-id chunk-id})
-                                first)
-                              (d/q db
-                                '{insert-into chunk
-                                  values      [{id   ?chunk-id
-                                                data ?blank-chunk}]}
-                                {:chunk-id    chunk-id
-                                 :blank-chunk blank-chunk})
-                              (-> (d/q db '{select [data]
-                                            from   chunk
-                                            where  [= id ?chunk-id]}
-                                    {:chunk-id chunk-id})
-                                first))
-                  new-chunk  (update chunk cell-id #(if (= 0 %) user-color 0))]
-              (d/q db '{update chunk
-                        set    {data ?new-chunk}
-                        where  [= id ?chunk-id]}
-                {:chunk-id  chunk-id
-                 :new-chunk new-chunk}))))))))
+                  chunk (or (@chunk-cache chunk-id)
+                          (-> (d/q db '{select [data]
+                                        from   chunk
+                                        where  [= id ?chunk-id]}
+                                {:chunk-id chunk-id})
+                            first)
+                          (d/q db
+                            '{insert-into chunk
+                              values      [{id   ?chunk-id
+                                            data ?blank-chunk}]}
+                            {:chunk-id    chunk-id
+                             :blank-chunk blank-chunk})
+                          (-> (d/q db '{select [data]
+                                        from   chunk
+                                        where  [= id ?chunk-id]}
+                                {:chunk-id chunk-id})
+                            first))]
+              (swap! chunk-cache assoc chunk-id
+                (update chunk cell-id #(if (= 0 %) user-color 0))))))))))
 
 (defn scroll-to-xy-js [x y]
   (str
@@ -527,7 +523,7 @@
 
 (comment
   (do (-main) nil)
-  ;; (clojure.java.browse/browse-url "https://localhost:3030/")
+  ;; (clojure.java.browse/browse-url "https://localhost:3030/") 
 
   ;; stop server
   ((@app_ :stop))
