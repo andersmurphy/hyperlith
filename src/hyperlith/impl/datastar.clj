@@ -6,7 +6,6 @@
             [hyperlith.impl.brotli :as br]
             [hyperlith.impl.crypto :as crypto]
             [hyperlith.impl.html :as h]
-            [hyperlith.impl.error :as er]
             [hyperlith.impl.json :as json]
             [hyperlith.impl.router :as router]
             [hyperlith.impl.engine :as engine]            
@@ -28,9 +27,8 @@
      :content-type "text/javascript"
      :compress?    true}))
 
-(defn patch-elements [event-id elements]
+(defn patch-elements [elements]
   (str "event: datastar-patch-elements"
-    "\nid: " event-id
     "\ndata: elements " (str/replace elements "\n" "\ndata: elements ")
     "\n\n\n"))
 
@@ -120,19 +118,9 @@
         {:on-open
          (fn hk-on-open [ch]
            (engine/add-connection! ch
-             (fn [db]
-               (let [last-view-hash ((:headers req) "last-event-id")]
-                 (when-some ;; stop in case of error
-                     [new-view (er/try-on-error (render-fn (assoc req :db db)))]
-                   (let [new-view-str  (h/html->str new-view)
-                         ;; This is a very fast hash
-                         new-view-hash (Integer/toHexString
-                                         (hash new-view-str))]
-                     ;; only send an event if the view has changed
-                     (when (not= last-view-hash new-view-hash)
-                       (patch-elements new-view-hash new-view-str))
-                     ;; new-view-hash
-                     )))))
+             (fn [db] (-> (render-fn (assoc req :db db))
+                        h/html->str
+                        patch-elements)))
            (tx! (fn [_tx! _cache] nil))
            (when on-open (on-open req)))
          :on-close (fn hk-on-close [_ _]

@@ -28,13 +28,19 @@
   (swap! connections_ assoc
     ch (let [out (br/byte-array-out-stream)
              br  (br/compress-out-stream out
-                   :window-size 24)]
+                   :window-size 24)
+             last-view-hash_ (atom nil)]
          (fn engine-connection [db]
            (try
              (if (hk/open? ch)
-               (some->> (render-fn db)
-                 (br/compress-stream out br)
-                 (send! ch))
+               (let [view (render-fn db)
+                     new-view-hash (hash view)
+                     render? (not= @last-view-hash_ new-view-hash)]
+                 (when render?
+                   (reset! last-view-hash_ new-view-hash)
+                   (->> view
+                     (br/compress-stream out br)
+                     (send! ch))))
                ;; Clean up connection
                (do (swap! connections_ dissoc ch)
                    (.close br)))
@@ -87,13 +93,9 @@
      :reader reader
      :stop!  nil}))
 
-;; TODO: max fps (to protect the browser)
-;; TODO: only send on change
+;; TODO: max fps (to protect the browser)?
 ;; TODO: refactor examples
 ;; TODO: update readme
-;; TODO: benchmark new vs old
-;; TODO: profile new vs old
-;; TODO: check errors
 ;; TODO: error handling
 
 (comment
