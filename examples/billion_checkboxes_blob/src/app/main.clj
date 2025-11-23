@@ -533,7 +533,7 @@
   ,)
 
 (comment
-  (def db (-> @app_ :ctx :db))
+  (def db (-> @app_ :ctx :reader))
   (d/pragma-check db)
 
   ;; Execution time mean : 78.177554 ms

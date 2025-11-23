@@ -82,8 +82,10 @@
                                (run! (fn [conn] (conn db)) conn-batch)))))))
                 (run! deref)))
             (ArrayList/.clear batch)))))
-    {:tx!   (fn [thunk] (BlockingQueue/.put |queue thunk))
-     :stop! nil}))
+    {:tx!    (fn [thunk] (BlockingQueue/.put |queue thunk))
+     :writer writer
+     :reader reader
+     :stop!  nil}))
 
 ;; TODO: max fps (to protect the browser)
 ;; TODO: only send on change
