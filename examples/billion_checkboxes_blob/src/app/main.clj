@@ -5,8 +5,7 @@
             [hyperlith.extras.sqlite :as d]
             [hyperlith.extras.ui.virtual-scroll :as vs]
             [clj-async-profiler.core :as prof]
-            [clojure.math :as math]
-            [hyperlith.impl.engine :as engine]))
+            [clojure.math :as math]))
 
 (def cell-size-px 32)
 (def chunk-size 16)
@@ -494,31 +493,20 @@
                :new-chunk new-chunk}))
       @cache)))
 
-(defn ctx-init []
-  (let [db-name "database-new.db"]
-    (engine/start db-name
-      {:batch-fn   #'batch-fn
-       :migrations migrations
-       :litestream
-       {:s3-access-key-id     (h/env :s3-access-key-id)
-        :s3-access-secret-key (h/env :s3-access-secret-key)
-        :config-yml
-        (h/edn->json
-          {:dbs
-           [{:path db-name
-             :replicas
-             [{:type          "s3"
-               :bucket        "hyperlith"
-               :endpoint      "https://nbg1.your-objectstorage.com"
-               :region        "nbg1"
-               :sync-interval "1s"}]}]}
-          :escape-slash false)}})))
-
 (defonce app_ (atom nil))
 
 (defn -main [& _]
   (reset! app_
-    (h/start-app {:ctx (ctx-init)})))
+    (h/start-app
+      {:db {:db-name    "database-new.db"
+            :batch-fn   #'batch-fn
+            :migrations migrations
+            :litestream
+            {:s3-access-key-id     (h/env :s3-access-key-id)
+             :s3-access-secret-key (h/env :s3-access-secret-key)
+             :bucket               "hyperlith"
+             :endpoint             "https://nbg1.your-objectstorage.com"
+             :region               "nbg1"}}})))
 
 (comment
   (do (-main) nil)

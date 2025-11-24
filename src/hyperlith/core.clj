@@ -4,7 +4,8 @@
             [hyperlith.impl.codec :as codec]
             [hyperlith.impl.crypto :as crypto]
             [hyperlith.impl.css]
-            [hyperlith.impl.datastar :as ds]
+            [hyperlith.impl.datastar :as ds]            
+            [hyperlith.impl.engine :as engine]
             [hyperlith.impl.env]
             [hyperlith.impl.error :as er]
             [hyperlith.impl.html :as h]
@@ -113,28 +114,32 @@
           {:port port})))))
 
 (defn start-app
-  [{:keys [port ctx on-error]
+  [{:keys [port ctx on-error db]
     :or   {port     8080
            on-error er/default-on-error}}]
   (throw-if-port-in-use! 8080)
-  (let [_              (reset! er/on-error_ on-error)
-        wrap-ctx       (fn [handler]
-                         (fn [req]
-                           (handler (u/merge req ctx))))
+  (let [_                        (reset! er/on-error_ on-error)
+        [engine-stop engine-ctx] (engine/start db)
+        ctx                      (merge ctx engine-ctx)
+        wrap-ctx                 (fn [handler]
+                                   (fn [req]
+                                     ;; fast merge as this is in a handler
+                                     (handler (u/merge req ctx))))
         ;; Middleware make for messy error stacks.
-        wrapped-router (-> router/router
-                         wrap-ctx
-                         ;; Wrap error here because req params/body/session
-                         ;; have been handled (and provide useful context).
-                         er/wrap-error
-                         ;; The handlers after this point do not throw errors
-                         ;; are robust/lenient.
-                         wrap-query-params
-                         wrap-session
-                         wrap-parse-json-body
-                         wrap-blocker)
-        stop-server    (hk/run-server wrapped-router {:port port})]
+        wrapped-router           (-> router/router
+                                   wrap-ctx
+                                   ;; Wrap error here because req params/body/session
+                                   ;; have been handled (and provide useful context).
+                                   er/wrap-error
+                                   ;; The handlers after this point do not throw errors
+                                   ;; are robust/lenient.
+                                   wrap-query-params
+                                   wrap-session
+                                   wrap-parse-json-body
+                                   wrap-blocker)
+        stop-server              (hk/run-server wrapped-router {:port port})]
     {:wrapped-router wrapped-router
      :ctx            ctx
      :stop           (fn stop [& [opts]]
-                       (stop-server opts))}))
+                       (stop-server opts)
+                       (engine-stop))}))

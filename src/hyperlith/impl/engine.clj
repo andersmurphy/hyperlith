@@ -13,8 +13,6 @@
   `(ExecutorService/.submit ~pool ^Callable
      (fn [] ~@body)))
 
-(def connections_ (atom {}))
-
 (defn send! [ch event]
   (hk/send! ch {:status  200
                 :headers (assoc default-headers
@@ -25,7 +23,7 @@
     false))
 
 (defn render-handler [{:keys [on-close on-open] :as _opts} render-fn]
-  (fn handler [{:keys [tx!] :as req}]
+  (fn handler [{:keys [tx! connections_] :as req}]
     (let [closed?_ (atom nil)]
       (hk/as-channel req
         {:on-open
@@ -61,21 +59,23 @@
                      (when on-close (on-close req)))}))))
 
 (defn start
-  [db-name {:keys [migrations litestream pragma batch-fn]}]
+  [{:keys [db-name migrations litestream pragma batch-fn]}]
   (assert (not (nil? batch-fn)))
-  (let [core-count (Runtime/.availableProcessors (Runtime/getRuntime))
-        _          (when litestream
+  (let [running_     (atom true)
+        connections_ (atom {})
+        core-count   (Runtime/.availableProcessors (Runtime/getRuntime))
+        _            (when litestream
                      (l/restore-then-replicate! db-name litestream))
         {:keys [writer reader]}
         (d/init-db! db-name
           {:pool-size core-count
            :pragma    pragma})
-        _          (migrations writer)
-        cpu-pool   (Executors/newFixedThreadPool core-count)
-        |queue     (ArrayBlockingQueue/new 10000)
-        batch      (ArrayList/new 10000)]
+        _            (migrations writer)
+        cpu-pool     (Executors/newFixedThreadPool core-count)
+        |queue       (ArrayBlockingQueue/new 10000)
+        batch        (ArrayList/new 10000)]
     (util/virtual-thread ;; Virtual thread for cheap blocking
-      (while true
+      (while @running_
         (if (= (count |queue) 0)
           (Thread/sleep 1) ;; let other v threads run
           (do
@@ -99,14 +99,20 @@
                                (run! (fn [conn] (conn db)) conn-batch)))))))
                 (run! deref)))
             (ArrayList/.clear batch)))))
-    {:tx!    (fn [thunk] (BlockingQueue/.put |queue thunk))
-     :writer writer
-     :reader reader}))
+    [(fn []
+       (reset! running_ false)
+       (reset! connections_ {}))
+     {:tx!          (fn [thunk] (BlockingQueue/.put |queue thunk))
+      :connections_ connections_
+      :writer       writer
+      :reader       reader}]))
+
+;; TODO: handler sandboxing?
+;; add-connection rather than connections
+;; q instead of reader
+
 
 ;; TODO: max fps (to protect the browser)?
 ;; TODO: refactor examples
 ;; TODO: update readme
 ;; TODO: error handling
-
-(comment
-  (count @connections_))
