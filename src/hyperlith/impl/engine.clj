@@ -54,15 +54,15 @@
                          (.close br)))
                    (catch Throwable _
                      (.close br))))))
-           (tx! (fn [_tx! _cache] nil))
+           (tx! (fn [& _] nil))
            (when on-open (on-open req)))
          :on-close (fn hk-on-close [_ _]
                      (reset! closed?_ true)
                      (when on-close (on-close req)))}))))
 
-(defn start!
-  [db-name {:keys [migrations litestream pragma cache-write-fn]
-            :or   {cache-write-fn (fn [_db _cache] nil)}}]
+(defn start
+  [db-name {:keys [migrations litestream pragma batch-fn]}]
+  (assert (not (nil? batch-fn)))
   (let [core-count (Runtime/.availableProcessors (Runtime/getRuntime))
         _          (when litestream
                      (l/restore-then-replicate! db-name litestream))
@@ -84,9 +84,7 @@
             (BlockingQueue/.drainTo |queue batch)
             @(on-pool! cpu-pool
                (d/with-write-tx [db writer]
-                 (let [cache (atom {})]
-                   (run! (fn [thunk] (thunk db cache)) batch)
-                   (cache-write-fn db cache))))
+                 (batch-fn db batch)))
             ;; Update views
             (let [conns @connections_]
               (->> conns
@@ -103,8 +101,7 @@
             (ArrayList/.clear batch)))))
     {:tx!    (fn [thunk] (BlockingQueue/.put |queue thunk))
      :writer writer
-     :reader reader
-     :stop!  nil}))
+     :reader reader}))
 
 ;; TODO: max fps (to protect the browser)?
 ;; TODO: refactor examples

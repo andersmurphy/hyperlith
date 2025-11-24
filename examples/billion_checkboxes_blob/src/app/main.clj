@@ -483,18 +483,22 @@
   (d/q db
     ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"]))
 
-(defn ctx-start []
+(defn batch-fn [db batch]
+  (let [cache (atom {})]
+    (run! (fn [thunk] (thunk db cache)) batch)
+    (run! (fn [[chunk-id new-chunk]]
+            (d/q db '{update chunk
+                      set    {data ?new-chunk}
+                      where  [= id ?chunk-id]}
+              {:chunk-id  chunk-id
+               :new-chunk new-chunk}))
+      @cache)))
+
+(defn ctx-init []
   (let [db-name "database-new.db"]
-    (engine/start! db-name
-      {:migrations migrations
-       :cache-write-fn (fn [db cache]
-                         (run! (fn [[chunk-id new-chunk]]
-                                (d/q db '{update chunk
-                                          set    {data ?new-chunk}
-                                          where  [= id ?chunk-id]}
-                                  {:chunk-id  chunk-id
-                                   :new-chunk new-chunk}))
-                          @cache))
+    (engine/start db-name
+      {:batch-fn   #'batch-fn
+       :migrations migrations
        :litestream
        {:s3-access-key-id     (h/env :s3-access-key-id)
         :s3-access-secret-key (h/env :s3-access-secret-key)
@@ -510,16 +514,11 @@
                :sync-interval "1s"}]}]}
           :escape-slash false)}})))
 
-(defn ctx-stop [ctx]
-  )
-
 (defonce app_ (atom nil))
 
 (defn -main [& _]
   (reset! app_
-    (h/start-app
-      {:ctx-start   ctx-start
-       :ctx-stop    ctx-stop})))
+    (h/start-app {:ctx (ctx-init)})))
 
 (comment
   (do (-main) nil)
