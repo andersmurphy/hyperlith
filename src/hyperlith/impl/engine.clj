@@ -24,28 +24,41 @@
                 :body    event}
     false))
 
-(defn add-connection! [ch render-fn]
-  (swap! connections_ assoc
-    ch (let [out (br/byte-array-out-stream)
-             br  (br/compress-out-stream out
-                   :window-size 24)
-             last-view-hash_ (atom nil)]
-         (fn engine-connection [db]
-           (try
-             (if (hk/open? ch)
-               (let [view (render-fn db)
-                     new-view-hash (hash view)
-                     render? (not= @last-view-hash_ new-view-hash)]
-                 (when render?
-                   (reset! last-view-hash_ new-view-hash)
-                   (->> view
-                     (br/compress-stream out br)
-                     (send! ch))))
-               ;; Clean up connection
-               (do (swap! connections_ dissoc ch)
-                   (.close br)))
-             (catch Throwable _
-               (.close br)))))))
+(defn render-handler [{:keys [on-close on-open] :as _opts} render-fn]
+  (fn handler [{:keys [tx!] :as req}]
+    (let [closed?_ (atom nil)]
+      (hk/as-channel req
+        {:on-open
+         (fn hk-on-open [ch]
+           (swap! connections_ assoc ch
+             (let [out             (br/byte-array-out-stream)
+                   br              (br/compress-out-stream out
+                                     :window-size 22)
+                   last-view-hash_ (atom nil)]
+               (fn engine-connection [db]
+                 (try
+                   ;; http-kit sometimes re-uses connections resurrecting
+                   ;; closed connection. So we use a more permanent flag.
+                   (if-not @closed?_
+                     (let [view          (render-fn (assoc req :db db))
+                           new-view-hash (hash view)
+                           render?       (not= @last-view-hash_
+                                           new-view-hash)]
+                       (when render?
+                         (reset! last-view-hash_ new-view-hash)
+                         (->> view
+                           (br/compress-stream out br)
+                           (send! ch))))
+                     ;; Clean up connection
+                     (do (swap! connections_ dissoc ch)
+                         (.close br)))
+                   (catch Throwable _
+                     (.close br))))))
+           (tx! (fn [_tx! _cache] nil))
+           (when on-open (on-open req)))
+         :on-close (fn hk-on-close [_ _]
+                     (reset! closed?_ true)
+                     (when on-close (on-close req)))}))))
 
 (defn start!
   [db-name {:keys [migrations litestream pragma cache-write-fn]

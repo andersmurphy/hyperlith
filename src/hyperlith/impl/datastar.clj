@@ -8,8 +8,7 @@
             [hyperlith.impl.html :as h]
             [hyperlith.impl.json :as json]
             [hyperlith.impl.router :as router]
-            [hyperlith.impl.engine :as engine]            
-            [org.httpkit.server :as hk]
+            [hyperlith.impl.engine :as engine]
             [clojure.string :as str]))
 
 (def datastar-source-map
@@ -111,20 +110,10 @@
            :status  204})))))
 
 (defn render-handler
-  [path render-fn & {:keys [on-close on-open] :as _opts}]
+  [path render-fn & {:keys [_on-close _on-open] :as opts}]
   (router/add-route! [:post path]
-    (fn handler [{:keys [tx!] :as req}]
-      (hk/as-channel req
-        {:on-open
-         (fn hk-on-open [ch]
-           (engine/add-connection! ch
-             (fn [db] (-> (render-fn (assoc req :db db))
-                        h/html->str
-                        patch-elements)))
-           (tx! (fn [_tx! _cache] nil))
-           (when on-open (on-open req)))
-         :on-close (fn hk-on-close [_ _]
-                     (when on-close (on-close req)))}))))
+    (engine/render-handler opts
+      (fn [req] (-> (render-fn req) h/html->str patch-elements)))))
 
 (defn patch-signals [signals]
   (h/html [:div {:data-signals (json/edn->json signals)
