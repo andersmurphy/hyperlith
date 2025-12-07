@@ -1,13 +1,11 @@
 (ns hyperlith.impl.engine
-  (:require [hyperlith.impl.util :as util]
-            [sqlite4clj.core :as d]
+  (:require [sqlite4clj.core :as d]
             [sqlite4clj.litestream :as l]
+            [sqlite4clj.batch :as b]
             [org.httpkit.server :as hk]
             [hyperlith.impl.headers :refer [default-headers]]
             [hyperlith.impl.brotli :as br])
-  (:import (java.util.concurrent BlockingQueue ArrayBlockingQueue
-             Executors ExecutorService)
-           (java.util ArrayList)))
+  (:import (java.util.concurrent Executors ExecutorService)))
 
 (defmacro on-pool! [pool & body]
   `(ExecutorService/.submit ~pool ^Callable
@@ -65,44 +63,39 @@
         connections_ (atom {})
         core-count   (Runtime/.availableProcessors (Runtime/getRuntime))
         _            (when litestream
-                     (l/restore-then-replicate! db-name litestream))
-        {:keys [writer reader]}
+                       (l/restore-then-replicate! db-name litestream))
+        {:keys [writer reader] :as db}
         (d/init-db! db-name
           {:pool-size core-count
            :pragma    pragma})
         _            (migrations writer)
         cpu-pool     (Executors/newFixedThreadPool core-count)
-        |queue       (ArrayBlockingQueue/new 10000)
-        batch        (ArrayList/new 10000)]
-    (util/virtual-thread ;; Virtual thread for cheap blocking
-      (while @running_
-        (if (= (count |queue) 0)
-          (Thread/sleep 1) ;; let other v threads run
-          (do
-            ;; Adaptive batching of actions
-            ;; drainTo is not blocking
-            (BlockingQueue/.drainTo |queue batch)
-            @(on-pool! cpu-pool
-               (d/with-write-tx [db writer]
-                 (batch-fn db batch)))
-            ;; Update views
-            (let [conns @connections_]
-              (->> conns
-                (into []
-                  (comp
-                    (map (fn [[_ v]] v))
-                    (partition-all (int (/ (count conns) core-count)))
-                    (map (fn [conn-batch]
-                           ;; Use the same connection per thread batch
-                           (on-pool! cpu-pool
-                             (d/with-conn [db reader]
-                               (run! (fn [conn] (conn db)) conn-batch)))))))
-                (run! deref)))
-            (ArrayList/.clear batch)))))
+        tx!
+        (b/async-batcher-init! db
+          {:max-batch-size  10000
+           :return-promise? false
+           :batch-fn
+           (fn [db batch]
+             @(on-pool! cpu-pool
+                (d/with-write-tx [db db]
+                  (batch-fn db batch)))
+             ;; Update views
+             (let [conns @connections_]
+               (->> conns
+                 (into []
+                   (comp
+                     (map (fn [[_ v]] v))
+                     (partition-all (int (/ (count conns) core-count)))
+                     (map (fn [conn-batch]
+                            ;; Use the same connection per thread batch
+                            (on-pool! cpu-pool
+                              (d/with-conn [db reader]
+                                (run! (fn [conn] (conn db)) conn-batch)))))))
+                 (run! deref))))})]
     [(fn []
        (reset! running_ false)
        (reset! connections_ {}))
-     {:tx!          (fn [thunk] (BlockingQueue/.put |queue thunk))
+     {:tx!          tx!
       :connections_ connections_
       :writer       writer
       :reader       reader}]))
