@@ -13,7 +13,9 @@
   io.netty/netty-buffer                          {:mvn/version "4.1.119.Final"}
 
   ;; TEMPLATING
-  dev.onionpancakes/chassis {:mvn/version "1.0.365"}
+  dev.onionpancakes/chassis
+  {:git/url "https://github.com/onionpancakes/chassis"
+   :git/sha "9b679a14d901a5dfa51e913ffad06b66f28b8326"}
 
   ;; SQLITE
   andersmurphy/sqlite4clj
