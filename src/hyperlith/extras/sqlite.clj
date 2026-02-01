@@ -1,7 +1,8 @@
 (ns hyperlith.extras.sqlite
   (:require [sqlite4clj.core :as d]
             [sqlite4clj.litestream]
-            [honey.sql :as hsql]))
+            [honey.sql :as hsql]
+            [honey.sql.pg-ops]))
 
 (defmacro q [db [query-type query :as string-query] & [params]]
   (if (string? query-type)

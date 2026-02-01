@@ -561,7 +561,7 @@
 
   (count @tab-state)
 
-  (def db-write (-> @app_ :ctx :db-write))
+  (def db-write (-> @app_ :ctx :writer))
 
   (d/q db-write
     '{update chunk
@@ -613,7 +613,7 @@
 
 (comment
   ;; clear out empty chunks
-  (def db-write (-> @app_ :ctx :db-write))
+  (def db-write (-> @app_ :ctx :writer))
   (d/q db-write '{select [[[count *]]] from chunk})
 
   (run! (fn [chunk-id]
@@ -626,6 +626,15 @@
             (d/q db-write '{delete-from chunk
                             where       [= id ?chunk-id]}
               {:chunk-id chunk-id})))
-    (range (* board-size board-size)))
+    (range (* board-size board-size))))
+
+(comment
+  (def db-write (-> @app_ :ctx :writer))
+
+  (d/q db-write
+    '{select [[[-> value [inline 0]] type]
+              [[-> value [inline 1]] oid]]
+      from   [[[json_each ?txn-ids]]]}
+    {:txn-ids (h/edn->json [[1 2] [1 3] [1 4]])})
 
   )
