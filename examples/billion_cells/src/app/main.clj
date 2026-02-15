@@ -498,7 +498,7 @@
          " - "
          [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_cells/src/app/main.clj" } "source"]
          " - "
-         [:p [:a {:href "https://andersmurphy.com/about"} "blog"]]]]])))
+         [:a {:href "https://andersmurphy.com/about"} "blog"]]]])))
 
 (defn prep-chunk-fts [chunk]
   (->> (flatten chunk)
