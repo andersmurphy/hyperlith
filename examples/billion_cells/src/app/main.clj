@@ -321,8 +321,8 @@
             :maxlength                     20
             :size                          10
             :type                          "text"
-            :data-on:load                  on-load
-            :data-preserve-attr            "data-on:load"
+            :data-preserve-attr            "data-init"
+            :data-init                     on-load
             :data-bind                     "cellvalue"
             :data-on:input__debounce.200ms on-input)]]))
 
@@ -353,8 +353,7 @@
 (defn Chunk [chunk-id chunk-cells sid]
   (h/html
     [:div.chunk {:id          (str "chunk-" chunk-id)
-                 :data-id     chunk-id
-                 :data-ignore true}
+                 :data-id     chunk-id}
      (into []
        (map-indexed (fn [local-id box] (Cell local-id box sid)))
        chunk-cells)]))
@@ -453,7 +452,7 @@
           "}")}
        [:div.view-wrapper
         {;; firefox sometimes preserves scroll on refresh and we don't want that
-         :data-on:load (scroll-to-xy-js jump-x jump-y)}
+         :data-init (scroll-to-xy-js jump-x jump-y)}
         [::vs/virtual-table#view
          {:data-ref              "_view"
           :v/x                   {:item-size          chunk-width-px
