@@ -119,7 +119,8 @@
       [:a {:href "https://data-star.dev"} "Datastar"]
       "🚀"]
      [:p "Source code can be found "
-      [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/game_of_life/main.clj"} "here"]]
+      [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/game_of_life/main.clj"} "here"]
+      "-" [:a {:href "https://andersmurphy.com/about"} "blog"]]
      @board-cache]))
 
 (defview render-home-embed {:path "/embed" :shim-headers shim-headers}
@@ -172,8 +173,7 @@
     (h/start-app
       {:max-refresh-ms 200
        :ctx-start      ctx-start
-       :ctx-stop       (fn [{:keys [game-stop]}] (game-stop))
-       :csrf-secret    (h/env :csrf-secret)})))
+       :ctx-stop       (fn [{:keys [game-stop]}] (game-stop))})))
 
 ;; Refresh app when you re-eval file
 (h/refresh-all!)

@@ -11,43 +11,40 @@
 (defn session-cookie [sid]
   (str "__Host-sid=" sid "; Path=/; Secure; HttpOnly; SameSite=Lax"))
 
-(defn csrf-cookie [csrf]
-  (str "__Host-csrf=" csrf "; Path=/; Secure; SameSite=Lax"))
-
 (defn wrap-session
-  [handler csrf-secret]
-  (let [;; Only create the spec once.
-        csrf-keyspec (crypto/secret-key->hmac-sha256-keyspec csrf-secret)
-        sid->csrf    (fn sid->csrf [sid] (crypto/hmac-md5 csrf-keyspec sid))]
-    (fn [req]
-      (let [body (:body req)
-            sid  (get-sid req)]
-        (cond
-          ;; If user has sid and csrf handle request
-          (and sid (= (:csrf body) (sid->csrf sid)))
-          (handler (assoc req :sid sid :csrf (:csrf body) :tabid (:tabid body)))
+  [handler]
+  (fn [req]
+    (let [body (:body req)
+          sid  (get-sid req)]
+      (cond
+        ;; If user has sid and is same origin.
+        (and sid
+             (or ;; :get is considered safe
+               (= (:request-method req) :get)
+               ;; Browsers that don't support Sec-Fetch-Site are considered
+               ;; unsafe and are not allowed to make anything other than
+               ;; get requests.
+               (= (get-in req [:headers "sec-fetch-site"]) "same-origin")))
+        (handler (assoc req :sid sid :tabid (:tabid body)))
 
-          ;; :get request and user does not have session we create one
-          ;; if they do not have a csrf cookie we give them one
-          (= (:request-method req) :get)
-          (let [new-sid (or sid (crypto/random-unguessable-uid))
-                csrf    (sid->csrf new-sid)]
-            (-> (handler (assoc req :sid new-sid :csrf csrf
-                           :tabid (:tabid body)))
+        ;; :get request and user does not have session we create one
+        (= (:request-method req) :get)
+        (let [new-sid (or sid (crypto/random-unguessable-uid))]
+          (-> (handler (assoc req :sid new-sid :tabid (:tabid body)))
               (assoc-in [:headers "Set-Cookie"]
                 ;; These cookies won't be set on local host on chrome/safari
                 ;; as it's using secure needs to be true and local host
                 ;; does not have HTTPS. SameSite is set to lax as it
                 ;; allows the same cookie session to be used following a
                 ;; link from another site.
-                [(session-cookie new-sid)
-                 (csrf-cookie csrf)])))
+                [(session-cookie new-sid)])))
 
-          ;; Not a :get request and user does not have session we 403
-          ;; Note: If the updates SSE connection is a not a :get then this
-          ;; will close the connection until the user reloads the page.
-          :else
-          {:status 403})))))
+        ;; Not a :get request and user does not have session we 403
+        ;; Note: If the updates SSE connection is a not a :get then this
+        ;; will close the connection until the user reloads the page.
+        :else
+        {:status 403}))))
 
-(def csrf-cookie-js
-  "document.cookie.match(/(^| )__Host-csrf=([^;]+)/)?.[2]")
+
+
+

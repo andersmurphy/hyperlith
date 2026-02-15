@@ -483,7 +483,7 @@
          " - "
          [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "source"]
          " - "
-         [:a {:href "https://cells.andersmurphy.com"} " more like this"]]]])))
+         [:a {:href "https://andersmurphy.com/about"} "blog"]]]])))
 
 (defn migrations [db]
   ;; Note: all this code must be idempotent
@@ -546,8 +546,7 @@
   (reset! app_
     (h/start-app
       {:ctx-start   ctx-start
-       :ctx-stop    ctx-stop
-       :csrf-secret (h/env :csrf-secret)})))
+       :ctx-stop    ctx-stop})))
 
 ;; Refresh app when you re-eval file
 (h/refresh-all!)
