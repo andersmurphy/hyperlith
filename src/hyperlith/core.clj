@@ -122,8 +122,7 @@
           {:port port})))))
 
 (defn start-app
-  [{:keys [port ctx-start ctx-stop csrf-secret
-           max-refresh-ms on-error]
+  [{:keys [port ctx-start ctx-stop max-refresh-ms on-error]
     :or   {port     8080
            on-error er/default-on-error}}]  
   (throw-if-port-in-use! 8080)
@@ -154,7 +153,7 @@
                            ;; The handlers after this point do not throw errors
                            ;; are robust/lenient.
                            wrap-query-params
-                           (wrap-session csrf-secret)
+                           wrap-session
                            wrap-parse-json-body
                            wrap-blocker)
         stop-server    (hk/run-server wrapped-router {:port port})]

@@ -9,8 +9,7 @@
   [:red :blue :green :orange :fuchsia :purple])
 
 (def css
-  (let [black           :black
-        cell-transition "background 0.6s ease"]
+  (let [black           :black]
     (h/static-css
       [["*, *::before, *::after"
         {:box-sizing :border-box
@@ -47,31 +46,17 @@
         {:background :white}]
 
        [:.red
-        {:background :red
-         :transition cell-transition}]
+        {:background :red}]
        [:.blue
-        {:background :blue
-         :transition cell-transition}]
+        {:background :blue}]
        [:.green
-        {:background :green
-         :transition cell-transition}]
+        {:background :green}]
        [:.orange
-        {:background :orange
-         :transition cell-transition}]
+        {:background :orange}]
        [:.fuchsia
-        {:background :fuchsia
-         :transition cell-transition}]
+        {:background :fuchsia}]
        [:.purple
-        {:background :purple
-         :transition cell-transition}]])))
-
-(defn board-state [db]
-  (into []
-    (comp
-      (map-indexed
-        (fn [id color-class]
-          (h/html [:div.tile {:class color-class :data-id id}]))))
-    (:board db)))
+        {:background :purple}]])))
 
 (defn fill-cell [board color id]
   (if ;; crude overflow check
@@ -94,6 +79,16 @@
       (fn [db]
         (swap! db fill-cross (parse-long id) sid)))))
 
+(defn board-state [db]
+  (into []
+    (comp
+      (map-indexed
+        (fn [id color-class]
+          (h/html [:div.tile
+                   {:class       color-class
+                    :data-action (str handler-tap-cell "?id=" id)}]))))
+    (:board db)))
+
 (def shim-headers
   (h/html
     [:link#css {:rel "stylesheet" :type "text/css" :href css}]
@@ -103,33 +98,15 @@
 (defn board [snapshot]
   (let [view (board-state snapshot)]
     (h/html
-      [:div {:data-on:pointerdown
-             (str "@post(`" handler-tap-cell "?id=${evt.target.dataset.id}`)")}
-       [:div.board nil view]])))
+      [:div.board nil view])))
 
 (defview render-home {:path "/" :shim-headers shim-headers}
   [{:keys [board-cache _sid] :as _req}]
   (h/html
-    [:link#css {:rel "stylesheet" :type "text/css" :href css}]
-    [:main#morph.main
-     [:h1 "Game of Life (multiplayer)"]
-     [:p "Built with ❤️ using "
-      [:a {:href "https://clojure.org/"} "Clojure"]
-      " and "
-      [:a {:href "https://data-star.dev"} "Datastar"]
-      "🚀"]
-     [:p "Source code can be found "
-      [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/game_of_life/main.clj"} "here"]]
-     @board-cache]))
-
-(defview render-home-embed {:path "/embed" :shim-headers shim-headers}
-  [{:keys [board-cache _sid] :as _req}]
-  (h/html
-    [:link#css {:rel "stylesheet" :type "text/css" :href css}]
-    [:main#morph.main
-     [:h1 "Game of Life (multiplayer)"]
-     [:p "Built with ❤️ using Clojure and Datastar 🚀"]
-     @board-cache]))
+    [:body
+     [:main.main
+      [:h1 "Game of Life (multiplayer)"]
+      @board-cache]]))
 
 (defn next-gen-board [current-board]
   (game/next-gen-board
@@ -179,7 +156,7 @@
 (h/refresh-all!)
 
 (comment
-  (do (-main) nil)
+  (do (-main) nil) 
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
   ;; stop server

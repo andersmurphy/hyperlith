@@ -1,6 +1,5 @@
 (ns hyperlith.impl.datastar
   (:require [hyperlith.impl.assets :refer [static-asset]]
-            [hyperlith.impl.session :refer [csrf-cookie-js]]
             [hyperlith.impl.headers
              :refer [default-headers strict-transport]]
             [hyperlith.impl.util :as util]
@@ -12,35 +11,20 @@
             [hyperlith.impl.router :as router]
             [hyperlith.impl.cpu-pool :as cp]
             [org.httpkit.server :as hk]
-            [clojure.string :as str]
-            [clojure.core.async :as a]))
+            [clojure.core.async :as a]
+            [clojure.string :as str]))
 
-(def datastar-source-map
-  (static-asset
-    {:body         (util/load-resource "datastar.js.map")
-     :content-type "text/javascript"
-     :compress?    true}))
-
-(def datastar
+(def packetstar
   (static-asset
     {:body
-     (-> (util/load-resource "datastar.js") slurp
-       ;; Make sure we point to the right source map
-       (str/replace "datastar.js.map" datastar-source-map))
+     (-> (util/load-resource "packetstar.js") slurp)
      :content-type "text/javascript"
      :compress?    true}))
 
 (defn patch-elements [event-id elements]
-  (str "event: datastar-patch-elements"
+  (str "event: message"
     "\nid: " event-id
-    "\ndata: elements " (str/replace elements "\n" "\ndata: elements ")
-    "\n\n\n"))
-
-(defn patch-append-body [elements]
-  (str "event: datastar-patch-elements"
-    "\ndata: selector body"
-    "\ndata: mode append"
-    "\ndata: elements " (str/replace elements "\n" "\ndata: elements ")
+    "\ndata: " elements
     "\n\n\n"))
 
 (defn throttle [<in-ch msec]
@@ -61,44 +45,22 @@
                 :body    event}
     false))
 
-(def on-load-js
-  ;; Quirk with browsers is that cache settings are per URL not per
-  ;; URL + METHOD this means that GET and POST cache headers can
-  ;; mess with each other. To get around this an unused query param
-  ;; is added to the url.
-
-  ;; Retry Infinity means we always try to reconnect. The other defaults
-  ;; mean that this will at most take 30s (default max backoff).
-  "@post(window.location.pathname + (window.location.search + '&u=').replace(/^&/,'?'), {retryMaxCount: Infinity})")
-
-(def tabid-js
-  ;; Higher collision risk is acceptable here as it only needs to be
-  ;; unique against a given users other tabs.
-  "self.crypto.randomUUID().substring(0,8)")
-
 (defn build-shim-page-resp [head-hiccup]
-  (let [body (-> (h/html
-                   [h/doctype-html5
-                    [:html  {:lang "en"}
-                     [:head
-                      [:meta {:charset "UTF-8"}]
-                      (when head-hiccup head-hiccup)
-                      ;; Scripts
-                      [:script#js {:defer true :type "module"
-                                   :src   datastar}]
-                      ;; Enables responsiveness on mobile devices
-                      [:meta {:name    "viewport"
-                              :content "width=device-width, initial-scale=1.0"}]]
-                     [:body
-                      [:div {:data-signals:csrf  csrf-cookie-js
-                             :data-signals:tabid tabid-js}]
-                      [:div {:data-init           on-load-js
-                             ;; Reconnect when the user comes online after
-                             ;; being offline. Closes any existing connection
-                             ;; from this div.
-                             :data-on:online__window on-load-js}]
-                      [:noscript "Your browser does not support JavaScript!"]
-                      [:main {:id "morph"}]]]])
+  (let [body (->
+               (h/html
+                 [h/doctype-html5
+                  [:html  {:lang "en"}
+                   [:head
+                    [:meta {:charset "UTF-8"}]
+                    (when head-hiccup head-hiccup)
+                    ;; Scripts
+                    [:script#js {:defer true :type "module"
+                                 :src   packetstar}]
+                    ;; Enables responsiveness on mobile devices
+                    [:meta {:name    "viewport"
+                            :content "width=device-width, initial-scale=1.0"}]]
+                   [:body
+                    [:noscript "Your browser does not support JavaScript!"]]]])
                h/html->str)]
     (-> {:status  200
          :headers (assoc default-headers "Content-Encoding" "br")
@@ -118,37 +80,27 @@
 (defn action-handler [path thunk]
   (router/add-route! [:post path]
     (fn handler [req]
-      (let [resp (thunk req)]
-        (if (h/chassis-data? resp)
-          {:status  200
-           :headers {"Content-Type"              "text/event-stream"
-                     "Cache-Control"             "no-store"
-                     "Content-Encoding"          "br"
-                     "Strict-Transport-Security" strict-transport}
-           :body    (-> (h/html->str resp)
-                      patch-append-body
-                      br/compress)}
-          ;; 204 needs even less
-          {:headers {"Strict-Transport-Security" strict-transport
-                     "Cache-Control"             "no-store"}
-           :status  204})))))
+      (thunk req)
+      {:headers {"Strict-Transport-Security" strict-transport
+                 "Cache-Control"             "no-store"}
+       :status  204})))
 
 (defn render-handler
-  [path render-fn & {:keys                     [on-close on-open br-window-size
-                            render-on-connect] :as _opts
-                     :or                       {;; Window size can be tuned to trade memory
-                                                ;; for reduced bandwidth and compute.
-                                                ;; The right window size can significantly improve
-                                                ;; compression of highly variable streams of data.
-                                                ;; (br/window-size->kb 18) => 262KB
-                                                br-window-size    18
-                                                ;; If false does not render on connect  waits for
-                                                ;; next batch. Note this means you should do
-                                                ;; something on connect to trigger a batch.
-                                                ;; Otherwise the user will not see anything
-                                                ;; until a batch is triggered.
-                                                render-on-connect true}}]
-  (router/add-route! [:post path]
+  [path render-fn &
+   {:keys [on-close on-open br-window-size render-on-connect] :as _opts
+    :or   {;; Window size can be tuned to trade memory
+           ;; for reduced bandwidth and compute.
+           ;; The right window size can significantly improve
+           ;; compression of highly variable streams of data.
+           ;; (br/window-size->kb 18) => 262KB
+           br-window-size    18
+           ;; If false does not render on connect  waits for
+           ;; next batch. Note this means you should do
+           ;; something on connect to trigger a batch.
+           ;; Otherwise the user will not see anything
+           ;; until a batch is triggered.
+           render-on-connect true}}]
+  (router/add-route! [:get (str/replace (str path "/stream") "//" "/")]
     (fn handler [req]
       (let [;; Dropping buffer is used here as we don't want a slow handler
             ;; blocking other handlers. Mult distributes each event to all
@@ -201,7 +153,7 @@
 
 (defn patch-signals [signals]
   (h/html [:div {:data-signals (json/edn->json signals)
-                 :data-init "el.remove()"}]))
+                 :data-init    "el.remove()"}]))
 
 (defn execute-expr [expr]
   (h/html [:div {:data-init (str expr ";el.remove()")}]))
