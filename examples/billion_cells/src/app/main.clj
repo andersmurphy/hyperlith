@@ -451,8 +451,6 @@
           "setTimeout(() => evt.target.classList.remove('pop'), 300)"
           "}")}
        [:div.view-wrapper
-        {;; firefox sometimes preserves scroll on refresh and we don't want that
-         :data-init (scroll-to-xy-js jump-x jump-y)}
         [::vs/virtual-table#view
          {:data-ref              "_view"
           :v/x                   {:item-size          chunk-width-px
@@ -498,7 +496,10 @@
          " - "
          [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_cells/src/app/main.clj" } "source"]
          " - "
-         [:a {:href "https://andersmurphy.com/about"} "blog"]]]])))
+         [:a {:href "https://andersmurphy.com/about"} "blog"]]]
+       [:div
+        {;; firefox sometimes preserves scroll on refresh and we don't want that
+         :data-init (scroll-to-xy-js jump-x jump-y)}]])))
 
 (defn prep-chunk-fts [chunk]
   (->> (flatten chunk)
