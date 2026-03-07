@@ -88,11 +88,9 @@
       (update :board fill-cell user-color (+ id 1))
       (update :board fill-cell user-color (+ id board-size)))))
 
-(defaction handler-tap-cell [{:keys [tx-batch! sid] {:strs [id]} :query-params}]
+(defaction handler-tap-cell [{:keys [db sid] {:strs [id]} :query-params}]
   (when id
-    (tx-batch!
-      (fn [db]
-        (swap! db fill-cross (parse-long id) sid)))))
+    (swap! db fill-cross (parse-long id) sid)))
 
 (def shim-headers
   (h/html
@@ -141,30 +139,23 @@
 (defn next-generation! [db]
   (swap! db update :board next-gen-board))
 
-(defn start-game! [tx-batch!]
+(defn start-game! [db board-cache]
   (let [running_ (atom true)]
     (h/thread
       (while @running_
         (Thread/sleep 200) ;; 5 fps
-        (tx-batch!
-          (fn [db] (next-generation! db)))))
+        (next-generation! db)
+        (reset! board-cache (board @db))
+        (h/refresh-all!)))
     (fn stop-game! [] (reset! running_ false))))
 
 (defn ctx-start []
   (let [db_         (atom {:board (game/empty-board board-size board-size)
                            :users {}})
-        board-cache (atom nil)
-        tx-batch!   (h/batch!
-                      (fn [thunks]
-                        (run! (fn [thunk] (thunk db_)) thunks)
-                        ;; rebuild board state
-                        (reset! board-cache (board @db_))
-                        (h/refresh-all!))
-                      {:run-every-ms 200})]
+        board-cache (atom nil)]
     {:board-cache board-cache
      :db          db_
-     :tx-batch!   tx-batch!
-     :game-stop   (start-game! tx-batch!)}))
+     :game-stop   (start-game! db_ board-cache)}))
 
 (defonce app_ (atom nil))
 

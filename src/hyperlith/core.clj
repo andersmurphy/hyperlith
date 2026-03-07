@@ -1,7 +1,6 @@
 (ns hyperlith.core
   (:require [clojure.core.async :as a]
             [hyperlith.impl.assets]
-            [hyperlith.impl.batch]
             [hyperlith.impl.blocker :refer [wrap-blocker]]
             [hyperlith.impl.codec :as codec]
             [hyperlith.impl.crypto :as crypto]
@@ -82,10 +81,7 @@
   ;; JSON
   [hyperlith.impl.json
    json->edn
-   edn->json]
-  ;; BATCH
-  [hyperlith.impl.batch
-   batch!])
+   edn->json])
 
 (defonce ^:private refresh-ch_ (atom nil))
 

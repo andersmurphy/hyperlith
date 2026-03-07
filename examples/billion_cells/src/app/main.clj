@@ -517,6 +517,20 @@
   (d/q db
     ["CREATE VIRTUAL TABLE IF NOT EXISTS chunk_fts USING fts5(data, content='chunk', content_rowid='id');"]))
 
+(defn batch-fn [writer thunks]
+  #_{:clj-kondo/ignore [:unresolved-symbol]}
+  (let [chunk-cache (atom {})]
+    (d/with-write-tx [db writer]
+      (run! (fn [thunk] (thunk db chunk-cache)) thunks)
+      (run! (fn [[chunk-id new-chunk]]
+              (d/q db '{update chunk
+                        set    {data ?new-chunk}
+                        where  [= id ?chunk-id]}
+                {:chunk-id  chunk-id
+                 :new-chunk new-chunk}))
+        @chunk-cache)))
+  (h/refresh-all!))
+
 (defn ctx-start []
   (let [db-name "cells.db"
         _       (d/restore-then-replicate! db-name
@@ -527,8 +541,7 @@
                    :region               "nbg1"})
         {:keys [writer reader] :as db-obj}
         (d/init-db! db-name
-          {:pool-size 4
-           :pragma    {:foreign_keys false}})]
+          {:pool-size 4})]
     (d/create-function db-obj "prep_chunk_fts" #'prep-chunk-fts
       {:deterministic? true})
     ;; Run migrations
@@ -537,21 +550,9 @@
      :db        reader
      :db-read   reader
      :db-write  writer
-     :tx-batch! (h/batch!
-                  (fn [thunks]
-                    #_{:clj-kondo/ignore [:unresolved-symbol]}
-                    (let [chunk-cache (atom {})]
-                      (d/with-write-tx [db writer]
-                        (run! (fn [thunk] (thunk db chunk-cache)) thunks)
-                        (run! (fn [[chunk-id new-chunk]]
-                                (d/q db '{update chunk
-                                          set    {data ?new-chunk}
-                                          where  [= id ?chunk-id]}
-                                  {:chunk-id  chunk-id
-                                   :new-chunk new-chunk}))
-                          @chunk-cache)))
-                    (h/refresh-all!))
-                  {:run-every-ms 100})}))
+     :tx-batch! (d/async-batcher-init! db-obj
+                  {:batch-fn        batch-fn
+                   :return-promise? false})}))
 
 (defn ctx-stop [ctx]
   (.close (:db-write ctx))

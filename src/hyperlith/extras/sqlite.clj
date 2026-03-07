@@ -2,6 +2,7 @@
   (:require [hyperlith.impl.namespaces :refer [import-vars]]
             [sqlite4clj.core :as d]
             [sqlite4clj.litestream]
+            [sqlite4clj.batch :as batch]
             [honey.sql :as hsql]))
 
 (import-vars
@@ -12,7 +13,9 @@
    create-function]
   [sqlite4clj.litestream
    restore-then-replicate!
-   restore-to-path!])
+   restore-to-path!]
+  [sqlite4clj.batch
+   async-batcher-init!])
 
 (defmacro q [db [query-type query :as string-query] & [params]]
   (if (string? query-type)
