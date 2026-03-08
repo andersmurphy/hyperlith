@@ -123,32 +123,31 @@
            :status  204})))))
 
 (defn render-handler
-  [path render-fn & {:keys                     [on-close on-open br-window-size
-                            render-on-connect] :as _opts
-                     :or                       {;; Window size can be tuned to trade memory
-                                                ;; for reduced bandwidth and compute.
-                                                ;; The right window size can significantly improve
-                                                ;; compression of highly variable streams of data.
-                                                ;; (br/window-size->kb 18) => 262KB
-                                                br-window-size    18
-                                                ;; If false does not render on connect  waits for
-                                                ;; next batch. Note this means you should do
-                                                ;; something on connect to trigger a batch.
-                                                ;; Otherwise the user will not see anything
-                                                ;; until a batch is triggered.
-                                                render-on-connect true}}]
+  [path render-fn &
+   {:keys [on-close on-open br-window-size render-on-connect]
+    :as   _opts
+    :or   {;; Window size can be tuned to trade memory
+           ;; for reduced bandwidth and compute.
+           ;; The right window size can significantly improve
+           ;; compression of highly variable streams of data.
+           ;; (br/window-size->kb 18) => 262KB
+           br-window-size    18
+           ;; If false does not render on connect  waits for
+           ;; next batch. Note this means you should do
+           ;; something on connect to trigger a batch.
+           ;; Otherwise the user will not see anything
+           ;; until a batch is triggered.
+           render-on-connect true}}]
   (router/add-route! [:post path]
     (fn handler [req]
       (let [;; Dropping buffer is used here as we don't want a slow handler
             ;; blocking other handlers. Mult distributes each event to all
             ;; taps in parallel and synchronously, i.e. each tap must
             ;; accept before the next item is distributed.
-            <ch     (a/tap (:hyperlith.core/refresh-mult req)
-                      (a/chan (a/dropping-buffer 1)))
+            <ch (a/tap (:hyperlith.core/refresh-mult req)
+                  (a/chan (a/dropping-buffer 1)))
             ;; Ensures at least one render on connect when enabled
-            _       (when render-on-connect (a/>!! <ch :first-render))
-            ;; poison pill for work cancelling
-            <cancel (a/chan)]
+            _   (when render-on-connect (a/>!! <ch :first-render))]
         (hk/as-channel req
           {:on-open
            (fn hk-on-open [ch]
@@ -157,40 +156,32 @@
                            br  (br/compress-out-stream out
                                  :window-size br-window-size)]
                  (loop [last-view-hash ((:headers req) "last-event-id")]
-                   (a/alt!!
-                     [<cancel]
-                     (do (a/close! <ch) (a/close! <cancel))
-
-                     [<ch]
-                     ([_]
-                      (some-> ;; stop in case of error
-                        (cp/on-cpu-pool ;; CPU work on real threads
-                          (when-some ;; stop in case of error
-                              [new-view (er/try-on-error (render-fn req))]
-                            (let [new-view-str  (h/html->str new-view)
-                                  ;; This is a very fast hash
-                                  new-view-hash (Integer/toHexString
-                                                  (hash new-view-str))]
-                              ;; only send an event if the view has changed
-                              (when (not= last-view-hash new-view-hash)
-                                (->> (patch-elements
-                                       new-view-hash new-view-str)
-                                  (br/compress-stream out br)
-                                  (send! ch)))
-                              new-view-hash)))
-                        recur))
-                     ;; we want work cancelling to have higher priority
-                     :priority true))
+                   (some-> ;; stop in case of error
+                     (cp/on-cpu-pool ;; CPU work on real threads
+                       (when-some ;; stop in case of error
+                           [new-view (er/try-on-error (render-fn req))]
+                         (let [new-view-str  (h/html->str new-view)
+                               ;; This is a very fast hash
+                               new-view-hash (Integer/toHexString
+                                               (hash new-view-str))]
+                           ;; only send an event if the view has changed
+                           (when (not= last-view-hash new-view-hash)
+                             (->> (patch-elements
+                                    new-view-hash new-view-str)
+                               (br/compress-stream out br)
+                               (send! ch)))
+                           new-view-hash)))
+                     recur))
                  ;; Close channel on error or when thread stops
                  (hk/close ch)))
              (when on-open (on-open req)))
            :on-close (fn hk-on-close [_ _]
-                       (a/>!! <cancel :cancel)
+                       (a/close! <ch)
                        (when on-close (on-close req)))})))))
 
 (defn patch-signals [signals]
   (h/html [:div {:data-signals (json/edn->json signals)
-                 :data-init "el.remove()"}]))
+                 :data-init    "el.remove()"}]))
 
 (defn execute-expr [expr]
   (h/html [:div {:data-init (str expr ";el.remove()")}]))
