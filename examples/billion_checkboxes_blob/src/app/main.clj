@@ -98,9 +98,6 @@
          (str "repeat("chunk-size","cell-size-px"px)")
          :grid-column              (str "span " chunk-size)
          :grid-row                 (str "span " chunk-size)
-         ;; For how subgrid and contain interact see:
-         ;; https://github.com/w3c/csswg-drafts/issues/7091
-         :content-visibility       :auto
          :contain                  :strict
          :contain-intrinsic-height (str (* chunk-size cell-size-px)"px")
          :contain-intrinsic-width  (str (* chunk-size cell-size-px)"px")}]
