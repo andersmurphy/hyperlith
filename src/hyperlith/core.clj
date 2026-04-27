@@ -121,7 +121,7 @@
   [{:keys [port ctx-start ctx-stop max-refresh-ms on-error]
     :or   {port     8080
            on-error er/default-on-error}}]  
-  (throw-if-port-in-use! 8080)
+  (throw-if-port-in-use! port)
   (let [<refresh-ch    (a/chan (a/dropping-buffer 1))
         _              (reset! refresh-ch_ <refresh-ch)
         ctx            (ctx-start)
