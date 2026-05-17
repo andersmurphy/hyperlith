@@ -21,8 +21,7 @@
   [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14])
 
 (def palette
-  [0xFFF1E8
-   0xFF004D
+  [0xFF004D
    0x29ADFF
    0x00E436
    0xFFA300
@@ -30,12 +29,12 @@
    0x7E2553
    0xFFCCAA
    0x1D2B53
-   0x008751
    0xAB5236
-   0x5F574F
+   0xFFEC27
+   0x008751
    0xC2C3C7
-   0xFFF1E8
-   0x83769C])
+   0x83769C
+   0x5F574F])
 
 (def state->class
   (mapv #(str "_" %) states))
@@ -252,7 +251,7 @@
         {:sid sid :new-data new-data}))))
 
 (def blank-chunk
-  (-> (repeat (* chunk-size chunk-size) 0) vec))
+  (-> (repeat (* chunk-size chunk-size) 0) byte-array))
 
 (defaction handler-scroll
   [{:keys [sid tabid tx-batch!] {:keys [view-x view-y]} :body}]
@@ -310,7 +309,11 @@
                                 {:chunk-id chunk-id})
                             first))]
               (swap! chunk-cache assoc chunk-id
-                (update chunk cell-id #(if (= 0 %) user-color 0))))))))))
+                (do (aset-byte chunk cell-id
+                      (if (= (byte 0) (aget chunk cell-id))
+                        (byte user-color)
+                        (byte 0)))
+                    chunk)))))))))
 
 (defn scroll-to-xy-js [x y]
   (str
@@ -335,7 +338,7 @@
          {:dark black :light white})]]]))
 
 (defn Checkbox [local-id state]
-  (let [state       (or state 0)
+  (let [state       (or (and state (long state)) 0)
         checked     (not= state 0)
         color-class (str "checked " (get state->class state))]
     (h/html
@@ -659,3 +662,79 @@
             (range 10))
           (Thread/sleep 1))
         (range 10000)))))
+
+(comment  
+  (def db-write (-> @app_ :ctx :db-write))
+  
+  (user/bench
+    (do (d/q db-write '{select * from chunk})
+        nil))
+
+  (d/q db-write '{select * from chunk where [= id 0]})
+
+  ;; Vector of longs encoded as edn
+  ;; 24.146393 ms
+  ;; 3.9M
+
+  ;; Byte array
+  ;; 1.9M 51% smaller
+  ;; 1.369069 ms 17.6x faster
+
+  (->> (d/q db-write '{select * from chunk})
+    (run!
+      (fn [[id data]]
+        (d/q db-write
+          '{update chunk
+            set    {data ?blank-chunk}
+            where  [= id ?id]}
+          {:id          id
+           :blank-chunk (mapv long data)}))))
+  
+  (->> (d/q db-write '{select * from chunk})
+    (run!
+      (fn [[id data]]
+        (d/q db-write
+          '{update chunk
+            set    {data ?blank-chunk}
+            where  [= id ?id]}
+          {:id          id
+           :blank-chunk (byte-array data)}))))
+
+  (->> (d/q db-write '{select [id data]
+                 from   chunk})
+    (remove (fn [[id data]] (= (type (byte-array [])) (type data))))
+    count)
+
+  (d/q db-write '{delete-from chunk where [= 45483 id]})
+
+  
+
+  (comment
+    (type (byte-array [1 2 3]))
+    (let [bytes (byte-array [1 2 3])]
+      (aset-byte bytes  1 1)
+      bytes)
+
+    (type (map identity
+            (byte-array [1 2 3])))
+
+    ))
+
+;; TODO: clean up actions to use bubble up with defmethod
+;; dotimes
+;; TODO: Fix palette (shows white box)
+;; TODO: WAL truncating and litestream
+
+;; ZOOM (1 level)
+;; 1 pixel per tile
+;; separate table?
+;; or generate column?
+;; 16x16
+;; absolute positioning (no grid?)
+;; how to serve/cache images?
+;; etags
+;; generated column virtual vs real
+;; real means bigger rows makes other queries slower
+;; (unless covering index is used)
+;; 6496
+;; [10041]
