@@ -20,6 +20,23 @@
 (def states
   [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14])
 
+(def palette
+  [0xFFF1E8
+   0xFF004D
+   0x29ADFF
+   0x00E436
+   0xFFA300
+   0xFF77A8
+   0x7E2553
+   0xFFCCAA
+   0x1D2B53
+   0x008751
+   0xAB5236
+   0x5F574F
+   0xC2C3C7
+   0xFFF1E8
+   0x83769C])
+
 (def state->class
   (mapv #(str "_" %) states))
 
@@ -129,21 +146,13 @@
          :animation      "pop .3s ease"
          ;; Disable element until this class is removed
          :pointer-events :none}]
-
-       [:._1  {:background-color "#FF004D"}]
-       [:._2  {:background-color "#29ADFF"}]
-       [:._3  {:background-color "#00E436"}]
-       [:._4  {:background-color "#FFA300"}]
-       [:._5  {:background-color "#FF77A8"}]
-       [:._6  {:background-color "#7E2553"}]
-       [:._7  {:background-color "#FFCCAA"}]
-       [:._8  {:background-color "#1D2B53"}]
-       [:._9  {:background-color "#AB5236"}]
-       [:._10 {:background-color "#FFEC27"}]
-       [:._11 {:background-color "#008751"}]
-       [:._12 {:background-color "#C2C3C7"}]
-       [:._13 {:background-color "#83769C"}]
-       [:._14 {:background-color "#5F574F"}]
+       
+       (map-indexed
+         (fn [i x]
+           [(keyword (str "._" (inc i)))
+            {:background-color
+             (format "#%06X" x)}])
+         palette)
 
        [:.palette
         {:margin-block          :5px
@@ -359,7 +368,7 @@
   (h/html
     (into []
       (map-indexed (fn [local-id box] (Checkbox local-id box)))
-      blank-chunk )))
+      blank-chunk)))
 
 (defn EmptyChunk [chunk-id]
   (h/html
@@ -650,22 +659,3 @@
             (range 10))
           (Thread/sleep 1))
         (range 10000)))))
-
-(comment
-  ;; clear out empty chunks
-  (def db-write (-> @app_ :ctx :db-write))
-  (d/q db-write '{select [[[count *]]] from chunk})
-
-  (run! (fn [chunk-id]
-          (when (= blank-chunk (-> (d/q db-write
-                                     '{select [data]
-                                       from   chunk
-                                       where  [= id ?chunk-id]}
-                                     {:chunk-id chunk-id})
-                                 first))
-            (d/q db-write '{delete-from chunk
-                            where       [= id ?chunk-id]}
-              {:chunk-id chunk-id})))
-    (range (* board-size board-size)))
-
-  )
