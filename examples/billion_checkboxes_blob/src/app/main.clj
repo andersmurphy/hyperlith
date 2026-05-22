@@ -36,16 +36,13 @@
    0x83769C
    0x5F574F])
 
-(def state->class
-  (mapv #(str "_" %) states))
-
 (def icon
   (h/static-asset
     {:body         (h/load-resource "check.png")
      :content-type "image/png"}))
 
-(def black         "#000000")
-(def white         "#FFF1E8")
+(def black "#000000")
+(def white "#FFF1E8")
 
 (def css
   (let [black  "#000000"
@@ -130,10 +127,16 @@
            :border-radius  :0.15em
            :display        :grid
            :place-content  :center
-           :pointer-events :all}])
-
-       ;; TODO: this is slow
-       [".checked::before"
+           :pointer-events :all}])       
+       
+       (map-indexed
+         (fn [i x]
+           [(str " :is(.box, .palette-item)[data-color='" (inc i) "']")
+            {:background-color
+             (format "#%06X" x)}])
+         palette)
+       
+       [".box[data-color]:not([data-color='0'])::before"
         {:content    "\"\""
          :width      "0.50em"
          :height     "0.50em"
@@ -145,13 +148,6 @@
          :animation      "pop .3s ease"
          ;; Disable element until this class is removed
          :pointer-events :none}]
-       
-       (map-indexed
-         (fn [i x]
-           [(keyword (str "._" (inc i)))
-            {:background-color
-             (format "#%06X" x)}])
-         palette)
 
        [:.palette
         {:margin-block          :5px
@@ -251,7 +247,7 @@
         {:sid sid :new-data new-data}))))
 
 (def blank-chunk
-  (-> (repeat (* chunk-size chunk-size) 0) byte-array))
+  (byte-array (* chunk-size chunk-size)))
 
 (defaction handler-scroll
   [{:keys [sid tabid tx-batch!] {:keys [view-x view-y]} :body}]
@@ -338,14 +334,11 @@
          {:dark black :light white})]]]))
 
 (defn Checkbox [local-id state]
-  (let [state       (or (and state (long state)) 0)
-        checked     (not= state 0)
-        color-class (str "checked " (get state->class state))]
-    (h/html
-      [:div.box
-       {:class       (when checked color-class)
-        :data-id     local-id
-        :data-action handler-check}])))
+  (h/html
+    [:div.box
+     {:data-color  state
+      :data-id     local-id
+      :data-action handler-check}]))
 
 (defn xy->chunk-id [x y]
   (+ x (* y board-size)))
@@ -403,10 +396,9 @@
              (h/html [:div.palette-item
                       {:data-id     state
                        :data-action handler-palette
-                       :class
-                       (str (state->class state)
-                         (when (= current-selected state)
-                           " palette-selected"))}]))
+                       :data-color  state
+                       :class       (when (= current-selected state)
+                                      "palette-selected")}]))
        (subvec states 1))]))
 
 (def shim-headers
@@ -724,17 +716,3 @@
 ;; dotimes
 ;; TODO: Fix palette (shows white box)
 ;; TODO: WAL truncating and litestream
-
-;; ZOOM (1 level)
-;; 1 pixel per tile
-;; separate table?
-;; or generate column?
-;; 16x16
-;; absolute positioning (no grid?)
-;; how to serve/cache images?
-;; etags
-;; generated column virtual vs real
-;; real means bigger rows makes other queries slower
-;; (unless covering index is used)
-;; 6496
-;; [10041]
