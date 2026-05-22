@@ -594,7 +594,7 @@
 
   (d/table-info db :chunk)
   (d/table-list db)
-  (d/q db '{select [[[count *]]] from session})
+  (d/q db '{select [[[count *]]] from session}) ;; 5624
 
   ;; (+ 17209)
 
@@ -671,48 +671,9 @@
   ;; Byte array
   ;; 1.9M 51% smaller
   ;; 1.369069 ms 17.6x faster
-
-  (->> (d/q db-write '{select * from chunk})
-    (run!
-      (fn [[id data]]
-        (d/q db-write
-          '{update chunk
-            set    {data ?blank-chunk}
-            where  [= id ?id]}
-          {:id          id
-           :blank-chunk (mapv long data)}))))
   
-  (->> (d/q db-write '{select * from chunk})
-    (run!
-      (fn [[id data]]
-        (d/q db-write
-          '{update chunk
-            set    {data ?blank-chunk}
-            where  [= id ?id]}
-          {:id          id
-           :blank-chunk (byte-array data)}))))
-
-  (->> (d/q db-write '{select [id data]
-                 from   chunk})
-    (remove (fn [[id data]] (= (type (byte-array [])) (type data))))
-    count)
-
-  (d/q db-write '{delete-from chunk where [= 45483 id]})
-
-  
-
-  (comment
-    (type (byte-array [1 2 3]))
-    (let [bytes (byte-array [1 2 3])]
-      (aset-byte bytes  1 1)
-      bytes)
-
-    (type (map identity
-            (byte-array [1 2 3])))
-
-    ))
+  )
 
 ;; TODO: clean up actions to use bubble up with defmethod
 ;; dotimes
-;; TODO: Fix palette (shows white box)
 ;; TODO: WAL truncating and litestream
