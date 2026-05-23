@@ -29,9 +29,8 @@
      :content-type "text/javascript"
      :compress?    true}))
 
-(defn patch-elements [event-id elements]
+(defn patch-elements [elements]
   (str "event: datastar-patch-elements"
-    "\nid: " event-id
     "\ndata: elements " (str/replace elements "\n" "\ndata: elements ")
     "\n\n\n"))
 
@@ -155,23 +154,16 @@
                (with-open [out (br/byte-array-out-stream)
                            br  (br/compress-out-stream out
                                  :window-size br-window-size)]
-                 (loop [last-view-hash ((:headers req) "last-event-id")]
-                   (some-> ;; stop in case of error
+                 (loop []
+                   (when-some [_ (a/<!! <ch)]
                      (cp/on-cpu-pool ;; CPU work on real threads
                        (when-some ;; stop in case of error
                            [new-view (er/try-on-error (render-fn req))]
-                         (let [new-view-str  (h/html->str new-view)
-                               ;; This is a very fast hash
-                               new-view-hash (Integer/toHexString
-                                               (hash new-view-str))]
-                           ;; only send an event if the view has changed
-                           (when (not= last-view-hash new-view-hash)
-                             (->> (patch-elements
-                                    new-view-hash new-view-str)
-                               (br/compress-stream out br)
-                               (send! ch)))
-                           new-view-hash)))
-                     recur))
+                         (->> (h/html->str new-view)
+                              patch-elements
+                              (br/compress-stream out br)
+                              (send! ch))))
+                     (recur)))
                  ;; Close channel on error or when thread stops
                  (hk/close ch)))
              (when on-open (on-open req)))
