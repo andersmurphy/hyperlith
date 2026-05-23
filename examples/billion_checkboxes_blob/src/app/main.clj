@@ -570,6 +570,7 @@
 
   ;; Execution time mean : 78.177554 ms
   ;; Execution time mean : 34.990452 ms
+  ;; Execution time mean : 25.271390 ms
   (user/bench
     (->> (mapv
            (fn [n]
@@ -586,6 +587,7 @@
 
   ;; Execution time mean : 2.424361 ms
   ;; Execution time mean : 1.159274 ms
+  ;; Execution  time mean : 686.989437 µs
   (user/bench
     (do
       (UserView db {:x-offset-items   0 :y-offset-items   0
@@ -677,3 +679,5 @@
 ;; TODO: clean up actions to use bubble up with defmethod
 ;; dotimes
 ;; TODO: WAL truncating and litestream
+;; TODO: issues on ios
+
