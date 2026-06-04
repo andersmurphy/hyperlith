@@ -6,6 +6,7 @@
                     "-Duser.timezone=UTC"
                     "-XX:+UseZGC"
                     "-XX:+ZGenerational"
+                    "-XX:+UseCompactObjectHeaders"
                     "-Djdk.attach.allowAttachSelf"
                     "-XX:+EnableDynamicAgentLoading"]}
            :build {:deps       {io.github.clojure/tools.build

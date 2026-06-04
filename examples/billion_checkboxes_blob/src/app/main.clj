@@ -7,6 +7,9 @@
             [clj-async-profiler.core :as prof]
             [clojure.math :as math]))
 
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* :warn-on-boxed)
+
 (def cell-size-px 32)
 (def chunk-size 16)
 (def chunk-size-px (* cell-size-px chunk-size))
