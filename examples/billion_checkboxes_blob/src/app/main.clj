@@ -468,11 +468,13 @@
          [:h2 "X:"]
          [:input.jump-input
           {:type        "number" :data-bind "jumpx"
-           :data-effect (str "$jumpx = " (scroll->cell-xy-js "$view-x"))}]
+           :data-effect
+           (str  "$view-x;@peek(() => {$jumpx = "(scroll->cell-xy-js "$view-x")"})")}]
          [:h2 "Y:"]
          [:input.jump-input
           {:type        "number" :data-bind "jumpy"
-           :data-effect (str "$jumpy = " (scroll->cell-xy-js "$view-y"))}]
+           :data-effect
+           (str  "$view-y;@peek(() => {$jumpy = "(scroll->cell-xy-js "$view-y")"})")}]
          [:div.button {:data-action handler-jump}
           [:strong.pe-none "JUMP"]]
          [:div.button {:data-action       handler-share

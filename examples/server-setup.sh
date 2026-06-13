@@ -25,7 +25,7 @@ User=app
 Restart=on-failure
 RestartSec=5s
 WorkingDirectory=/home/app
-ExecStart=/usr/bin/java -Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl}" -jar app.jar -m app.main -Duser.timezone=UTC -XX:+UseZGC -XX:InitialRAMPercentage 75.0 -XX:MaxRAMPercentage 75.0 -XX:MinRAMPercentage 75.0 -Djdk.attach.allowAttachSelf
+ExecStart=/usr/bin/java -Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl}" -jar app.jar -m app.main -Duser.timezone=UTC -XX:+UseZGC -XX:InitialRAMPercentage 75.0 -XX:MaxRAMPercentage 75.0 -XX:MinRAMPercentage 75.0 -XX:+UseCompactObjectHeaders
 
 [Install]
 WantedBy=multi-user.target
@@ -89,4 +89,3 @@ PubkeyAuthentication yes
 AuthorizedKeysFile .ssh/authorized_keys
 EOD
 systemctl restart ssh
-

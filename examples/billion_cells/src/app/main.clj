@@ -475,13 +475,15 @@
          [:h2 "X:"]
          [:input.jump-input
           {:type        "number" :data-bind "jumpx"
-           :data-effect (str "$jumpx = Math.round(($view-x/" board-width-px
-                          ")*" size ")")}]
+           :data-effect
+           (str  "$view-x;@peek(() => {$jumpx = Math.round(($view-x/"
+             board-width-px")*"size")})")}]
          [:h2 "Y:"]
          [:input.jump-input
           {:type        "number" :data-bind "jumpy"
-           :data-effect (str "$jumpy = Math.round(($view-y/" board-height-px
-                          ")*" size ")")}]
+           :data-effect
+           (str  "$view-y;@peek(() => {$jumpy = Math.round(($view-y/"
+             board-height-px")*"size")})")}]
          [:div.button {:data-action handler-jump}
           [:strong.pe-none "GO"]]
          [:div.button
