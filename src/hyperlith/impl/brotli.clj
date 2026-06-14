@@ -15,26 +15,31 @@
 (defn window-size->kb [window-size]
   (/ (- (m/pow 2 window-size) 16) 1000))
 
-(defn encoder-params [{:keys [quality window-size]}]
+(defn encoder-params [opts]
   (doto (Encoder$Parameters/new)
     (.setMode Encoder$Mode/TEXT)
     ;; LZ77 window size (0, 10-24) (default: 24)
     ;; window size is (pow(2, NUM) - 16)
-    (.setWindow (or window-size 24))
-    (.setQuality (or quality 4))))
+    (.setQuality (or (opts :quality) 3))
+    (.setWindow  (or (opts :window-size) 22))))
 
-(defn compress [data & {:as opts}]
-  (-> (if (string? data) (String/.getBytes data "UTF-8") ^byte/1 data)
-    (Encoder/compress (encoder-params opts))))
+(defn compress
+  ([data]
+   (compress data {}))
+  ([data opts]
+   (-> (if (string? data) (String/.getBytes data "UTF-8") ^byte/1 data)
+     (Encoder/compress (encoder-params opts)))))
 
 (defn byte-array-out-stream ^ByteArrayOutputStream []
   (ByteArrayOutputStream/new))
 
 (defn compress-out-stream ^BrotliOutputStream
-  [^ByteArrayOutputStream out-stream & {:as opts}]
-  (BrotliOutputStream/new out-stream (encoder-params opts)
-    ;; TODO: Default buffer size for brotli library, needs to be tuned.
-    16384))
+  ([^ByteArrayOutputStream out-stream]
+   (compress-out-stream out-stream {}))
+  ([^ByteArrayOutputStream out-stream opts]
+   (BrotliOutputStream/new out-stream (encoder-params opts)
+     ;; TODO: Default buffer size for brotli library, needs to be tuned.
+     16384)))
 
 (defn compress-stream [^ByteArrayOutputStream out ^BrotliOutputStream br chunk]
   (doto br

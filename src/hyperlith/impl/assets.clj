@@ -12,7 +12,8 @@
                         "Cache-Control" "max-age=31536000, immutable"
                         "Content-Type"  content-type)
                       :body    body}
-               compress? (update :body br/compress :quality 11)
+               compress? (update :body br/compress
+                           {:quality 11 :window-size 24})
                compress? (assoc-in [:headers "Content-Encoding"] "br"))
         path (str "/" (crypto/digest body))]
     (router/add-route! [:get path] (fn [_] resp))))

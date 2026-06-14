@@ -90,7 +90,7 @@
                h/html->str)]
     (-> {:status  200
          :headers (assoc default-headers "Content-Encoding" "br")
-         :body    (-> body (br/compress :quality 11))}
+         :body    (-> body (br/compress {:quality 11 :window-size 24}))}
       ;; Etags ensure the shim is only sent again if it's contents have changed
       (assoc-in [:headers "ETag"] (crypto/digest body)))))
 
@@ -115,7 +115,7 @@
                      "Strict-Transport-Security" strict-transport}
            :body    (-> (h/html->str resp)
                       patch-append-body
-                      br/compress)}
+                      (br/compress {:quality 11 :window-size 24}))}
           ;; 204 needs even less
           {:headers {"Strict-Transport-Security" strict-transport
                      "Cache-Control"             "no-store"}
@@ -153,7 +153,7 @@
              (util/thread
                (with-open [out (br/byte-array-out-stream)
                            br  (br/compress-out-stream out
-                                 :window-size br-window-size)]
+                                 {:window-size br-window-size})]
                  (loop []
                    (when-some [_ (a/<!! <ch)]
                      (cp/on-cpu-pool ;; CPU work on real threads
