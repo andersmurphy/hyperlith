@@ -1,4 +1,4 @@
-{:paths ["src" "resources"]
+{:paths ["src" "resources" "classes"]
  :deps
  {org.clojure/clojure    {:mvn/version "1.12.2"}
   org.clojure/data.json  {:mvn/version "2.5.1"}
@@ -18,7 +18,7 @@
 
   ;; SQLITE
   andersmurphy/sqlite4clj
-   ;; {:local/root "../sqlite4clj"}
+  ;; {:local/root "../sqlite4clj"}
   {:git/url "https://github.com/andersmurphy/sqlite4clj"
    :git/sha "2f3db153cf881049f84bc45731e7a30c3d9e3e3d"}
   com.github.seancorfield/honeysql {:mvn/version "2.7.1325"}}
@@ -28,4 +28,8 @@
    :extra-deps
    {com.aayushatharva.brotli4j/native-osx-x86_64    {:mvn/version "1.18.0"}
     com.aayushatharva.brotli4j/native-osx-aarch64   {:mvn/version "1.18.0"}
-    com.aayushatharva.brotli4j/native-linux-aarch64 {:mvn/version "1.18.0"}}}}}
+    com.aayushatharva.brotli4j/native-linux-aarch64 {:mvn/version "1.18.0"}}}
+  :build
+  {:deps       {io.github.clojure/tools.build
+                {:git/tag "v0.10.14" :git/sha "1176afd"}}
+   :ns-default build}}}

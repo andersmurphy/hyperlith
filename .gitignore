@@ -2,6 +2,7 @@
 **/db/
 **/database.db*
 .*
+target
 !.github
 !.gitignore
 .clj-kondo
