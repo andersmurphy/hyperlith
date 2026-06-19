@@ -9,8 +9,10 @@
 (defn clean [_]
   (b/delete {:path "classes"}))
 
+;; Run with  "-target" "21"
 (defn jcompile [_]
   (clean nil)
   (b/javac {:src-dirs   ["src"]
             :class-dir  class-dir
-            :basis      basis}))
+            :basis      basis
+            :javac-opts ["--release" "21"]}))

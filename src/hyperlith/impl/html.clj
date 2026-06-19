@@ -15,7 +15,6 @@
   (let [_ (h/write-html out root)]
     out))
 
-;; TODO: remove
 (def html->str h/html)
 
 (def html-raw-str h/raw-string)
