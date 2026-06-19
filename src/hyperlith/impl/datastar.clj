@@ -1,18 +1,21 @@
 (ns hyperlith.impl.datastar
-  (:require [hyperlith.impl.assets :refer [static-asset]]
-            [hyperlith.impl.headers
-             :refer [default-headers strict-transport]]
-            [hyperlith.impl.util :as util]
-            [hyperlith.impl.brotli :as br]
-            [hyperlith.impl.crypto :as crypto]
-            [hyperlith.impl.html :as h]
-            [hyperlith.impl.error :as er]
-            [hyperlith.impl.json :as json]
-            [hyperlith.impl.router :as router]
-            [hyperlith.impl.cpu-pool :as cp]
-            [org.httpkit.server :as hk]
-            [clojure.string :as str]
-            [clojure.core.async :as a]))
+  (:require[clojure.core.async :as a]
+           [clojure.string :as str]
+           [hyperlith.impl.assets :refer [static-asset]]
+           [hyperlith.impl.brotli :as br]
+           [hyperlith.impl.cpu-pool :as cp]
+           [hyperlith.impl.crypto :as crypto]
+           [hyperlith.impl.error :as er]
+           [hyperlith.impl.headers
+            :refer [default-headers strict-transport]]
+           [hyperlith.impl.html :as h]
+           [hyperlith.impl.json :as json]
+           [hyperlith.impl.router :as router]
+           [hyperlith.impl.util :as util]
+           [org.httpkit.server :as hk])
+  (:import(java.io BufferedWriter OutputStream OutputStreamWriter)
+          (java.nio.charset StandardCharsets)
+          (hyperlith.impl SSENewlineFilterWriter)))
 
 (def datastar-source-map
   (static-asset
@@ -28,11 +31,6 @@
        (str/replace "datastar.js.map" datastar-source-map))
      :content-type "text/javascript"
      :compress?    true}))
-
-(defn patch-elements [elements]
-  (str "event: datastar-patch-elements"
-    "\ndata: elements " (str/replace elements "\n" "\ndata: elements ")
-    "\n\n\n"))
 
 (defn patch-append-body [elements]
   (str "event: datastar-patch-elements"
@@ -115,7 +113,7 @@
                      "Strict-Transport-Security" strict-transport}
            :body    (-> (h/html->str resp)
                       patch-append-body
-                      (br/compress {:quality 11 :window-size 24}))}
+                      (br/compress {:quality 3 :window-size 24}))}
           ;; 204 needs even less
           {:headers {"Strict-Transport-Security" strict-transport
                      "Cache-Control"             "no-store"}
@@ -152,17 +150,28 @@
            (fn hk-on-open [ch]
              (util/thread
                (with-open [out (br/byte-array-out-stream)
-                           br  (br/compress-out-stream out
-                                 {:window-size br-window-size})]
+                           sw (OutputStreamWriter/new
+                                ^OutputStream
+                                (br/compress-out-stream out
+                                  {:window-size br-window-size})
+                                StandardCharsets/UTF_8)
+                           w  (BufferedWriter/new
+                                (SSENewlineFilterWriter/new sw) 16384)]
                  (loop []
                    (when-some [_ (a/<!! <ch)]
                      (cp/on-cpu-pool ;; CPU work on real threads
                        (when-some ;; stop in case of error
                            [new-view (er/try-on-error (render-fn req))]
-                         (->> (h/html->str new-view)
-                              patch-elements
-                              (br/compress-stream out br)
-                              (send! ch))))
+                         (OutputStreamWriter/.append sw
+                           "event: datastar-patch-elements\ndata: elements ")
+                         (h/html->stream w new-view)
+                         ;; need to flush before appending 
+                         (BufferedWriter/.flush w) 
+                         (OutputStreamWriter/.append sw "\n\n\n")
+                         (BufferedWriter/.flush w)
+                         (let [result (.toByteArray out)]
+                           (.reset out)
+                           (send! ch result))))
                      (recur)))
                  ;; Close channel on error or when thread stops
                  (hk/close ch)))

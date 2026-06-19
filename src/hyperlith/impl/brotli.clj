@@ -1,12 +1,13 @@
 (ns hyperlith.impl.brotli
-  (:require
-   [clojure.java.io :as io]
-   [clojure.math :as m])
+  (:require [clojure.math :as m])
   (:import (com.aayushatharva.brotli4j Brotli4jLoader )
-           (com.aayushatharva.brotli4j.encoder Encoder Encoder$Parameters
-             Encoder$Mode BrotliOutputStream)
-           (com.aayushatharva.brotli4j.decoder Decoder BrotliInputStream)
-           (java.io ByteArrayOutputStream IOException)))
+           (com.aayushatharva.brotli4j.decoder Decoder)
+           (com.aayushatharva.brotli4j.encoder
+             BrotliOutputStream
+             Encoder
+             Encoder$Mode
+             Encoder$Parameters)
+           (java.io ByteArrayOutputStream OutputStream)))
 
 #_:clj-kondo/ignore
 (defonce ensure-br
@@ -33,42 +34,15 @@
 (defn byte-array-out-stream ^ByteArrayOutputStream []
   (ByteArrayOutputStream/new))
 
-(defn compress-out-stream ^BrotliOutputStream
+(defn compress-out-stream ^OutputStream
   ([^ByteArrayOutputStream out-stream]
    (compress-out-stream out-stream {}))
   ([^ByteArrayOutputStream out-stream opts]
-   (BrotliOutputStream/new out-stream (encoder-params opts)
-     ;; TODO: Default buffer size for brotli library, needs to be tuned.
-     16384)))
-
-(defn compress-stream [^ByteArrayOutputStream out ^BrotliOutputStream br chunk]
-  (doto br
-    (.write  (String/.getBytes chunk "UTF-8"))
-    (.flush))
-  (let [result (.toByteArray out)]
-    (.reset out)
-    result))
+   (BrotliOutputStream/new out-stream (encoder-params opts) 16384)))
 
 (defn decompress [data]
   (let [decompressed (Decoder/decompress data)]
     (String/new (.getDecompressedData decompressed))))
-
-(defn decompress-stream [data]
-  (with-open [in  (-> (if (string? data) (String/.getBytes data "UTF-8") data)
-                    io/input-stream
-                    (BrotliInputStream/new))
-              out (ByteArrayOutputStream/new)]
-    (.enableEagerOutput in) 
-    (try ;; Allows decompressing of incomplete streams
-      (loop [read (.read in)]
-        (when (> read -1)
-          (.write out read)
-          (recur (.read in))))
-      (catch IOException _))
-    (str out)))
-
-(comment
-  (decompress (compress "hellohellohello")))
 
 
 

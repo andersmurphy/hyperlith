@@ -1,12 +1,21 @@
 (ns hyperlith.impl.html
-  (:require [dev.onionpancakes.chassis.core :as h]
-            [dev.onionpancakes.chassis.compiler :as cc]))
+  (:require
+   [dev.onionpancakes.chassis.compiler :as cc]
+   [dev.onionpancakes.chassis.core :as h]) 
+  (:import
+   [java.io OutputStream]))
 
 ;; Warn on ambiguous attributes
 (cc/set-warn-on-ambig-attrs!)
 
 (def doctype-html5 h/doctype-html5)
 
+(defn html->stream
+  [^OutputStream out root]
+  (let [_ (h/write-html out root)]
+    out))
+
+;; TODO: remove
 (def html->str h/html)
 
 (def html-raw-str h/raw-string)
