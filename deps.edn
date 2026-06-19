@@ -20,7 +20,7 @@
   andersmurphy/sqlite4clj
   ;; {:local/root "../sqlite4clj"}
   {:git/url "https://github.com/andersmurphy/sqlite4clj"
-   :git/sha "2f3db153cf881049f84bc45731e7a30c3d9e3e3d"}
+   :git/sha "8ec0fd5e38faa1195fe17ce06cf18c5f7088dd5d"}
   com.github.seancorfield/honeysql {:mvn/version "2.7.1325"}}
  :aliases
  {:dev

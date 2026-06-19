@@ -3,6 +3,7 @@
   (:require [hyperlith.core :as h :refer [defaction defview]]
             [hyperlith.extras.sqlite :as d]
             [clojure.math :as math]
+            [hyperlith.extras.batch :as batch]
             [hyperlith.extras.ui.virtual-scroll :as vs]
             [clojure.string :as str]))
 
@@ -548,13 +549,12 @@
       {:deterministic? true})
     ;; Run migrations
     (migrations writer)
-    {:db-obj    db-obj
-     :db        reader
+    {:db        reader
      :db-read   reader
      :db-write  writer
-     :tx-batch! (d/async-batcher-init! db-obj
-                  {:batch-fn        batch-fn
-                   :return-promise? false})}))
+     :tx-batch! (batch/async-batcher-init! writer
+                  {:batch-fn      batch-fn
+                   :batch-tick-ms 50})}))
 
 (defn ctx-stop [ctx]
   (.close (:db-write ctx))

@@ -15,7 +15,7 @@
    "sec-fetch-site"  "same-origin"})
 
 (let [url "https://localhost:3030/?u="]
-  (dotimes [_ 100]
+  (dotimes [_ 1000]
     (Thread/startVirtualThread
       (fn []
         (try
@@ -27,8 +27,8 @@
               (while true
                 (.skip in Long/MAX_VALUE)
                 (Thread/sleep 10))))
-          (catch Exception _)
-          (println "Stream closed"))))))
+          (catch Exception _))
+        (println "Stream closed")))))
 
 (let [url "https://localhost:3030/t_rqnpSL_NvK8EJhoBwkc6TNJ4VsLi1Fs"]
   (dotimes [_ 10000]
@@ -41,4 +41,4 @@
                       {"tabid"    "7dc673ca"
                        "targetid" (str (rand-int 255))
                        "parentid" (str 0)})})))
-    (Thread/sleep 50)))
+    (Thread/sleep 5)))

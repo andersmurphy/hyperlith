@@ -3,12 +3,13 @@
   (:require [app.qrcode :as qrcode]
             [hyperlith.core :as h :refer [defaction defview]]
             [hyperlith.extras.sqlite :as d]
+            [hyperlith.extras.batch :as batch]
             [hyperlith.extras.ui.virtual-scroll :as vs]
             [clj-async-profiler.core :as prof]
             [clojure.math :as math]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* :warn-on-boxed)
+;; (set! *unchecked-math* :warn-on-boxed)
 
 (def cell-size-px 32)
 (def chunk-size 16)
@@ -309,7 +310,7 @@
                             first))]
               (swap! chunk-cache assoc chunk-id
                 (do (aset-byte chunk cell-id
-                      (if (= (byte 0) (aget chunk cell-id))
+                      (if (= (byte 0) (aget ^byte/1 chunk cell-id))
                         (byte user-color)
                         (byte 0)))
                     chunk)))))))))
@@ -530,18 +531,17 @@
                           :region        "nbg1"
                           :sync-interval "1s"}]}]}
                      :escape-slash false)})
-        {:keys [writer reader] :as db-obj}
+        {:keys [writer reader]}
         (d/init-db! db-name
           {:pool-size 4})]
     ;; Run migrations
     (migrations writer)
-    {:db-obj    db-obj
-     :db        reader
+    {:db        reader
      :db-read   reader
      :db-write  writer
-     :tx-batch! (d/async-batcher-init! db-obj
-                  {:batch-fn        batch-fn
-                   :return-promise? false})}))
+     :tx-batch! (batch/async-batcher-init! writer
+                  {:batch-fn      #'batch-fn
+                   :batch-tick-ms 50})}))
 
 (defn ctx-stop [ctx]
   (.close (:db-write ctx))
