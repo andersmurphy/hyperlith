@@ -637,31 +637,6 @@
   ;; (clojure.java.browse/browse-url "http://localhost:7777/")
   )
 
-(comment
-  (def wrapped-router (-> @app_ :wrapped-router))
-
-  (future
-    (time
-      (run!
-        (fn [_]
-          (run!
-            (fn [_]
-              (-> (wrapped-router
-                    {:headers
-                     {"accept-encoding" "br"
-                      "cookie"          "__Host-sid=5SNfeDa90PhXl0expOLFGdjtrpY; __Host-csrf=I3AAFrMG99lxoqwi87cSpn7unri5qYqJ-Vr9DLc4-s4"
-                      "content-type"    "application/json"}
-                     :request-method :post
-                     :uri            handler-check
-                     :body
-                     {:csrf     "I3AAFrMG99lxoqwi87cSpn7unri5qYqJ-Vr9DLc4-s4"
-                      :parentid (str (rand-int 10))
-                      :targetid (str (rand-int 200))}})))
-            ;; 10000r/s
-            (range 10))
-          (Thread/sleep 1))
-        (range 10000)))))
-
 (comment  
   (def db-write (-> @app_ :ctx :db-write))
   
