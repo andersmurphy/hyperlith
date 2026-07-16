@@ -514,7 +514,7 @@
   ;; Create tables
   (println "Running migrations...")
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS chunk(id INT PRIMARY KEY, data BLOB)"])
+    ["CREATE TABLE IF NOT EXISTS chunk(id INTEGER PRIMARY KEY, data BLOB)"])
   (d/q db
     ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"])
   (d/q db
@@ -631,5 +631,21 @@
   (d/q db-write
     ["insert into chunk_fts(rowid, data) select id, prep_chunk_fts(data) from chunk"])
 
+  )
+
+(comment ;; Example migration of for changing column type
+  
+  (def db-write (-> @app_ :ctx :db-write))
+  (d/q db-write
+    ["CREATE TABLE IF NOT EXISTS newchunk(id INTEGER PRIMARY KEY, data BLOB)"])
+  (d/q db-write ["INSERT INTO newchunk SELECT * FROM chunk"])
+  (d/q db-write ["DROP TABLE chunk"])
+  (d/q db-write ["ALTER TABLE newchunk RENAME TO chunk"])
+
+  (d/q db-write
+    ["DROP TABLE chunk_fts;"])
+
+  (d/q db-write
+    ["CREATE VIRTUAL TABLE IF NOT EXISTS chunk_fts USING fts5(data, content='chunk', content_rowid='id');"])
   )
 
