@@ -44,6 +44,7 @@
   ;; HTML
   [hyperlith.impl.html
    html
+   html->str
    html-raw-str
    html-resolve-alias]
   ;; CRYPTO
