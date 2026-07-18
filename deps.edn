@@ -2,7 +2,6 @@
  :deps
  {org.clojure/clojure    {:mvn/version "1.12.2"}
   org.clojure/data.json  {:mvn/version "2.5.1"}
-  org.clojure/core.async {:mvn/version "1.7.701"}
 
   ;; HTTP
   http-kit/http-kit {:mvn/version "2.9.0-beta1"}

@@ -704,3 +704,14 @@ FROM chunk;"])
 
 
   )
+
+(comment ;; Example migration of for changing column type
+
+   (def db-write (-> @app_ :ctx :db-write))
+   (d/q db-write
+     ["CREATE TABLE IF NOT EXISTS newchunk(id INTEGER PRIMARY KEY, data BLOB, html BLOB)"])
+   (d/q db-write ["INSERT INTO newchunk SELECT * FROM chunk"])
+   (d/q db-write ["DROP TABLE chunk"])
+   (d/q db-write ["ALTER TABLE newchunk RENAME TO chunk"])
+
+   (d/q db-write '{select * from chunk where [= id 0]}))

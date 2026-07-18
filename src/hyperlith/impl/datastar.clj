@@ -1,21 +1,20 @@
 (ns hyperlith.impl.datastar
-  (:require[clojure.core.async :as a]
-           [clojure.string :as str]
-           [hyperlith.impl.assets :refer [static-asset]]
-           [hyperlith.impl.brotli :as br]
-           [hyperlith.impl.cpu-pool :as cp]
-           [hyperlith.impl.crypto :as crypto]
-           [hyperlith.impl.error :as er]
-           [hyperlith.impl.headers
-            :refer [default-headers strict-transport]]
-           [hyperlith.impl.html :as h]
-           [hyperlith.impl.json :as json]
-           [hyperlith.impl.router :as router]
-           [hyperlith.impl.util :as util]
-           [org.httpkit.server :as hk])
+  (:require [clojure.string :as str]
+            [hyperlith.impl.assets :refer [static-asset]]
+            [hyperlith.impl.brotli :as br]
+            [hyperlith.impl.crypto :as crypto]
+            [hyperlith.impl.error :as er]
+            [hyperlith.impl.headers
+             :refer [default-headers strict-transport]]
+            [hyperlith.impl.html :as h]
+            [hyperlith.impl.json :as json]
+            [hyperlith.impl.router :as router]
+            [hyperlith.impl.util :as util]
+            [org.httpkit.server :as hk])
   (:import(java.io BufferedWriter OutputStream OutputStreamWriter)
           (java.nio.charset StandardCharsets)
-          (hyperlith.impl SSENewlineFilterWriter)))
+          (hyperlith.impl SSENewlineFilterWriter)
+          (java.util.concurrent ConcurrentHashMap)))
 
 (def datastar-source-map
   (static-asset
@@ -137,47 +136,39 @@
            render-on-connect true}}]
   (router/add-route! [:post path]
     (fn handler [req]
-      (let [;; Dropping buffer is used here as we don't want a slow handler
-            ;; blocking other handlers. Mult distributes each event to all
-            ;; taps in parallel and synchronously, i.e. each tap must
-            ;; accept before the next item is distributed.
-            <ch (a/tap (:hyperlith.core/refresh-mult req)
-                  (a/chan (a/dropping-buffer 1)))
-            ;; Ensures at least one render on connect when enabled
-            _   (when render-on-connect (a/>!! <ch :first-render))]
-        (hk/as-channel req
-          {:on-open
-           (fn hk-on-open [ch]
-             (util/thread
-               (with-open [out (br/byte-array-out-stream)
-                           sw (OutputStreamWriter/new
-                                ^OutputStream
-                                (br/compress-out-stream out
-                                  {:window-size br-window-size})
-                                StandardCharsets/UTF_8)
-                           w  (BufferedWriter/new
-                                (SSENewlineFilterWriter/new sw) 16384)]
-                 (loop []
-                   (when-some [_ (a/<!! <ch)]
-                     (cp/on-cpu-pool ;; CPU work on real threads
-                       (when-some ;; stop in case of error
-                           [new-view (er/try-on-error (render-fn req))]
-                         (OutputStreamWriter/.append sw
-                           "event: datastar-patch-elements\ndata: elements ")
-                         (h/html->stream w new-view)
-                         ;; need to flush before appending 
-                         (BufferedWriter/.flush w) 
-                         (OutputStreamWriter/.append sw "\n\n\n")
-                         (BufferedWriter/.flush w)
-                         (let [result (.toByteArray out)]
-                           (.reset out)
-                           (send! ch result))))
-                     (recur)))
-                 ;; Close channel on error or when thread stops
-                 (hk/close ch)))
-             (when on-open (on-open req)))
+      (hk/as-channel req
+        (let [out    (br/byte-array-out-stream)
+              sw     (OutputStreamWriter/new
+                      ^OutputStream
+                      (br/compress-out-stream out
+                        {:window-size br-window-size})
+                      StandardCharsets/UTF_8)
+              w      (BufferedWriter/new
+                      (SSENewlineFilterWriter/new sw) 16384)
+              conns  (req :hyperlith.core/conns)
+              ch     (req :async-channel)
+              render (fn render []
+                       (when (hk/open? ch)
+                         (when-some [new-view (er/try-on-error (render-fn req))]
+                           (OutputStreamWriter/.append sw
+                             "event: datastar-patch-elements\ndata: elements ")
+                           (h/html->stream w new-view)
+                           ;; need to flush before appending
+                           (BufferedWriter/.flush w)
+                           (OutputStreamWriter/.append sw "\n\n\n")
+                           (BufferedWriter/.flush w)
+                           (let [result (.toByteArray out)]
+                             (.reset out)
+                             (send! ch result)))))]
+          {:on-open  (fn hk-on-open [_]
+                       (ConcurrentHashMap/.put conns render :present)
+                       (when render-on-connect (render))
+                       (when on-open (on-open req)))
            :on-close (fn hk-on-close [_ _]
-                       (a/close! <ch)
+                       (ConcurrentHashMap/.remove conns render)
+                       (.close out)
+                       (.close sw)
+                       (.close w)
                        (when on-close (on-close req)))})))))
 
 (defn patch-signals [signals]
