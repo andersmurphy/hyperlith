@@ -31,9 +31,6 @@
    (-> (if (string? data) (String/.getBytes data "UTF-8") ^byte/1 data)
      (Encoder/compress (encoder-params opts)))))
 
-(defn byte-array-out-stream ^ByteArrayOutputStream []
-  (ByteArrayOutputStream/new))
-
 (defn compress-out-stream ^OutputStream
   ([^ByteArrayOutputStream out-stream]
    (compress-out-stream out-stream {}))

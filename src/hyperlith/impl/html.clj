@@ -10,10 +10,7 @@
 
 (def doctype-html5 h/doctype-html5)
 
-(defn html->stream
-  [^OutputStream out root]
-  (let [_ (h/write-html out root)]
-    out))
+(def html->stream h/write-html)
 
 (def html->str h/html)
 

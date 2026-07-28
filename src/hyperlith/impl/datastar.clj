@@ -11,9 +11,13 @@
             [hyperlith.impl.router :as router]
             [hyperlith.impl.util :as util]
             [org.httpkit.server :as hk])
-  (:import(java.io BufferedWriter OutputStream OutputStreamWriter)
-          (java.nio.charset StandardCharsets)
-          (java.util.concurrent ConcurrentHashMap)))
+  (:import (java.io
+             BufferedWriter
+             ByteArrayOutputStream
+             OutputStream
+             OutputStreamWriter)
+           (java.nio.charset StandardCharsets)
+           (java.util.concurrent ConcurrentHashMap)))
 
 (def datastar-source-map
   (static-asset
@@ -119,13 +123,13 @@
   (router/add-route! [:post path]
     (fn handler [req]
       (hk/as-channel req
-        (let [out    (br/byte-array-out-stream)
+        (let [out    (ByteArrayOutputStream/new 4096)
               sw     (OutputStreamWriter/new
                       ^OutputStream
                       (br/compress-out-stream out
                         {:window-size br-window-size})
                       StandardCharsets/UTF_8)
-              w      (BufferedWriter/new sw 16384)
+              w      (BufferedWriter/new sw 4096)
               conns  (req :hyperlith.core/conns)
               ch     (req :async-channel)
               render (fn render []
