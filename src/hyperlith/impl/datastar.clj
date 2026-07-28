@@ -13,7 +13,6 @@
             [org.httpkit.server :as hk])
   (:import(java.io BufferedWriter OutputStream OutputStreamWriter)
           (java.nio.charset StandardCharsets)
-          (hyperlith.impl SSENewlineFilterWriter)
           (java.util.concurrent ConcurrentHashMap)))
 
 (def datastar-source-map
@@ -143,8 +142,7 @@
                       (br/compress-out-stream out
                         {:window-size br-window-size})
                       StandardCharsets/UTF_8)
-              w      (BufferedWriter/new
-                      (SSENewlineFilterWriter/new sw) 16384)
+              w      (BufferedWriter/new sw 16384)
               conns  (req :hyperlith.core/conns)
               ch     (req :async-channel)
               render (fn render []
