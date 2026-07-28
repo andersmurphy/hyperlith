@@ -30,13 +30,6 @@
      :content-type "text/javascript"
      :compress?    true}))
 
-(defn patch-append-body [elements]
-  (str "event: datastar-patch-elements"
-    "\ndata: selector body"
-    "\ndata: mode append"
-    "\ndata: elements " (str/replace elements "\n" "\ndata: elements ")
-    "\n\n\n"))
-
 (defn send! [ch event]
   (hk/send! ch {:status  200
                 :headers (assoc default-headers
@@ -102,20 +95,10 @@
 (defn action-handler [path thunk]
   (router/add-route! [:post path]
     (fn handler [req]
-      (let [resp (thunk req)]
-        (if (h/chassis-data? resp)
-          {:status  200
-           :headers {"Content-Type"              "text/event-stream"
-                     "Cache-Control"             "no-store"
-                     "Content-Encoding"          "br"
-                     "Strict-Transport-Security" strict-transport}
-           :body    (-> (h/html->str resp)
-                      patch-append-body
-                      (br/compress {:quality 3 :window-size 24}))}
-          ;; 204 needs even less
-          {:headers {"Strict-Transport-Security" strict-transport
-                     "Cache-Control"             "no-store"}
-           :status  204})))))
+      (thunk req)
+      {:headers {"Strict-Transport-Security" strict-transport
+                 "Cache-Control"             "no-store"}
+       :status  204})))
 
 (defn render-handler
   [path render-fn &
@@ -173,6 +156,7 @@
   (h/html [:div {:data-signals (json/edn->json signals)
                  :data-init    "el.remove()"}]))
 
-(defn execute-expr [expr]
-  (h/html [:div {:data-init (str expr ";el.remove()")}]))
+(defn execute-expr [id expr]
+  (h/html [:div {:id id :data-ignore-morph true}
+           [:div {:data-init (str expr ";el.remove()")}]]))
 

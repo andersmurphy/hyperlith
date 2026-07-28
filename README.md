@@ -74,7 +74,7 @@ The only way for actions to affect the view returned by the `render-fn` running 
 
 #### CQRS
 
-- Actions modify the database and return a 204 or a 200 if they `patch-signals`.
+- Actions modify the database and return a 204.
 - Render functions re-render when the database changes and send an update down the updates SSE connection.
 
 #### Batching

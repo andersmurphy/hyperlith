@@ -321,21 +321,18 @@
     "," (int (* (/ y size) board-size-px)) ");"))
 
 (defaction handler-jump
-  [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
-  (h/execute-expr (scroll-to-xy-js jumpx jumpy)))
+  [{:keys [sid tabid tx-batch!] {:keys [jumpx jumpy]} :body}]
+  (tx-batch!
+    (fn [db _]
+      (update-tab-data! db sid tabid
+        #(assoc % :jump-x jumpx :jump-y jumpy :jump-id (h/new-uid))))))
 
 (defaction handler-share
-  [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
-  (h/html
-    [:div.toast {:data-on:mousedown "el.remove()"}
-     [:div.toast-card
-      [:p [:strong nil (str "X: " jumpx " Y: " jumpy)]]
-      [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]
-      [:div.qrcode nil
-       (qrcode/url->qrcode-svg
-         (str "https://checkboxes.andersmurphy.com?x="
-           jumpx "&y=" jumpy)
-         {:dark black :light white})]]]))
+  [{:keys [sid tabid tx-batch!] {:keys [jumpx jumpy]} :body}]
+  (tx-batch!
+    (fn [db _]
+      (update-tab-data! db sid tabid
+        #(assoc % :share-x jumpx :share-y jumpy :share-id (h/new-uid))))))
 
 (defn Checkbox [local-id state]
   (h/html
@@ -427,11 +424,12 @@
   [{:keys         [db sid tabid]
     {:strs [x y]} :query-params
     :as           _req}]
-  (let [jump-x                     (h/try-parse-long x 0)
-        jump-y                     (h/try-parse-long y 0)
-        tab-data                   (get-tab-data db sid tabid)
-        {:keys [x y height width]} tab-data
-        palette                    (Palette (or (:color tab-data) 1))]
+  (let [init-jump-x               (h/try-parse-long x 0)
+        init-jump-y               (h/try-parse-long y 0)
+        tab-data                  (get-tab-data db sid tabid)
+        {:keys [x y height width share-id
+                share-x share-y jump-x jump-y jump-id]} tab-data
+        palette                   (Palette (or (:color tab-data) 1))]
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href css}]
       [:main#morph.main
@@ -466,16 +464,16 @@
           :v/resize-handler-path handler-resize}]]
        [:div.controls-wrapper
         {;; firefox sometimes preserves scroll on refresh and we don't want that
-         :data-init (scroll-to-xy-js jump-x jump-y)}
+         :data-init (scroll-to-xy-js init-jump-x init-jump-y)}
         [:div.jump
          [:h2 "X:"]
          [:input.jump-input
-          {:type        "number" :data-bind "jumpx"
+          {:type "number" :data-bind "jumpx"
            :data-effect
            (str  "$view-x;@peek(() => {$jumpx = "(scroll->cell-xy-js "$view-x")"})")}]
          [:h2 "Y:"]
          [:input.jump-input
-          {:type        "number" :data-bind "jumpy"
+          {:type "number" :data-bind "jumpy"
            :data-effect
            (str  "$view-y;@peek(() => {$jumpy = "(scroll->cell-xy-js "$view-y")"})")}]
          [:div.button {:data-action handler-jump}
@@ -492,7 +490,20 @@
          " - "
          [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "source"]
          " - "
-         [:a {:href "https://andersmurphy.com/about"} "blog"]]]])))
+         [:a {:href "https://andersmurphy.com/about"} "blog"]]]
+       (when share-id
+         [:div {:id share-id :data-ignore-morph true}
+          [:div.toast {:data-on:mousedown "el.remove()"}
+           [:div.toast-card
+            [:p [:strong nil (str "X: " share-x " Y: " share-y)]]
+            [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]
+            [:div.qrcode nil
+             (qrcode/url->qrcode-svg
+               (str "https://checkboxes.andersmurphy.com?x="
+                 share-x "&y=" share-y)
+               {:dark black :light white})]]]])
+       (when jump-id
+         (h/execute-expr jump-id (scroll-to-xy-js jump-x jump-y)))])))
 
 (defn migrations [db]
   ;; Note: all this code must be idempotent

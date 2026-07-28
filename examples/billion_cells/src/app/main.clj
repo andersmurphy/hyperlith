@@ -296,16 +296,18 @@
     "," (int (* (/ y size) board-height-px)) ");"))
 
 (defaction handler-jump
-  [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
-  (h/execute-expr (scroll-to-xy-js jumpx jumpy)))
+  [{:keys [sid tabid tx-batch!] {:keys [jumpx jumpy]} :body}]
+  (tx-batch!
+    (fn [db _]
+      (update-tab-data! db sid tabid
+        #(assoc % :jump-x jumpx :jump-y jumpy :jump-id (h/new-uid))))))
 
 (defaction handler-share
-  [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
-  (h/html
-    [:div.toast {:data-on:load__delay.3s "el.remove()"}
-     [:div.button
-      [:p [:strong nil (str "X: " jumpx " Y: " jumpy)]]
-      [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]]]))
+  [{:keys [sid tabid tx-batch!] {:keys [jumpx jumpy]} :body}]
+  (tx-batch!
+    (fn [db _]
+      (update-tab-data! db sid tabid
+        #(assoc % :share-x jumpx :share-y jumpy :share-id (h/new-uid))))))
 
 (defn Cell [local-id {:keys [value focus]} sid]
   (cond
@@ -425,7 +427,7 @@
 (defview handler-root
   {:path              "/" :shim-headers shim-headers :br-window-size 24
    :on-close          (fn [{:keys [tx-batch! sid tabid]}]
-               (tx-batch! (partial remove-focus! sid tabid)))
+                        (tx-batch! (partial remove-focus! sid tabid)))
    :render-on-connect false
    :on-open           (fn [{:keys [tx-batch!]}]
                         ;; This will trigger a batch on new user connect
@@ -434,10 +436,11 @@
   [{:keys         [db sid tabid]
     {:strs [x y]} :query-params
     :as           _req}]
-  (let [jump-x                     (h/try-parse-long x 0)
-        jump-y                     (h/try-parse-long y 0)
+  (let [init-jump-x                     (h/try-parse-long x 0)
+        init-jump-y                     (h/try-parse-long y 0)
         tab-data                   (get-tab-data db sid tabid)
-        {:keys [x y height width]} tab-data]
+        {:keys [x y height width share-id share-x share-y jump-id jump-x
+                jump-y]} tab-data]
     (h/html
       [:link#css {:rel "stylesheet" :type "text/css" :href css}]
       [:main#morph.main
@@ -472,16 +475,18 @@
           :v/scroll-handler-path handler-scroll
           :v/resize-handler-path handler-resize}]]
        [:div.controls-wrapper
+        {;; firefox sometimes preserves scroll on refresh and we don't want that
+         :data-init (scroll-to-xy-js init-jump-x init-jump-y)}
         [:div.jump
          [:h2 "X:"]
          [:input.jump-input
-          {:type        "number" :data-bind "jumpx"
+          {:type "number" :data-bind "jumpx"
            :data-effect
            (str  "$view-x;@peek(() => {$jumpx = Math.round(($view-x/"
              board-width-px")*"size")})")}]
          [:h2 "Y:"]
          [:input.jump-input
-          {:type        "number" :data-bind "jumpy"
+          {:type "number" :data-bind "jumpy"
            :data-effect
            (str  "$view-y;@peek(() => {$jumpy = Math.round(($view-y/"
              board-height-px")*"size")})")}]
@@ -500,9 +505,14 @@
          [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_cells/src/app/main.clj" } "source"]
          " - "
          [:a {:href "https://andersmurphy.com/about"} "blog"]]]
-       [:div
-        {;; firefox sometimes preserves scroll on refresh and we don't want that
-         :data-init (scroll-to-xy-js jump-x jump-y)}]])))
+       (when share-id
+         [:div {:id share-id :data-ignore-morph true}
+          [:div.toast {:data-init__delay.3s "el.remove()"}
+           [:div.button
+            [:p [:strong nil (str "X: " share-x " Y: " share-y)]]
+            [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]]]])
+       (when jump-id
+         (h/execute-expr jump-id (scroll-to-xy-js jump-x jump-y)))])))
 
 (defn prep-chunk-fts [chunk]
   (->> (flatten chunk)
