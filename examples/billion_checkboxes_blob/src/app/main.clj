@@ -297,12 +297,16 @@
                                         where  [= id ?chunk-id]}
                                 {:chunk-id chunk-id})
                             first)
-                          (d/q db
-                            '{insert-into chunk
-                              values      [{id   ?chunk-id
-                                            data ?blank-chunk}]}
-                            {:chunk-id    chunk-id
-                             :blank-chunk blank-chunk})
+                          (and (d/q db
+                                 '{insert-into chunk
+                                   values      [{id   ?chunk-id
+                                                 data ?blank-chunk}]}
+                                 {:chunk-id    chunk-id
+                                  :blank-chunk blank-chunk})
+                            (d/q db
+                              '{insert-into chunk-html
+                                values      [{chunk-id ?chunk-id}]}
+                              {:chunk-id chunk-id}))
                           (-> (d/q db '{select [data]
                                         from   chunk
                                         where  [= id ?chunk-id]}
@@ -381,10 +385,13 @@
   [db offset-data]
   {:content (->> (xy->chunk-ids offset-data)
               (mapv (fn [chunk-id]
-                      (let [[[id html]] (d/q db '{select [id html]
-                                                  from   chunk
-                                                  where  [= id ?chunk-id]}
-                                          {:chunk-id chunk-id})]
+                      (let [[[id html]]
+                            (d/q db
+                              '{select [chunk-html.chunk-id chunk-html.data]
+                                from   chunk
+                                join   [:chunk-html [= chunk-id chunk.id]]
+                                where  [= chunk.id ?chunk-id]}
+                              {:chunk-id chunk-id})]
                         (-> (if id
                               (String. ^byte/1 html)
                               (EmptyChunk chunk-id))
@@ -510,7 +517,9 @@
   ;; Create tables
   (println "Running migrations...")
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS chunk(id INTEGER PRIMARY KEY, data BLOB, html BLOB)"])
+    ["CREATE TABLE IF NOT EXISTS chunk(id INTEGER PRIMARY KEY, data BLOB)"])
+  (d/q db
+    ["CREATE TABLE IF NOT EXISTS chunk_html(chunk_id INTEGER PRIMARY KEY, data BLOB, FOREIGN KEY(chunk_id) REFERENCES chunk(id))"])
   (d/q db
     ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"]))
 
@@ -521,12 +530,16 @@
       (run! (fn [thunk] (thunk db chunk-cache)) thunks)
       (run! (fn [[chunk-id new-chunk]]
               (d/q db '{update chunk
-                        set    {data ?new-chunk
-                                html ?new-html}
+                        set    {id ?chunk-id data ?new-chunk}
                         where  [= id ?chunk-id]}
+                {:chunk-id chunk-id :new-chunk new-chunk})
+              (d/q db '{update chunk_html
+                        set    {chunk-id ?chunk-id
+                                data     ?new-html}
+                        where  [= chunk-id ?chunk-id]}
                 {:chunk-id  chunk-id
                  :new-chunk new-chunk
-                 :new-html (String/.getBytes
+                 :new-html  (String/.getBytes
                              (h/html->str (Chunk chunk-id new-chunk)))}))
         @chunk-cache)))
   (h/refresh-all!))
@@ -671,47 +684,32 @@
   ;; 1.369069 ms 17.6x faster  
   )
 
-(comment ;; Example migration of for changing column type
-  
+(comment ;; Example projection generation
+
   (def db-write (-> @app_ :ctx :db-write))
-  (d/q db-write
-    ["CREATE TABLE IF NOT EXISTS newchunk(id INTEGER PRIMARY KEY, data BLOB, html BLOB)"])
-  (d/q db-write ["INSERT INTO newchunk SELECT * FROM chunk"])
-  (d/q db-write ["DROP TABLE chunk"])
-  (d/q db-write ["ALTER TABLE newchunk RENAME TO chunk"])
 
   (d/q db-write '{select * from chunk where [= id 0]})
+
+  (d/q db-write ["ALTER TABLE chunk DROP COLUMN html;"])
+
+  (d/q db-write ["DROP TABLE chunk_html;"])
 
   (run!
     (fn [[id chunk]]
       (d/q db-write
-        '{update chunk
-          set    {html ?html}
-          where  [= id ?id]}
-        {:id   id
-         :html  (String/.getBytes (h/html->str (Chunk id chunk)))}))
+        '{insert-into chunk-html
+          values      [{chunk-id ?chunk-id data ?data}]}
+        {:chunk-id id
+         :data     (String/.getBytes (h/html->str (Chunk id chunk)))}))
     (d/q db-write '{select * from chunk}))
 
-  (d/q db-write
-    ["SELECT DISTINCT path FROM dbstat WHERE pagetype = 'overflow';"])
+  (d/q db-write '{select * from chunk-html})
 
-  (d/q db-write
-    ["SELECT * FROM pragma_page_size;"])
-
-  (d/q db-write ["SELECT * FROM dbstat;"])
-
-  (d/q db-write
-    ["SELECT rowid, (
-  length(id) + length(data) + length(html) + 8
-) AS approx_payload
-FROM chunk
-WHERE approx_payload > 4069;"])
-
-  (d/q db-write
-    ["SELECT rowid, (
-  length(id) + length(data) + length(html) + 8
-) AS approx_payload
-FROM chunk;"])
+  (d/q db-write '{select [chunk-html.id chunk-html.data]
+                  from   chunk
+                  join   [:chunk_html [= chunk-id chunk.id]]
+                  where  [= chunk.id ?chunk-id]}
+    {:chunk-id 1})
 
 
   )
