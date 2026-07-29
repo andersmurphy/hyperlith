@@ -97,6 +97,7 @@
 
 (defn html->stream!
   [^BufferedWriter out root]
+  (assert (vector? root))
   (run!
     (fn [node]
       (BufferedWriter/.write out
@@ -156,4 +157,3 @@
 (defn execute-expr [id expr]
   (h/html [:div {:id id :data-ignore-morph true}
            [:div {:data-init (str expr ";el.remove()")}]]))
-
