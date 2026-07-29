@@ -15,7 +15,7 @@
             [hyperlith.impl.session :refer [wrap-session]]
             [hyperlith.impl.trace]
             [hyperlith.impl.util :as u]
-            [org.httpkit.server :as hk])
+            [aleph.http :as http])
   (:import (java.net ServerSocket)
            (java.util.concurrent Executors ThreadPoolExecutor
              ConcurrentHashMap)))
@@ -128,9 +128,11 @@
         wrap-ctx       (fn [handler]
                          (fn [req]
                            (handler
-                             (-> 
-                               (assoc req :hyperlith.core/conns conns)
-                                 (u/merge ctx)))))
+                             (-> (into {} req)
+                               ;; TODO: context should be it's own submap
+                               ;; to avoid merge.
+                               (assoc :hyperlith.core/conns conns)
+                               (u/merge ctx)))))
         ;; Middleware make for messy error stacks.
         wrapped-router (-> router/router
                          wrap-ctx
@@ -143,9 +145,10 @@
                          wrap-session
                          wrap-parse-json-body
                          wrap-blocker)
-        stop-server    (hk/run-server wrapped-router {:port port})]
+        server         (http/start-server wrapped-router
+                         {:port port})]
     {:wrapped-router wrapped-router
      :ctx            ctx
-     :stop           (fn stop [& [opts]]
-                       (stop-server opts)
+     :stop           (fn stop [& [_opts]]
+                       (.close server)
                        (ctx-stop ctx))}))

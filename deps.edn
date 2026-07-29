@@ -4,7 +4,7 @@
   org.clojure/data.json  {:mvn/version "2.5.1"}
 
   ;; HTTP
-  http-kit/http-kit {:mvn/version "2.9.0-beta1"}
+  aleph/aleph {:mvn/version "0.9.9"}
 
   ;; COMPRESSION
   com.aayushatharva.brotli4j/brotli4j            {:mvn/version "1.18.0"}

@@ -10,7 +10,7 @@
             [hyperlith.impl.json :as json]
             [hyperlith.impl.router :as router]
             [hyperlith.impl.util :as util]
-            [org.httpkit.server :as hk])
+            [manifold.stream :as s])
   (:import (java.io
              BufferedWriter
              ByteArrayOutputStream
@@ -33,15 +33,6 @@
        (str/replace "datastar.js.map" datastar-source-map))
      :content-type "text/javascript"
      :compress?    true}))
-
-(defn send! [ch event]
-  (hk/send! ch {:status  200
-                :headers (assoc default-headers
-                           "Content-Type"  "text/event-stream"
-                           "Cache-Control" "no-store"
-                           "Content-Encoding" "br")
-                :body    event}
-    false))
 
 (def on-load-js
   ;; Quirk with browsers is that cache settings are per URL not per
@@ -113,41 +104,45 @@
            ;; The right window size can significantly improve
            ;; compression of highly variable streams of data.
            ;; (br/window-size->kb 18) => 262KB
-           br-window-size    18}}]
+           br-window-size 18}}]
   (router/add-route! [:post path]
     (fn handler [req]
-      (hk/as-channel req
-        (let [out    (ByteArrayOutputStream/new 4096)
-              sw     (OutputStreamWriter/new
-                      ^OutputStream
-                      (br/compress-out-stream out
-                        {:window-size br-window-size})
-                      StandardCharsets/UTF_8)
-              w      (BufferedWriter/new sw 4096)
-              conns  (req :hyperlith.core/conns)
-              ch     (req :async-channel)
-              render (fn render []
-                       (when (hk/open? ch)
-                         (when-some [new-view (er/try-on-error (render-fn req))]
-                           (OutputStreamWriter/.append sw
-                             "event: datastar-patch-elements\ndata: elements ")
-                           (h/html->stream w new-view)
-                           ;; need to flush before appending
-                           (BufferedWriter/.flush w)
-                           (OutputStreamWriter/.append sw "\n\n\n")
-                           (BufferedWriter/.flush w)
-                           (let [result (.toByteArray out)]
-                             (.reset out)
-                             (send! ch result)))))]
-          {:on-open  (fn hk-on-open [_]
-                       (ConcurrentHashMap/.put conns render :present)
-                       (when on-open (on-open req)))
-           :on-close (fn hk-on-close [_ _]
-                       (ConcurrentHashMap/.remove conns render)
-                       (.close out)
-                       (.close sw)
-                       (.close w)
-                       (when on-close (on-close req)))})))))
+      (let [out    (ByteArrayOutputStream/new 4096)
+            sw     (OutputStreamWriter/new
+                     ^OutputStream
+                     (br/compress-out-stream out
+                       {:window-size br-window-size})
+                     StandardCharsets/UTF_8)
+            w      (BufferedWriter/new sw 4096)
+            conns  (req :hyperlith.core/conns)
+            stream (s/stream)
+            render (fn render []
+                     (if-not (s/closed? stream)
+                       (when-some [new-view (er/try-on-error (render-fn req))]
+                         (OutputStreamWriter/.append sw
+                           "event: datastar-patch-elements\ndata: elements ")
+                         (h/html->stream w new-view)
+                         ;; need to flush before appending
+                         (BufferedWriter/.flush w)
+                         (OutputStreamWriter/.append sw "\n\n\n")
+                         (BufferedWriter/.flush w)
+                         (let [result (.toByteArray out)]
+                           (.reset out)
+                           @(s/put! stream result)))
+                       (do
+                         (ConcurrentHashMap/.remove conns render)
+                         (.close out)
+                         (.close sw)
+                         (.close w)
+                         (when on-close (on-close req)))))]
+        (ConcurrentHashMap/.put conns render :present)
+        (when on-open (on-open req))
+        {:status  200
+         :headers (assoc default-headers
+                    "Content-Type"  "text/event-stream"
+                    "Cache-Control" "no-store"
+                    "Content-Encoding" "br")
+         :body    stream}))))
 
 (defn patch-signals [signals]
   (h/html [:div {:data-signals (json/edn->json signals)

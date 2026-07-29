@@ -569,8 +569,8 @@
                    :batch-tick-ms 50})}))
 
 (defn ctx-stop [ctx]
-  (.close (:db-write ctx))
-  (.close (:db-read ctx)))
+  ;; TODO: implement closing
+  )
 
 (defonce app_ (atom nil))
 
