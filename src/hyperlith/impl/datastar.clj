@@ -106,20 +106,14 @@
 
 (defn render-handler
   [path render-fn &
-   {:keys [on-close on-open br-window-size render-on-connect]
+   {:keys [on-close on-open br-window-size]
     :as   _opts
     :or   {;; Window size can be tuned to trade memory
            ;; for reduced bandwidth and compute.
            ;; The right window size can significantly improve
            ;; compression of highly variable streams of data.
            ;; (br/window-size->kb 18) => 262KB
-           br-window-size    18
-           ;; If false does not render on connect  waits for
-           ;; next batch. Note this means you should do
-           ;; something on connect to trigger a batch.
-           ;; Otherwise the user will not see anything
-           ;; until a batch is triggered.
-           render-on-connect true}}]
+           br-window-size    18}}]
   (router/add-route! [:post path]
     (fn handler [req]
       (hk/as-channel req
@@ -147,7 +141,6 @@
                              (send! ch result)))))]
           {:on-open  (fn hk-on-open [_]
                        (ConcurrentHashMap/.put conns render :present)
-                       (when render-on-connect (render))
                        (when on-open (on-open req)))
            :on-close (fn hk-on-close [_ _]
                        (ConcurrentHashMap/.remove conns render)
