@@ -267,7 +267,9 @@
   (when (and targetid parentid)
     (let [cell-id  (int (parse-long targetid))
           chunk-id (int (parse-long parentid))]
-      (when (>= (dec (* chunk-size chunk-size)) cell-id 0)
+      (when (and
+              (>= (dec (* chunk-size chunk-size)) cell-id  0)
+              (>= (dec (* board-size board-size)) chunk-id 0))
         (tx-batch! (partial remove-focus! sid tabid))
         (tx-batch!
           (fn [db chunk-cache]
