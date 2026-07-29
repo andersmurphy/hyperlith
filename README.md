@@ -16,12 +16,6 @@ Hyperlith only uses a subset of Datastar's feartures. If you want a production r
 - **Operationally Simple** - handles all operational tasks in process.
 - **Sovereign** - can be deployed on any VPS provider.
 
-## F.A.Q
-
-**Q:** *Why do I get 403 when running the examples locally in Chrome or Safari?*
-
-**A:** *The session and csrf cookies use `Secure` this means that these cookies won't be set on localhost when using chrome or safari (as they require HTTPS) . If you want to use Chrome or Safari for local development you can run `caddy run` to start a local https proxy on https://localhost:3030. The local `caddyfile` can be [found here](https://github.com/andersmurphy/hyperlith/blob/master/Caddyfile). The goal is for development to be as close to production as possible, and Hyperlith is designed to be run behind a reverse proxy.*
-
 ## Rational (more like a collection of opinions)
 
 #### Why large/fat/main morphs (immediate mode)?
@@ -118,10 +112,6 @@ Rather than returning the whole page on initial render and having two render pat
 #### Routing
 
 Router is a simple map, this means path parameters are not supported use query parameters or body instead. I've found over time that path parameters force you to adopt an arbitrary hierarchy that is often wrong (and place oriented programming). Removing them avoids this and means routing can be simplified to a map and have better performance than a more traditional adaptive radix tree router.
-
-#### Reverse proxy
-
-Hyperlith is designed to be deployed between a reverse proxy like caddy for handling HTTP2/3 (you want to be using HTTP2/3 with SSE).
 
 #### Minimal middleware 
 

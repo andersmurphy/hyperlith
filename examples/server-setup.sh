@@ -7,7 +7,7 @@ add-apt-repository ppa:openjdk-r/ppa
 # Dependencies
 apt-get update
 apt-get upgrade
-apt-get -y install openjdk-23-jre-headless ufw caddy
+apt-get -y install openjdk-23-jre-headless ufw
 
 # App user (you cannot login as this user)
 useradd -rms /usr/sbin/nologin app
@@ -64,22 +64,6 @@ ufw allow OpenSSH
 ufw allow 80
 ufw allow 443
 ufw --force enable
-
-# Reverse proxy
-rm /etc/caddy/Caddyfile
-cat > /etc/caddy/Caddyfile << EOD
-example.andersmurphy.com {
-  header -Server
-  reverse_proxy localhost:8080 {
-    lb_try_duration 30s
-    lb_try_interval 1s
-  }
-}
-EOD
-
-# Let's encrypt
-systemctl daemon-reload
-systemctl enable --now caddy
 
 # ssh config
 cat >> /etc/ssh/sshd_config << EOD

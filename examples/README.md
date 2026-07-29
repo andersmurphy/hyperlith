@@ -26,22 +26,6 @@ bash server-setup.sh
 
 follow instructions.
 
-## Caddy service
-
-Check status:
-
-```bash
-systemctl status caddy
-```
-
-Reload config without downtime.
-
-```bash
-systemctl reload caddy
-```
-
-Docs: https://caddyserver.com/docs/running#using-the-service
-
 ## Useful systemd commands
 
 Check status of service.
