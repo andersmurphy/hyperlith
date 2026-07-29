@@ -282,38 +282,38 @@
           (update-tab-data! db sid tabid #(assoc % :color color)))))))
 
 (defaction handler-check
-  [{:keys                       [sid tx-batch! db tabid]
+  [{:keys                       [sid tx-batch! tabid]
     {:keys [targetid parentid]} :body}]
   (when (and targetid parentid)
-    (let [user-color (or (:color (get-tab-data db sid tabid)) 1)
-          cell-id    (int (parse-long targetid))
-          chunk-id   (int (parse-long parentid))]
+    (let [cell-id  (int (parse-long targetid))
+          chunk-id (int (parse-long parentid))]
       (when (and
               (>= (dec (* chunk-size chunk-size)) cell-id  0)
               (>= (dec (* board-size board-size)) chunk-id 0))
         (tx-batch!
           (fn [db chunk-cache]
-            (let [chunk (or (@chunk-cache chunk-id)
-                          (-> (d/q db '{select [data]
-                                        from   chunk
-                                        where  [= id ?chunk-id]}
-                                {:chunk-id chunk-id})
-                            first)
-                          (and (d/q db
-                                 '{insert-into chunk
-                                   values      [{id   ?chunk-id
-                                                 data ?blank-chunk}]}
-                                 {:chunk-id    chunk-id
-                                  :blank-chunk blank-chunk})
-                            (d/q db
-                              '{insert-into chunk-html
-                                values      [{chunk-id ?chunk-id}]}
-                              {:chunk-id chunk-id}))
-                          (-> (d/q db '{select [data]
-                                        from   chunk
-                                        where  [= id ?chunk-id]}
-                                {:chunk-id chunk-id})
-                            first))]
+            (let [user-color (or (:color (get-tab-data db sid tabid)) 1)
+                  chunk      (or (@chunk-cache chunk-id)
+                               (-> (d/q db '{select [data]
+                                             from   chunk
+                                             where  [= id ?chunk-id]}
+                                     {:chunk-id chunk-id})
+                                 first)
+                               (and (d/q db
+                                      '{insert-into chunk
+                                        values      [{id   ?chunk-id
+                                                      data ?blank-chunk}]}
+                                      {:chunk-id    chunk-id
+                                       :blank-chunk blank-chunk})
+                                 (d/q db
+                                   '{insert-into chunk-html
+                                     values      [{chunk-id ?chunk-id}]}
+                                   {:chunk-id chunk-id}))
+                               (-> (d/q db '{select [data]
+                                             from   chunk
+                                             where  [= id ?chunk-id]}
+                                     {:chunk-id chunk-id})
+                                 first))]
               (swap! chunk-cache assoc chunk-id
                 (do (aset-byte chunk cell-id
                       (if (= (byte 0) (aget ^byte/1 chunk cell-id))
