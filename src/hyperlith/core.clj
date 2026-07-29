@@ -98,8 +98,6 @@
          (ds/render-handler ~path (var ~sym-fn) ~opts)
          (def ~sym ~path))))
 
-(fn [render-fn] (render-fn))
-
 (defonce ^ThreadPoolExecutor render-pool
   (Executors/newFixedThreadPool
     (Runtime/.availableProcessors (Runtime/getRuntime))))

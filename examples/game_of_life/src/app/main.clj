@@ -107,28 +107,28 @@
 
 (defview render-home {:path "/" :shim-headers shim-headers}
   [{:keys [board-cache _sid] :as _req}]
-  (h/html
-    [:link#css {:rel "stylesheet" :type "text/css" :href css}]
-    [:main#morph.main
-     [:h1 "Game of Life (multiplayer)"]
-     [:p "Built with ❤️ using "
-      [:a {:href "https://clojure.org/"} "Clojure"]
-      " and "
-      [:a {:href "https://data-star.dev"} "Datastar"]
-      "🚀"]
-     [:p "Source code can be found "
-      [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/game_of_life/main.clj"} "here"]
-      "-" [:a {:href "https://andersmurphy.com/about"} "blog"]]
-     @board-cache]))
+  [(h/html
+     [:link#css {:rel "stylesheet" :type "text/css" :href css}]
+     [:main#morph.main
+      [:h1 "Game of Life (multiplayer)"]
+      [:p "Built with ❤️ using "
+       [:a {:href "https://clojure.org/"} "Clojure"]
+       " and "
+       [:a {:href "https://data-star.dev"} "Datastar"]
+       "🚀"]
+      [:p "Source code can be found "
+       [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/game_of_life/main.clj"} "here"]
+       "-" [:a {:href "https://andersmurphy.com/about"} "blog"]]
+      @board-cache])])
 
 (defview render-home-embed {:path "/embed" :shim-headers shim-headers}
   [{:keys [board-cache _sid] :as _req}]
-  (h/html
-    [:link#css {:rel "stylesheet" :type "text/css" :href css}]
-    [:main#morph.main
-     [:h1 "Game of Life (multiplayer)"]
-     [:p "Built with ❤️ using Clojure and Datastar 🚀"]
-     @board-cache]))
+  [(h/html
+     [:link#css {:rel "stylesheet" :type "text/css" :href css}]
+     [:main#morph.main
+      [:h1 "Game of Life (multiplayer)"]
+      [:p "Built with ❤️ using Clojure and Datastar 🚀"]
+      @board-cache])])
 
 (defn next-gen-board [current-board]
   (game/next-gen-board

@@ -1,9 +1,7 @@
 (ns hyperlith.impl.html
   (:require
    [dev.onionpancakes.chassis.compiler :as cc]
-   [dev.onionpancakes.chassis.core :as h]) 
-  (:import
-   [java.io OutputStream]))
+   [dev.onionpancakes.chassis.core :as h]))
 
 ;; Warn on ambiguous attributes
 (cc/set-warn-on-ambig-attrs!)

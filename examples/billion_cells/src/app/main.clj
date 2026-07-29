@@ -443,78 +443,78 @@
         tab-data                   (get-tab-data db sid tabid)
         {:keys [x y height width share-id share-x share-y jump-id jump-x
                 jump-y]} tab-data]
-    (h/html
-      [:link#css {:rel "stylesheet" :type "text/css" :href css}]
-      [:main#morph.main
-       {:data-on:mousedown
-        (str
-          "if (evt.target.dataset.action) {"
-          "evt.target.classList.add('pop');"
-          "$targetid = evt.target.dataset.id;"
-          "$parentid = evt.target.parentElement.dataset.id;"
-          "$gparentid = evt.target.parentElement.parentElement.dataset.id;"
-          "@post(`${evt.target.dataset.action}`);"
-          "setTimeout(() => evt.target.classList.remove('pop'), 300)"
-          "}")}
-       [:div.view-wrapper
-        [::vs/virtual-table#view
-         {:data-ref              "_view"
-          :v/x                   {:item-size          chunk-width-px
-                                  :buffer-items       1
-                                  :max-rendered-items 5
-                                  :scroll-pos         x
-                                  :view-size          width
-                                  :item-count-fn      (fn [] board-size)
-                                  :chunk-size         chunk-size}
-          :v/y                   {:item-size          chunk-height-px
-                                  :buffer-items       2
-                                  :max-rendered-items 7
-                                  :scroll-pos         y
-                                  :view-size          height
-                                  :item-count-fn      (fn [] board-size)
-                                  :chunk-size         chunk-size}
-          :v/item-fn             (partial UserView db sid)
-          :v/scroll-handler-path handler-scroll
-          :v/resize-handler-path handler-resize}]]
-       [:div.controls-wrapper
-        {;; firefox sometimes preserves scroll on refresh and we don't want that
-         :data-init (scroll-to-xy-js init-jump-x init-jump-y)}
-        [:div.jump
-         [:h2 "X:"]
-         [:input.jump-input
-          {:type "number" :data-bind "jumpx"
-           :data-effect
-           (str  "$view-x;@peek(() => {$jumpx = Math.round(($view-x/"
-             board-width-px")*"size")})")}]
-         [:h2 "Y:"]
-         [:input.jump-input
-          {:type "number" :data-bind "jumpy"
-           :data-effect
-           (str  "$view-y;@peek(() => {$jumpy = Math.round(($view-y/"
-             board-height-px")*"size")})")}]
-         [:div.button {:data-action handler-jump}
-          [:strong.pe-none "GO"]]
-         [:div.button
-          {:data-action       handler-share
-           :data-on:mousedown copy-xy-to-clipboard-js}
-          [:strong.pe-none "SHARE"]]]
-        [:h1 "One Billion Cells"]
-        [:p "Built using "
-         [:a {:href "https://clojure.org/"} "Clojure"]
-         " and "
-         [:a {:href "https://data-star.dev"} "Datastar"]
-         " - "
-         [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_cells/src/app/main.clj" } "source"]
-         " - "
-         [:a {:href "https://andersmurphy.com/about"} "blog"]]]
-       (when share-id
-         [:div {:id share-id :data-ignore-morph true}
-          [:div.toast {:data-init__delay.3s "el.remove()"}
-           [:div.button
-            [:p [:strong nil (str "X: " share-x " Y: " share-y)]]
-            [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]]]])
-       (when jump-id
-         (h/execute-expr jump-id (scroll-to-xy-js jump-x jump-y)))])))
+    [(h/html [:link#css {:rel "stylesheet" :type "text/css" :href css}])
+     (h/html
+       [:main#morph.main
+        {:data-on:mousedown
+         (str
+           "if (evt.target.dataset.action) {"
+           "evt.target.classList.add('pop');"
+           "$targetid = evt.target.dataset.id;"
+           "$parentid = evt.target.parentElement.dataset.id;"
+           "$gparentid = evt.target.parentElement.parentElement.dataset.id;"
+           "@post(`${evt.target.dataset.action}`);"
+           "setTimeout(() => evt.target.classList.remove('pop'), 300)"
+           "}")}
+        [:div.view-wrapper
+         [::vs/virtual-table#view
+          {:data-ref              "_view"
+           :v/x                   {:item-size          chunk-width-px
+                                   :buffer-items       1
+                                   :max-rendered-items 5
+                                   :scroll-pos         x
+                                   :view-size          width
+                                   :item-count-fn      (fn [] board-size)
+                                   :chunk-size         chunk-size}
+           :v/y                   {:item-size          chunk-height-px
+                                   :buffer-items       2
+                                   :max-rendered-items 7
+                                   :scroll-pos         y
+                                   :view-size          height
+                                   :item-count-fn      (fn [] board-size)
+                                   :chunk-size         chunk-size}
+           :v/item-fn             (partial UserView db sid)
+           :v/scroll-handler-path handler-scroll
+           :v/resize-handler-path handler-resize}]]
+        [:div.controls-wrapper
+         {;; firefox sometimes preserves scroll on refresh and we don't want that
+          :data-init (scroll-to-xy-js init-jump-x init-jump-y)}
+         [:div.jump
+          [:h2 "X:"]
+          [:input.jump-input
+           {:type "number" :data-bind "jumpx"
+            :data-effect
+            (str  "$view-x;@peek(() => {$jumpx = Math.round(($view-x/"
+              board-width-px")*"size")})")}]
+          [:h2 "Y:"]
+          [:input.jump-input
+           {:type "number" :data-bind "jumpy"
+            :data-effect
+            (str  "$view-y;@peek(() => {$jumpy = Math.round(($view-y/"
+              board-height-px")*"size")})")}]
+          [:div.button {:data-action handler-jump}
+           [:strong.pe-none "GO"]]
+          [:div.button
+           {:data-action       handler-share
+            :data-on:mousedown copy-xy-to-clipboard-js}
+           [:strong.pe-none "SHARE"]]]
+         [:h1 "One Billion Cells"]
+         [:p "Built using "
+          [:a {:href "https://clojure.org/"} "Clojure"]
+          " and "
+          [:a {:href "https://data-star.dev"} "Datastar"]
+          " - "
+          [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_cells/src/app/main.clj" } "source"]
+          " - "
+          [:a {:href "https://andersmurphy.com/about"} "blog"]]]
+        (when share-id
+          [:div {:id share-id :data-ignore-morph true}
+           [:div.toast {:data-init__delay.3s "el.remove()"}
+            [:div.button
+             [:p [:strong nil (str "X: " share-x " Y: " share-y)]]
+             [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]]]])
+        (when jump-id
+          (h/execute-expr jump-id (scroll-to-xy-js jump-x jump-y)))])]))
 
 (defn prep-chunk-fts [chunk]
   (->> (flatten chunk)

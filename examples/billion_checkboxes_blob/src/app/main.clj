@@ -439,80 +439,80 @@
         {:keys [x y height width share-id
                 share-x share-y jump-x jump-y jump-id]} tab-data
         palette                   (Palette (or (:color tab-data) 1))]
-    (h/html
-      [:link#css {:rel "stylesheet" :type "text/css" :href css}]
-      [:main#morph.main
-       {:data-on:mousedown
-        (str
-          "if (evt.target.dataset.action) {"
-          "evt.target.classList.add('pop');"
-          "$targetid = evt.target.dataset.id;"
-          "$parentid = evt.target.parentElement.dataset.id;"
-          "@post(`${evt.target.dataset.action}`);"
-          "setTimeout(() => evt.target.classList.remove('pop'), 300)"
-          "}")}
-       [:div.view-wrapper
-        [::vs/virtual#view
-         {:data-ref              "_view"
-          :v/x                   {:item-size          chunk-size-px
-                                  :buffer-items       2
-                                  :max-rendered-items 7
-                                  :scroll-pos         x
-                                  :view-size          width
-                                  :item-count-fn      (fn [] board-size)
-                                  :chunk-size         chunk-size}
-          :v/y                   {:item-size          chunk-size-px
-                                  :buffer-items       2
-                                  :max-rendered-items 7
-                                  :scroll-pos         y
-                                  :view-size          height
-                                  :item-count-fn      (fn [] board-size)
-                                  :chunk-size         chunk-size}
-          :v/item-fn             (partial UserView db)
-          :v/scroll-handler-path handler-scroll
-          :v/resize-handler-path handler-resize}]]
-       [:div.controls-wrapper
-        {;; firefox sometimes preserves scroll on refresh and we don't want that
-         :data-init (scroll-to-xy-js init-jump-x init-jump-y)}
-        [:div.jump
-         [:h2 "X:"]
-         [:input.jump-input
-          {:type "number" :data-bind "jumpx"
-           :data-effect
-           (str  "$view-x;@peek(() => {$jumpx = "(scroll->cell-xy-js "$view-x")"})")}]
-         [:h2 "Y:"]
-         [:input.jump-input
-          {:type "number" :data-bind "jumpy"
-           :data-effect
-           (str  "$view-y;@peek(() => {$jumpy = "(scroll->cell-xy-js "$view-y")"})")}]
-         [:div.button {:data-action handler-jump}
-          [:strong.pe-none "JUMP"]]
-         [:div.button {:data-action       handler-share
-                       :data-on:mousedown copy-xy-to-clipboard-js}
-          [:strong.pe-none "SHARE"]]]
-        palette
-        [:h1 "One Billion Checkboxes"]
-        [:p "Built using "
-         [:a {:href "https://clojure.org/"} "Clojure"]
-         " and "
-         [:a {:href "https://data-star.dev"} "Datastar"]
-         " - "
-         [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "source"]
-         " - "
-         [:a {:href "https://andersmurphy.com/about"} "blog"]]]
-       (when share-id
-         [:div {:id share-id :data-ignore-morph true}
-          [:div.toast {:data-on:mousedown "el.remove()"}
-           [:div.toast-card
-            [:p [:strong nil (str "X: " share-x " Y: " share-y)]]
-            [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]
-            [:div.qrcode nil
-             (qrcode/url->qrcode-svg
-               (str "https://checkboxes.andersmurphy.com?x="
-                 share-x "&y=" share-y)
-               {:dark black :light white})]]]])
-       (when jump-id
-         (h/execute-expr jump-id (scroll-to-xy-js jump-x jump-y)))])))
+    [(h/html [:link#css {:rel "stylesheet" :type "text/css" :href css}])
+     (h/html
+       [:main#morph.main
+        {:data-on:mousedown
+         (str
+           "if (evt.target.dataset.action) {"
+           "evt.target.classList.add('pop');"
+           "$targetid = evt.target.dataset.id;"
+           "$parentid = evt.target.parentElement.dataset.id;"
+           "@post(`${evt.target.dataset.action}`);"
+           "setTimeout(() => evt.target.classList.remove('pop'), 300)"
+           "}")}
+        [:div.view-wrapper
+         [::vs/virtual#view
+          {:data-ref              "_view"
+           :v/x                   {:item-size          chunk-size-px
+                                   :buffer-items       2
+                                   :max-rendered-items 7
+                                   :scroll-pos         x
+                                   :view-size          width
+                                   :item-count-fn      (fn [] board-size)
+                                   :chunk-size         chunk-size}
+           :v/y                   {:item-size          chunk-size-px
+                                   :buffer-items       2
+                                   :max-rendered-items 7
+                                   :scroll-pos         y
+                                   :view-size          height
+                                   :item-count-fn      (fn [] board-size)
+                                   :chunk-size         chunk-size}
+           :v/item-fn             (partial UserView db)
+           :v/scroll-handler-path handler-scroll
+           :v/resize-handler-path handler-resize}]]
+        [:div.controls-wrapper
+         {;; firefox sometimes preserves scroll on refresh and we don't want that
+          :data-init (scroll-to-xy-js init-jump-x init-jump-y)}
+         [:div.jump
+          [:h2 "X:"]
+          [:input.jump-input
+           {:type "number" :data-bind "jumpx"
+            :data-effect
+            (str  "$view-x;@peek(() => {$jumpx = "(scroll->cell-xy-js "$view-x")"})")}]
+          [:h2 "Y:"]
+          [:input.jump-input
+           {:type "number" :data-bind "jumpy"
+            :data-effect
+            (str  "$view-y;@peek(() => {$jumpy = "(scroll->cell-xy-js "$view-y")"})")}]
+          [:div.button {:data-action handler-jump}
+           [:strong.pe-none "JUMP"]]
+          [:div.button {:data-action       handler-share
+                        :data-on:mousedown copy-xy-to-clipboard-js}
+           [:strong.pe-none "SHARE"]]]
+         palette
+         [:h1 "One Billion Checkboxes"]
+         [:p "Built using "
+          [:a {:href "https://clojure.org/"} "Clojure"]
+          " and "
+          [:a {:href "https://data-star.dev"} "Datastar"]
+          " - "
+          [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "source"]
+          " - "
+          [:a {:href "https://andersmurphy.com/about"} "blog"]]]
+        (when share-id
+          [:div {:id share-id :data-ignore-morph true}
+           [:div.toast {:data-on:mousedown "el.remove()"}
+            [:div.toast-card
+             [:p [:strong nil (str "X: " share-x " Y: " share-y)]]
+             [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]
+             [:div.qrcode nil
+              (qrcode/url->qrcode-svg
+                (str "https://checkboxes.andersmurphy.com?x="
+                  share-x "&y=" share-y)
+                {:dark black :light white})]]]])
+        (when jump-id
+          (h/execute-expr jump-id (scroll-to-xy-js jump-x jump-y)))])]))
 
 (defn migrations [db]
   ;; Note: all this code must be idempotent

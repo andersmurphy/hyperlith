@@ -64,7 +64,7 @@
                               :content "width=device-width, initial-scale=1.0"}]]
                      [:body
                       [:div {:data-signals:tabid tabid-js}]
-                      [:div {:data-init           on-load-js
+                      [:div {:data-init              on-load-js
                              ;; Reconnect when the user comes online after
                              ;; being offline. Closes any existing connection
                              ;; from this div.
@@ -95,6 +95,16 @@
                  "Cache-Control"             "no-store"}
        :status  204})))
 
+(defn html->stream!
+  [^BufferedWriter out root]
+  (run!
+    (fn [node]
+      (BufferedWriter/.write out
+        "event: datastar-patch-elements\ndata: elements ")
+      (h/html->stream out node)
+      (BufferedWriter/.write out "\n\n"))
+    root))
+
 (defn render-handler
   [path render-fn &
    {:keys [on-close on-open br-window-size]
@@ -119,12 +129,7 @@
             render (fn render []
                      (if-not (s/closed? stream)
                        (when-some [new-view (er/try-on-error (render-fn req))]
-                         (OutputStreamWriter/.append sw
-                           "event: datastar-patch-elements\ndata: elements ")
-                         (h/html->stream w new-view)
-                         ;; need to flush before appending
-                         (BufferedWriter/.flush w)
-                         (OutputStreamWriter/.append sw "\n\n\n")
+                         (html->stream! w new-view)
                          (BufferedWriter/.flush w)
                          (let [result (.toByteArray out)]
                            (.reset out)
