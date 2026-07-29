@@ -8,7 +8,6 @@
             [hyperlith.impl.env]
             [hyperlith.impl.error :as er]
             [hyperlith.impl.html :as h]
-            [hyperlith.impl.http]
             [hyperlith.impl.json :refer [wrap-parse-json-body]]
             [hyperlith.impl.namespaces :refer [import-vars]]
             [hyperlith.impl.params :refer [wrap-query-params]]
@@ -55,11 +54,6 @@
   [hyperlith.impl.datastar
    patch-signals
    execute-expr]
-  ;; HTTP
-  [hyperlith.impl.http
-   get!
-   post!
-   throw-if-status-not!]
   ;; CSS
   [hyperlith.impl.css
    static-css
