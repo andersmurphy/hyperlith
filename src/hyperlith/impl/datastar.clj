@@ -10,7 +10,8 @@
             [hyperlith.impl.json :as json]
             [hyperlith.impl.router :as router]
             [hyperlith.impl.util :as util]
-            [manifold.stream :as s])
+            [manifold.stream :as s]
+            [manifold.deferred :as d])
   (:import (java.io
              BufferedWriter
              ByteArrayOutputStream
@@ -118,29 +119,34 @@
            br-window-size 18}}]
   (router/add-route! [:post path]
     (fn handler [req]
-      (let [out    (ByteArrayOutputStream/new 4096)
-            sw     (OutputStreamWriter/new
-                     ^OutputStream
-                     (br/compress-out-stream out
-                       {:window-size br-window-size})
-                     StandardCharsets/UTF_8)
-            w      (BufferedWriter/new sw 4096)
-            conns  (req :hyperlith.core/conns)
-            stream (s/stream)
-            render (fn render []
-                     (if-not (s/closed? stream)
-                       (when-some [new-view (er/try-on-error (render-fn req))]
-                         (html->stream! w new-view)
-                         (BufferedWriter/.flush w)
-                         (let [result (.toByteArray out)]
-                           (.reset out)
-                           @(s/put! stream result)))
-                       (do
-                         (ConcurrentHashMap/.remove conns render)
-                         (.close out)
-                         (.close sw)
-                         (.close w)
-                         (when on-close (on-close req)))))]
+      (let [out       (ByteArrayOutputStream/new 4096)
+            sw        (OutputStreamWriter/new
+                        ^OutputStream
+                        (br/compress-out-stream out
+                          {:window-size br-window-size})
+                        StandardCharsets/UTF_8)
+            w         (BufferedWriter/new sw 4096)
+            conns     (req :hyperlith.core/conns)
+            stream    (s/stream)
+            last-put_ (atom nil)
+            render
+            (fn render []
+              (if-not (s/closed? stream)
+                ;; Only render again if previous event was sent
+                ;; this gives you back pressure and frame dropping.
+                (when (or (nil? @last-put_) (d/realized? @last-put_))
+                  (when-some [new-view (er/try-on-error (render-fn req))]
+                    (html->stream! w new-view)
+                    (BufferedWriter/.flush w)
+                    (let [result (.toByteArray out)]
+                      (.reset out)
+                      (reset! last-put_ (s/put! stream result)))))
+                (do
+                  (ConcurrentHashMap/.remove conns render)
+                  (.close out)
+                  (.close sw)
+                  (.close w)
+                  (when on-close (on-close req)))))]
         (ConcurrentHashMap/.put conns render :present)
         (when on-open (on-open req))
         {:status  200
