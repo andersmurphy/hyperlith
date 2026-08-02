@@ -3,7 +3,6 @@
             [hyperlith.impl.assets :refer [static-asset]]
             [hyperlith.impl.brotli :as br]
             [hyperlith.impl.crypto :as crypto]
-            [hyperlith.impl.error :as er]
             [hyperlith.impl.headers
              :refer [default-headers strict-transport]]
             [hyperlith.impl.html :as h]
@@ -131,22 +130,26 @@
             last-put_ (atom nil)
             render
             (fn render []
-              (if-not (s/closed? stream)
-                ;; Only render again if previous event was sent
-                ;; this gives you back pressure and frame dropping.
-                (when (or (nil? @last-put_) (d/realized? @last-put_))
-                  (when-some [new-view (er/try-on-error (render-fn req))]
-                    (html->stream! w new-view)
-                    (BufferedWriter/.flush w)
-                    (let [result (.toByteArray out)]
-                      (.reset out)
-                      (reset! last-put_ (s/put! stream result)))))
-                (do
-                  (ConcurrentHashMap/.remove conns render)
-                  (.close out)
-                  (.close sw)
-                  (.close w)
-                  (when on-close (on-close req)))))]
+              (try
+                (if-not (s/closed? stream)
+                  ;; Only render again if previous event was sent
+                  ;; this gives you back pressure and frame dropping.
+                  (when (or (nil? @last-put_) (d/realized? @last-put_))
+                    (when-some [new-view (render-fn req)]
+                      (html->stream! w new-view)
+                      (BufferedWriter/.flush w)
+                      (let [result (.toByteArray out)]
+                        (.reset out)
+                        (reset! last-put_ (s/put! stream result)))))
+                  (do
+                    (ConcurrentHashMap/.remove conns render)
+                    (.close out)
+                    (.close sw)
+                    (.close w)
+                    (when on-close (on-close req))))
+                (catch Throwable t
+                  (.printStackTrace t)
+                  (flush))))]
         (ConcurrentHashMap/.put conns render :present)
         (when on-open (on-open req))
         {:status  200

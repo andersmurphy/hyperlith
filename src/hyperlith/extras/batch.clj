@@ -35,8 +35,9 @@
               (when-not (.isEmpty batch)
                 (try
                   (batch-fn ctx (seq batch))
-                  (catch Exception e
-                    (println "batch-fn error:" e))))
+                  (catch Throwable t
+                    (.printStackTrace t)
+                    (flush))))
               (Thread/sleep ;; sleep 0 to let other tasks run
                 (int (max 0 (- next-tick (System/currentTimeMillis))))))))))
     (fn tx! [thunk] (LinkedBlockingQueue/.offer queue thunk))))

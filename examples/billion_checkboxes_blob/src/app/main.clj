@@ -542,7 +542,7 @@
                 {:chunk-id  chunk-id
                  :new-chunk new-chunk
                  :new-html  (String/.getBytes
-                             (h/html->str (Chunk chunk-id new-chunk)))}))
+                              (h/html->str (Chunk chunk-id new-chunk)))}))
         @chunk-cache)))
   (h/refresh-all!))
 

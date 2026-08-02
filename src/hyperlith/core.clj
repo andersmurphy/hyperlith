@@ -6,7 +6,6 @@
             [hyperlith.impl.css]
             [hyperlith.impl.datastar :as ds]
             [hyperlith.impl.env]
-            [hyperlith.impl.error :as er]
             [hyperlith.impl.html :as h]
             [hyperlith.impl.json :refer [wrap-parse-json-body]]
             [hyperlith.impl.namespaces :refer [import-vars]]
@@ -66,9 +65,6 @@
    traces
    trace>
    traces-reset!]
-  ;; ERROR
-  [hyperlith.impl.error
-   try-on-error]
   ;; CODEC
   [hyperlith.impl.codec
    url-query-string
@@ -116,13 +112,20 @@
             " already in use! Server might already be runnin!")
           {:port port})))))
 
+(defn wrap-error [handler]
+  (fn [req]
+    (try
+      (handler req)
+      (catch Throwable t
+        (.printStackTrace t)
+        (flush)
+        {:status 500}))))
+
 (defn start-app
-  [{:keys [port ctx-start ctx-stop on-error]
-    :or   {port     8080
-           on-error er/default-on-error}}]
+  [{:keys [port ctx-start ctx-stop]
+    :or   {port     8080}}]
   (throw-if-port-in-use! 8080)
   (let [ctx            (ctx-start)
-        _              (reset! er/on-error_ on-error)
         wrap-ctx       (fn [handler]
                          (fn [req]
                            (handler
@@ -136,7 +139,7 @@
                          wrap-ctx
                          ;; Wrap error here because req params/body/session
                          ;; have been handled (and provide useful context).
-                         er/wrap-error
+                         wrap-error
                          ;; The handlers after this point do not throw errors
                          ;; are robust/lenient.
                          wrap-query-params
