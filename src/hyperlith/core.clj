@@ -1,23 +1,25 @@
 (ns hyperlith.core
-  (:require [hyperlith.impl.assets]
-            [hyperlith.impl.blocker :refer [wrap-blocker]]
-            [hyperlith.impl.codec :as codec]
-            [hyperlith.impl.crypto :as crypto]
-            [hyperlith.impl.css]
-            [hyperlith.impl.datastar :as ds]
-            [hyperlith.impl.env]
-            [hyperlith.impl.html :as h]
-            [hyperlith.impl.json :refer [wrap-parse-json-body]]
-            [hyperlith.impl.namespaces :refer [import-vars]]
-            [hyperlith.impl.params :refer [wrap-query-params]]
-            [hyperlith.impl.router :as router]
-            [hyperlith.impl.session :refer [wrap-session]]
-            [hyperlith.impl.trace]
-            [hyperlith.impl.util :as u]
-            [aleph.http :as http])
-  (:import (java.net ServerSocket)
-           (java.util.concurrent Executors ThreadPoolExecutor
-             ConcurrentHashMap)))
+  (:require
+   [aleph.http :as http]
+   [clojure.stacktrace :as stacktrace]
+   [hyperlith.impl.assets]
+   [hyperlith.impl.blocker :refer [wrap-blocker]]
+   [hyperlith.impl.codec :as codec]
+   [hyperlith.impl.crypto :as crypto]
+   [hyperlith.impl.css]
+   [hyperlith.impl.datastar :as ds]
+   [hyperlith.impl.env]
+   [hyperlith.impl.html :as h]
+   [hyperlith.impl.json :refer [wrap-parse-json-body]]
+   [hyperlith.impl.namespaces :refer [import-vars]]
+   [hyperlith.impl.params :refer [wrap-query-params]]
+   [hyperlith.impl.router :as router]
+   [hyperlith.impl.session :refer [wrap-session]]
+   [hyperlith.impl.trace]
+   [hyperlith.impl.util :as u])
+  (:import
+   (java.net ServerSocket)
+   (java.util.concurrent ConcurrentHashMap Executors ThreadPoolExecutor)))
 
 ;; Make futures use virtual threads
 (set-agent-send-executor!
@@ -117,7 +119,7 @@
     (try
       (handler req)
       (catch Throwable t
-        (.printStackTrace t)
+        (stacktrace/print-stack-trace t)
         (flush)
         {:status 500}))))
 

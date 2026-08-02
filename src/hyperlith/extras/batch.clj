@@ -1,4 +1,6 @@
 (ns hyperlith.extras.batch 
+  (:require
+   [clojure.stacktrace :as stack]) 
   (:import
    [java.util ArrayList]
    [java.util.concurrent LinkedBlockingQueue]))
@@ -36,7 +38,7 @@
                 (try
                   (batch-fn ctx (seq batch))
                   (catch Throwable t
-                    (.printStackTrace t)
+                    (stack/print-stack-trace t)
                     (flush))))
               (Thread/sleep ;; sleep 0 to let other tasks run
                 (int (max 0 (- next-tick (System/currentTimeMillis))))))))))

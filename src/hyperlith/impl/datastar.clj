@@ -1,23 +1,26 @@
 (ns hyperlith.impl.datastar
-  (:require [clojure.string :as str]
-            [hyperlith.impl.assets :refer [static-asset]]
-            [hyperlith.impl.brotli :as br]
-            [hyperlith.impl.crypto :as crypto]
-            [hyperlith.impl.headers
+  (:require
+   [clojure.stacktrace :as stacktrace]
+   [clojure.string :as str]
+   [hyperlith.impl.assets :refer [static-asset]]
+   [hyperlith.impl.brotli :as br]
+   [hyperlith.impl.crypto :as crypto]
+   [hyperlith.impl.headers
              :refer [default-headers strict-transport]]
-            [hyperlith.impl.html :as h]
-            [hyperlith.impl.json :as json]
-            [hyperlith.impl.router :as router]
-            [hyperlith.impl.util :as util]
-            [manifold.stream :as s]
-            [manifold.deferred :as d])
-  (:import (java.io
-             BufferedWriter
-             ByteArrayOutputStream
-             OutputStream
-             OutputStreamWriter)
-           (java.nio.charset StandardCharsets)
-           (java.util.concurrent ConcurrentHashMap)))
+   [hyperlith.impl.html :as h]
+   [hyperlith.impl.json :as json]
+   [hyperlith.impl.router :as router]
+   [hyperlith.impl.util :as util]
+   [manifold.deferred :as d]
+   [manifold.stream :as s])
+  (:import
+   (java.io
+    BufferedWriter
+    ByteArrayOutputStream
+    OutputStream
+    OutputStreamWriter)
+   (java.nio.charset StandardCharsets)
+   (java.util.concurrent ConcurrentHashMap)))
 
 (def datastar-source-map
   (static-asset
@@ -148,7 +151,7 @@
                     (.close w)
                     (when on-close (on-close req))))
                 (catch Throwable t
-                  (.printStackTrace t)
+                  (stacktrace/print-stack-trace t)
                   (flush))))]
         (ConcurrentHashMap/.put conns render :present)
         (when on-open (on-open req))
