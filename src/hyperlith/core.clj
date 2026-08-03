@@ -1,7 +1,7 @@
 (ns hyperlith.core
   (:require
    [aleph.http :as http]
-   [clojure.stacktrace :as stacktrace]
+   [clojure.main :refer [repl-caught]]
    [hyperlith.impl.assets]
    [hyperlith.impl.blocker :refer [wrap-blocker]]
    [hyperlith.impl.codec :as codec]
@@ -119,8 +119,7 @@
     (try
       (handler req)
       (catch Throwable t
-        (stacktrace/print-stack-trace t)
-        (flush)
+        (repl-caught t)
         {:status 500}))))
 
 (defn start-app

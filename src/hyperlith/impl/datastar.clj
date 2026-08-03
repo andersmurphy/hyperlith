@@ -1,6 +1,6 @@
 (ns hyperlith.impl.datastar
   (:require
-   [clojure.stacktrace :as stacktrace]
+   [clojure.main :refer [repl-caught]]
    [clojure.string :as str]
    [hyperlith.impl.assets :refer [static-asset]]
    [hyperlith.impl.brotli :as br]
@@ -151,8 +151,7 @@
                     (.close w)
                     (when on-close (on-close req))))
                 (catch Throwable t
-                  (stacktrace/print-stack-trace t)
-                  (flush))))]
+                  (repl-caught t))))]
         (ConcurrentHashMap/.put conns render :present)
         (when on-open (on-open req))
         {:status  200
