@@ -3,7 +3,6 @@
   (:require [app.qrcode :as qrcode]
             [hyperlith.core :as h :refer [defaction defview]]
             [hyperlith.extras.sqlite :as d]
-            [hyperlith.extras.batch :as batch]
             [hyperlith.extras.ui.virtual-scroll :as vs]
             [clj-async-profiler.core :as prof]
             [clojure.math :as math]))
@@ -254,8 +253,8 @@
   (byte-array (* chunk-size chunk-size)))
 
 (defaction handler-scroll
-  [{:keys [sid tabid tx-batch!] {:keys [view-x view-y]} :body}]
-  (tx-batch!
+  [{:keys [sid tabid ::h/tx!] {:keys [view-x view-y]} :body}]
+  (tx!
     (fn [db _]
       (update-tab-data! db sid tabid
         #(assoc %
@@ -263,9 +262,9 @@
            :y (max (int view-y) 0))))))
 
 (defaction handler-resize
-  [{:keys [sid tabid tx-batch!] {:keys [view-h view-w]} :body}]
+  [{:keys [sid tabid ::h/tx!] {:keys [view-h view-w]} :body}]
   (when (and view-h view-w)
-    (tx-batch!
+    (tx!
       (fn [db _]
         (update-tab-data! db sid tabid
           #(assoc %
@@ -273,16 +272,16 @@
              :width  (max (int view-w) 0)))))))
 
 (defaction handler-palette
-  [{:keys [sid tabid tx-batch!] {:keys [targetid]} :body}]
+  [{:keys [sid tabid ::h/tx!] {:keys [targetid]} :body}]
   (let [color (parse-long targetid)]
     ;; 0 is an empty color (used for clearing)
     (when (<= 0 color (dec (count states)))
-      (tx-batch!
+      (tx!
         (fn [db _]
           (update-tab-data! db sid tabid #(assoc % :color color)))))))
 
 (defaction handler-check
-  [{:keys                       [sid tx-batch! tabid]
+  [{:keys                       [sid tabid ::h/tx!]
     {:keys [targetid parentid]} :body}]
   (when (and targetid parentid)
     (let [cell-id  (int (parse-long targetid))
@@ -290,7 +289,7 @@
       (when (and
               (>= (dec (* chunk-size chunk-size)) cell-id  0)
               (>= (dec (* board-size board-size)) chunk-id 0))
-        (tx-batch!
+        (tx!
           (fn [db chunk-cache]
             (let [user-color (or (:color (get-tab-data db sid tabid)) 1)
                   chunk      (or (@chunk-cache chunk-id)
@@ -327,15 +326,15 @@
     "," (int (* (/ y size) board-size-px)) ");"))
 
 (defaction handler-jump
-  [{:keys [sid tabid tx-batch!] {:keys [jumpx jumpy]} :body}]
-  (tx-batch!
+  [{:keys [sid tabid ::h/tx!] {:keys [jumpx jumpy]} :body}]
+  (tx!
     (fn [db _]
       (update-tab-data! db sid tabid
         #(assoc % :jump-x jumpx :jump-y jumpy :jump-id (h/new-uid))))))
 
 (defaction handler-share
-  [{:keys [sid tabid tx-batch!] {:keys [jumpx jumpy]} :body}]
-  (tx-batch!
+  [{:keys [sid tabid ::h/tx!] {:keys [jumpx jumpy]} :body}]
+  (tx!
     (fn [db _]
       (update-tab-data! db sid tabid
         #(assoc % :share-x jumpx :share-y jumpy :share-id (h/new-uid))))))
@@ -426,10 +425,10 @@
 (defview handler-root
   {:path              "/" :shim-headers shim-headers :br-window-size 24
    :render-on-connect false
-   :on-open           (fn [{:keys [tx-batch!]}]
+   :on-open           (fn [{:keys [::h/tx!]}]
                         ;; This will trigger a batch on new user connect
                         ;; But not actually update the database
-                        (tx-batch! (fn [& _] nil)))}
+                        (tx! (fn [& _] nil)))}
   [{:keys         [db sid tabid]
     {:strs [x y]} :query-params
     :as           _req}]
@@ -525,10 +524,10 @@
   (d/q db
     ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"]))
 
-(defn batch-fn [writer thunks]
+(defn batch-fn [{:keys [db-write]} thunks]
   #_{:clj-kondo/ignore [:unresolved-symbol]}
   (let [chunk-cache (atom {})]
-    (d/with-write-tx [db writer]
+    (d/with-write-tx [db db-write]
       (run! (fn [thunk] (thunk db chunk-cache)) thunks)
       (run! (fn [[chunk-id new-chunk]]
               (d/q db '{update chunk
@@ -543,8 +542,7 @@
                  :new-chunk new-chunk
                  :new-html  (String/.getBytes
                               (h/html->str (Chunk chunk-id new-chunk)))}))
-        @chunk-cache)))
-  (h/refresh-all!))
+        @chunk-cache))))
 
 (defn ctx-start []
   (let [db-name "database-new.db"
@@ -562,39 +560,28 @@
                           :region        "nbg1"
                           :sync-interval "1s"}]}]}
                      :escape-slash false)})
-        {:keys [writer reader]}
-        (d/init-db! db-name
-          {:pool-size 4})]
+        {:keys [writer reader]} (d/init-db! db-name {:pool-size 4})]
     ;; Run migrations
     (migrations writer)
-    {:db        reader
-     :db-read   reader
-     :db-write  writer
-     :tx-batch! (batch/async-batcher-init! writer
-                  {:batch-fn      #'batch-fn
-                   :batch-tick-ms 50})}))
-
-(defn ctx-stop [ctx]
-  ;; TODO: implement closing
-  )
+    {:db       reader
+     :db-read  reader
+     :db-write writer}))
 
 (defonce app_ (atom nil))
 
 (defn -main [& _]
   (reset! app_
     (h/start-app
-      {:ctx-start   ctx-start
-       :ctx-stop    ctx-stop})))
-
-;; Refresh app when you re-eval file
-(h/refresh-all!)
+      {:ctx-start     ctx-start
+       :batch-fn      #'batch-fn
+       :batch-tick-ms 50})))
 
 (comment
   (do (-main) nil)
   ;; (clojure.java.browse/browse-url "https://localhost:3030/")
 
   ;; stop server
-  ((@app_ :stop))
+  ((@app_ :stop!))
 
   (def db (-> @app_ :ctx :db))
 

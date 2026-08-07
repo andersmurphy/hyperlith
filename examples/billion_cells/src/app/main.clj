@@ -3,7 +3,6 @@
   (:require [hyperlith.core :as h :refer [defaction defview]]
             [hyperlith.extras.sqlite :as d]
             [clojure.math :as math]
-            [hyperlith.extras.batch :as batch]
             [hyperlith.extras.ui.virtual-scroll :as vs]
             [clojure.string :as str]))
 
@@ -24,8 +23,8 @@
 (def white "#FFF1E8")
 
 (def css
-  (let [accent          "#008751"
-        other           "#FF004D"]
+  (let [accent "#008751"
+        other  "#FF004D"]
     (h/static-css
       [["*, *::before, *::after"
         {:box-sizing :border-box
@@ -104,7 +103,7 @@
          :grid-row                 (str "span " chunk-size)
          ;; For how subgrid and contain interact see:
          ;; https://github.com/w3c/csswg-drafts/issues/7091
-         :content-visibility       :auto 
+         :content-visibility       :auto
          :contain                  :strict
          :contain-intrinsic-height (str (* chunk-size cell-height-px)"px")
          :contain-intrinsic-width  (str (* chunk-size cell-width-px)"px")}]
@@ -154,10 +153,10 @@
          :pointer-events :all}]
 
        [:.focus-cell
-        {:background  white
-         :border      (str "1px solid " black)
-         :position    :relative
-         :font-size   :1.2rem}]
+        {:background white
+         :border     (str "1px solid " black)
+         :position   :relative
+         :font-size  :1.2rem}]
 
        [:.focus-user
         {:font-size      :1.2rem
@@ -235,8 +234,8 @@
     (swap! chunk-cache assoc chunk-id new-chunk)))
 
 (defaction handler-scroll
-  [{:keys [sid tabid tx-batch!] {:keys [view-x view-y]} :body}]
-  (tx-batch!
+  [{:keys [sid tabid ::h/tx!] {:keys [view-x view-y]} :body}]
+  (tx!
     (fn [db _]
       (update-tab-data! db sid tabid
         #(assoc %
@@ -244,9 +243,9 @@
            :y (max (int view-y) 0))))))
 
 (defaction handler-resize
-  [{:keys [sid tabid tx-batch!] {:keys [view-h view-w]} :body}]
+  [{:keys [sid tabid ::h/tx!] {:keys [view-h view-w]} :body}]
   (when (and view-h view-w)
-    (tx-batch!
+    (tx!
       (fn [db _]
         (update-tab-data! db sid tabid
           #(assoc %
@@ -262,7 +261,7 @@
         #(update % focus-cell-id dissoc :focus)))))
 
 (defaction handler-focused
-  [{:keys                       [sid tx-batch! tabid]
+  [{:keys                       [sid tabid ::h/tx!]
     {:keys [targetid parentid]} :body}]
   (when (and targetid parentid)
     (let [cell-id  (int (parse-long targetid))
@@ -270,8 +269,8 @@
       (when (and
               (>= (dec (* chunk-size chunk-size)) cell-id  0)
               (>= (dec (* board-size board-size)) chunk-id 0))
-        (tx-batch! (partial remove-focus! sid tabid))
-        (tx-batch!
+        (tx! (partial remove-focus! sid tabid))
+        (tx!
           (fn [db chunk-cache]
             (update-chunk! db chunk-cache chunk-id
               ;; Should this be tab id too?
@@ -281,13 +280,13 @@
                  :focus-cell-id cell-id))))))))
 
 (defaction handler-save-cell
-  [{:keys                                 [tx-batch!]
+  [{:keys                                 [::h/tx!]
     {:keys [targetid parentid cellvalue]} :body}]
   (when (and targetid parentid)
     (let [cell-id  (int (parse-long targetid))
           chunk-id (int (parse-long parentid))]
       (when (>= (dec (* chunk-size chunk-size)) cell-id 0)
-        (tx-batch!
+        (tx!
           (fn [db chunk-cache]
             (update-chunk! db chunk-cache chunk-id
               #(assoc-in % [cell-id :value]
@@ -298,15 +297,15 @@
     "," (int (* (/ y size) board-height-px)) ");"))
 
 (defaction handler-jump
-  [{:keys [sid tabid tx-batch!] {:keys [jumpx jumpy]} :body}]
-  (tx-batch!
+  [{:keys [sid tabid ::h/tx!] {:keys [jumpx jumpy]} :body}]
+  (tx!
     (fn [db _]
       (update-tab-data! db sid tabid
         #(assoc % :jump-x jumpx :jump-y jumpy :jump-id (h/new-uid))))))
 
 (defaction handler-share
-  [{:keys [sid tabid tx-batch!] {:keys [jumpx jumpy]} :body}]
-  (tx-batch!
+  [{:keys [sid tabid ::h/tx!] {:keys [jumpx jumpy]} :body}]
+  (tx!
     (fn [db _]
       (update-tab-data! db sid tabid
         #(assoc % :share-x jumpx :share-y jumpy :share-id (h/new-uid))))))
@@ -335,14 +334,14 @@
     (h/html
       [:div.focus-cell
        [:p.focus-other
-        {:data-id       local-id
-         :data-action   handler-focused}
+        {:data-id     local-id
+         :data-action handler-focused}
         value]])
 
     :else (h/html [:p.cell
-                   {:data-id       local-id
-                    :data-value    value
-                    :data-action   handler-focused}
+                   {:data-id     local-id
+                    :data-value  value
+                    :data-action handler-focused}
                    value])))
 
 (defn xy->chunk-id [x y]
@@ -357,8 +356,8 @@
 
 (defn Chunk [chunk-id chunk-cells sid]
   (h/html
-    [:div.chunk {:id          (str "chunk-" chunk-id)
-                 :data-id     chunk-id}
+    [:div.chunk {:id      (str "chunk-" chunk-id)
+                 :data-id chunk-id}
      (into []
        (map-indexed (fn [local-id box] (Cell local-id box sid)))
        chunk-cells)]))
@@ -378,9 +377,9 @@
      empty-cells]))
 
 (defn UserView
-  [db sid {:keys [x-offset-items y-offset-items
+  [db sid {:keys                                     [x-offset-items y-offset-items
                   x-rendered-items y-rendered-items] :as offset-data}]
-  {:corner (h/html [:div {:style {:background white}}])
+  {:corner  (h/html [:div {:style {:background white}}])
    :header  (mapv (fn [x] (h/html
                             [:div {:style {:background  black
                                            :color       white
@@ -428,19 +427,19 @@
 
 (defview handler-root
   {:path              "/" :shim-headers shim-headers :br-window-size 24
-   :on-close          (fn [{:keys [tx-batch! sid tabid]}]
-                        (tx-batch! (partial remove-focus! sid tabid)))
+   :on-close          (fn [{:keys [::h/tx! sid tabid]}]
+                        (tx! (partial remove-focus! sid tabid)))
    :render-on-connect false
-   :on-open           (fn [{:keys [tx-batch!]}]
+   :on-open           (fn [{:keys [::h/tx!]}]
                         ;; This will trigger a batch on new user connect
                         ;; But not actually update the database
-                        (tx-batch! (fn [& _] nil)))}
+                        (tx! (fn [& _] nil)))}
   [{:keys         [db sid tabid]
     {:strs [x y]} :query-params
     :as           _req}]
-  (let [init-jump-x                     (h/try-parse-long x 0)
-        init-jump-y                     (h/try-parse-long y 0)
-        tab-data                   (get-tab-data db sid tabid)
+  (let [init-jump-x      (h/try-parse-long x 0)
+        init-jump-y      (h/try-parse-long y 0)
+        tab-data         (get-tab-data db sid tabid)
         {:keys [x y height width share-id share-x share-y jump-id jump-x
                 jump-y]} tab-data]
     [(h/html [:link#css {:rel "stylesheet" :type "text/css" :href css}])
@@ -532,10 +531,10 @@
   (d/q db
     ["CREATE VIRTUAL TABLE IF NOT EXISTS chunk_fts USING fts5(data, content='chunk', content_rowid='id');"]))
 
-(defn batch-fn [writer thunks]
+(defn batch-fn [{:keys [db-write]} thunks]
   #_{:clj-kondo/ignore [:unresolved-symbol]}
   (let [chunk-cache (atom {})]
-    (d/with-write-tx [db writer]
+    (d/with-write-tx [db db-write]
       (run! (fn [thunk] (thunk db chunk-cache)) thunks)
       (run! (fn [[chunk-id new-chunk]]
               (d/q db '{update chunk
@@ -543,8 +542,7 @@
                         where  [= id ?chunk-id]}
                 {:chunk-id  chunk-id
                  :new-chunk new-chunk}))
-        @chunk-cache)))
-  (h/refresh-all!))
+        @chunk-cache))))
 
 (defn ctx-start []
   (let [db-name "cells.db"
@@ -561,39 +559,30 @@
       {:deterministic? true})
     ;; Run migrations
     (migrations writer)
-    {:db        reader
-     :db-read   reader
-     :db-write  writer
-     :tx-batch! (batch/async-batcher-init! writer
-                  {:batch-fn      batch-fn
-                   :batch-tick-ms 50})}))
-
-(defn ctx-stop [ctx]
-  ;; TODO: implement closing
-  )
+    {:db       reader
+     :db-read  reader
+     :db-write writer}))
 
 (defonce app_ (atom nil))
 
 (defn -main [& _]
   (reset! app_
     (h/start-app
-      {:ctx-start      ctx-start
-       :ctx-stop       ctx-stop})))
-
-;; Refresh app when you re-eval file
-(h/refresh-all!)
+      {:ctx-start     ctx-start
+       :batch-fn      #'batch-fn
+       :batch-tick-ms 50})))
 
 (comment
   (do (-main) nil)
   ;; (clojure.java.browse/browse-url "https://localhost:3030/")
 
   ;; stop server
-  ((@app_ :stop))
+  ((@app_ :stop!))
 
   (def db (-> @app_ :ctx :db))
   (d/q db '{select [[[count *]]] from session})
   (+ 7698)
-  
+
 
   ,)
 
@@ -601,7 +590,7 @@
   ;; clear out empty chunks
   (def db-write (-> @app_ :ctx :db-write))
   (d/q db-write '{select [[[count *]]] from chunk})
-  
+
   (run! (fn [chunk-id]
           (when (= blank-chunk (-> (d/q db-write
                                      '{select [data]
@@ -629,13 +618,13 @@
 
   (def db-write (-> @app_ :ctx :db-write))
 
-  
+
   (d/q db-write ["select data from chunk"])
 
   (count
 
     (d/q db-write ["select * from chunk_fts where chunk_fts match 'cool'"]))
-  
+
   (d/q db-write ["select count(*) from chunk_fts"])
 
   (d/q db-write
@@ -646,7 +635,7 @@
   )
 
 (comment ;; Example migration of for changing column type
-  
+
   (def db-write (-> @app_ :ctx :db-write))
   (d/q db-write
     ["CREATE TABLE IF NOT EXISTS newchunk(id INTEGER PRIMARY KEY, data BLOB)"])

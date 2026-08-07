@@ -19,7 +19,9 @@
    [hyperlith.impl.util :as u])
   (:import
    (java.net ServerSocket)
-   (java.util.concurrent ConcurrentHashMap Executors ThreadPoolExecutor)))
+   (java.util.concurrent ConcurrentHashMap Executors ThreadPoolExecutor
+     LinkedBlockingQueue)
+   (java.util ArrayList)))
 
 ;; Make futures use virtual threads
 (set-agent-send-executor!
@@ -76,8 +78,6 @@
    json->edn
    edn->json])
 
-(defonce ^ConcurrentHashMap conns (ConcurrentHashMap.))
-
 (defmacro defaction
   {:clj-kondo/lint-as 'clojure.core/defn}
   [sym args & body]
@@ -95,14 +95,6 @@
          (ds/shim-handler ~path ~shim-headers)
          (ds/render-handler ~path (var ~sym-fn) ~opts)
          (def ~sym ~path))))
-
-(defonce ^ThreadPoolExecutor render-pool
-  (Executors/newFixedThreadPool
-    (Runtime/.availableProcessors (Runtime/getRuntime))))
-
-(defn refresh-all! [& _opts]
-  (.invokeAll render-pool
-    (sort-by System/identityHashCode (.keySet conns))))
 
 (defn throw-if-port-in-use! [port]
   (try
@@ -122,18 +114,55 @@
         (repl-caught t)
         {:status 500}))))
 
+(defn start-batch-loop!
+  [{:keys [::conns ::render-pool] :as ctx}
+   {:keys [batch-fn batch-tick-ms]}]
+  (let [q (LinkedBlockingQueue/new)
+        t (Thread/startVirtualThread
+            (bound-fn* ;; binding conveyance
+              (fn batch-thread []
+                (while (not (Thread/interrupted))
+                  (let [next-tick (+ (System/currentTimeMillis) batch-tick-ms)
+                        batch     (ArrayList/new)]
+                    (.drainTo q batch)
+                    (try
+                      (batch-fn ctx (seq batch))
+                      ;; Refresh connections
+                      (.invokeAll render-pool
+                        (sort-by System/identityHashCode
+                          (ConcurrentHashMap/.keySet conns)))
+                      (catch Throwable t
+                        (repl-caught t)
+                        (flush)))
+                    (Thread/sleep ;; sleep 0 to let other tasks run
+                      (int (max 0 (- next-tick
+                                    (System/currentTimeMillis))))))))))]
+    (-> (assoc ctx
+          ::tx!
+          (fn tx! [thunk] (LinkedBlockingQueue/.offer q thunk)) )
+      (update ::stop!
+        conj (fn [] (Thread/.interrupt t))))))
+
 (defn start-app
-  [{:keys [port ctx-start ctx-stop]
-    :or   {port     8080}}]
+  [{:keys [port ctx-start batch-fn batch-tick-ms]
+    :or   {port 8080 batch-tick-ms 50}}]
+  (assert (not (nil? batch-fn)))
   (throw-if-port-in-use! 8080)
-  (let [ctx            (ctx-start)
+  (let [ctx (-> (ctx-start)
+              (assoc
+                ::conns (ConcurrentHashMap.)
+                ::render-pool
+                (Executors/newFixedThreadPool
+                  (Runtime/.availableProcessors (Runtime/getRuntime))))
+              (start-batch-loop!
+                {:batch-fn      batch-fn
+                 :batch-tick-ms batch-tick-ms}))
         wrap-ctx       (fn [handler]
                          (fn [req]
                            (handler
                              (-> (into {} req)
                                ;; TODO: context should be it's own submap
                                ;; to avoid merge.
-                               (assoc :hyperlith.core/conns conns)
                                (u/merge ctx)))))
         ;; Middleware make for messy error stacks.
         wrapped-router (-> router/router
@@ -151,6 +180,7 @@
                          {:port port})]
     {:wrapped-router wrapped-router
      :ctx            ctx
-     :stop           (fn stop [& [_opts]]
-                       (.close server)
-                       (ctx-stop ctx))}))
+     :stop!          (fn stop [& [_opts]]
+                       (java.io.Closeable/.close server)
+                       (->> ctx ::stop!
+                         (run! (fn [stop!] (stop!)))))}))
