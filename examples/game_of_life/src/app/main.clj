@@ -88,9 +88,9 @@
       (update :board fill-cell user-color (+ id 1))
       (update :board fill-cell user-color (+ id board-size)))))
 
-(defaction handler-tap-cell [{:keys [db sid] {:strs [id]} :query-params}]
+(defaction handler-tap-cell [{:keys [::h/tx! sid] {:strs [id]} :query-params}]
   (when id
-    (swap! db fill-cross (parse-long id) sid)))
+    (tx! (fn [db] (swap! db fill-cross (parse-long id) sid)))))
 
 (def shim-headers
   (h/html
@@ -100,10 +100,12 @@
 
 (defn board [snapshot]
   (let [view (board-state snapshot)]
-    (h/html
-      [:div {:data-on:pointerdown
-             (str "@post(`" handler-tap-cell "?id=${evt.target.dataset.id}`)")}
-       [:div.board nil view]])))
+    (-> (h/html
+          [:div {:data-on:pointerdown
+                 (str "@post(`" handler-tap-cell "?id=${evt.target.dataset.id}`)")}
+           [:div.board nil view]])
+      h/html->str
+      h/html-raw-str)))
 
 (defview render-home {:path "/" :shim-headers shim-headers}
   [{:keys [board-cache _sid] :as _req}]
@@ -139,41 +141,33 @@
 (defn next-generation! [db]
   (swap! db update :board next-gen-board))
 
-(defn start-game! [db board-cache]
-  (let [running_ (atom true)]
-    (h/thread
-      (while @running_
-        (Thread/sleep 200) ;; 5 fps
-        (next-generation! db)
-        (reset! board-cache (board @db))
-        (h/refresh-all!)))
-    (fn stop-game! [] (reset! running_ false))))
+(defn batch-fn [{:keys [db board-cache]} thunks]
+  (run! (fn [thunk] (thunk db)) thunks)
+  (next-generation! db)
+  (reset! board-cache (board @db)))
 
 (defn ctx-start []
   (let [db_         (atom {:board (game/empty-board board-size board-size)
                            :users {}})
         board-cache (atom nil)]
     {:board-cache board-cache
-     :db          db_
-     :game-stop   (start-game! db_ board-cache)}))
+     :db          db_}))
 
 (defonce app_ (atom nil))
 
 (defn -main [& _]
   (reset! app_
     (h/start-app
-      {:ctx-start      ctx-start
-       :ctx-stop       (fn [{:keys [game-stop]}] (game-stop))})))
-
-;; Refresh app when you re-eval file
-(h/refresh-all!)
+      {:ctx-start     ctx-start
+       :batch-fn      #'batch-fn
+       :batch-tick-ms 200})))
 
 (comment
   (do (-main) nil)
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
   ;; stop server
-  ((@app_ :stop))
+  ((@app_ :stop!))
 
   (def db (-> @app_ :ctx :db))
 
