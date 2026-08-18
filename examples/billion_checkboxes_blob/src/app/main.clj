@@ -4,6 +4,7 @@
             [hyperlith.core :as h :refer [defaction defview]]
             [hyperlith.extras.sqlite :as d]
             [hyperlith.extras.ui.virtual-scroll :as vs]
+            [hyperlith.impl.brotli :as br]
             [clj-async-profiler.core :as prof]
             [clojure.math :as math]))
 
@@ -394,7 +395,7 @@
                                 where  [= chunk.id ?chunk-id]}
                               {:chunk-id chunk-id})]
                         (-> (if id
-                              (String. ^byte/1 html)
+                              (String. (br/decompress ^byte/1 html))
                               (EmptyChunk chunk-id))
                           h/html-raw-str)))))})
 
@@ -540,8 +541,10 @@
                         where  [= chunk-id ?chunk-id]}
                 {:chunk-id  chunk-id
                  :new-chunk new-chunk
-                 :new-html  (String/.getBytes
-                              (h/html->str (Chunk chunk-id new-chunk)))}))
+                 :new-html  (-> (Chunk chunk-id new-chunk)
+                             h/html->str
+                             String/.getBytes
+                             (br/compress {:quality 3 :window-size 20}))}))
         @chunk-cache))))
 
 (defn ctx-start []
@@ -683,13 +686,17 @@
 
   (d/q db-write ["DROP TABLE chunk_html;"])
 
+  (d/q db-write '{delete-from chunk-html})
+
   (run!
     (fn [[id chunk]]
       (d/q db-write
         '{insert-into chunk-html
           values      [{chunk-id ?chunk-id data ?data}]}
         {:chunk-id id
-         :data     (String/.getBytes (h/html->str (Chunk id chunk)))}))
+         :data     (br/compress 
+                     (String/.getBytes (h/html->str (Chunk id chunk)))
+                     {:quality 3 :window-size 20})}))
     (d/q db-write '{select * from chunk}))
 
   (d/q db-write '{select * from chunk-html})
