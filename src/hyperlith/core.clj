@@ -181,8 +181,8 @@
         (if dev?
           (http/start-server router {:port port})
           (clave-aleph/start-server router
-            {:port                      port :http-versions [:http2 :http1]
-             ::clave-aleph/http-options {:port (inc port)}
+            {:port                      443 :http-versions [:http2 :http1]
+             ::clave-aleph/http-options {:port 80}
              ::clave-aleph/config
              {:domains [domain]
               :issuers
