@@ -2,6 +2,7 @@
   (:require
    [aleph.http :as http]
    [clojure.main :refer [repl-caught]]
+   [ol.clave.ext.aleph :as clave-aleph]
    [hyperlith.impl.assets]
    [hyperlith.impl.blocker :refer [wrap-blocker]]
    [hyperlith.impl.codec :as codec]
@@ -19,8 +20,7 @@
    [hyperlith.impl.util :as u])
   (:import
    (java.net ServerSocket)
-   (java.util.concurrent ConcurrentHashMap Executors ThreadPoolExecutor
-     LinkedBlockingQueue)
+   (java.util.concurrent ConcurrentHashMap Executors LinkedBlockingQueue)
    (java.util ArrayList)))
 
 ;; Make futures use virtual threads
@@ -144,43 +144,54 @@
         conj (fn [] (Thread/.interrupt t))))))
 
 (defn start-app
-  [{:keys [port ctx-start batch-fn batch-tick-ms]
+  [{:keys [port ctx-start batch-fn batch-tick-ms
+           domain email dev?]
     :or   {port 8080 batch-tick-ms 50}}]
   (assert (not (nil? batch-fn)))
   (throw-if-port-in-use! 8080)
-  (let [ctx (-> (ctx-start)
-              (assoc
-                ::conns (ConcurrentHashMap.)
-                ::render-pool
-                (Executors/newFixedThreadPool
-                  (Runtime/.availableProcessors (Runtime/getRuntime))))
-              (start-batch-loop!
-                {:batch-fn      batch-fn
-                 :batch-tick-ms batch-tick-ms}))
-        wrap-ctx       (fn [handler]
-                         (fn [req]
-                           (handler
-                             (-> (into {} req)
-                               ;; TODO: context should be it's own submap
-                               ;; to avoid merge.
-                               (u/merge ctx)))))
+  (let [ctx      (-> (ctx-start)
+                   (assoc
+                     ::conns (ConcurrentHashMap.)
+                     ::render-pool
+                     (Executors/newFixedThreadPool
+                       (Runtime/.availableProcessors (Runtime/getRuntime))))
+                   (start-batch-loop!
+                     {:batch-fn      batch-fn
+                      :batch-tick-ms batch-tick-ms}))
+        wrap-ctx (fn [handler]
+                   (fn [req]
+                     (handler
+                       (-> (into {} req)
+                         ;; TODO: context should be it's own submap
+                         ;; to avoid merge.
+                         (u/merge ctx)))))
         ;; Middleware make for messy error stacks.
-        wrapped-router (-> router/router
-                         wrap-ctx
-                         ;; Wrap error here because req params/body/session
-                         ;; have been handled (and provide useful context).
-                         wrap-error
-                         ;; The handlers after this point do not throw errors
-                         ;; are robust/lenient.
-                         wrap-query-params
-                         wrap-session
-                         wrap-parse-json-body
-                         wrap-blocker)
-        server         (http/start-server wrapped-router
-                         {:port port})]
-    {:wrapped-router wrapped-router
+        router   (-> router/router
+                   wrap-ctx
+                   ;; Wrap error here because req params/body/session
+                   ;; have been handled (and provide useful context).
+                   wrap-error
+                   ;; The handlers after this point do not throw errors
+                   ;; are robust/lenient.
+                   wrap-query-params
+                   wrap-session
+                   wrap-parse-json-body
+                   wrap-blocker)
+        server
+        (if dev?
+          (http/start-server router {:port port})
+          (clave-aleph/start-server router
+            {:port                      port :http-versions [:http2 :http1]
+             ::clave-aleph/http-options {:port (inc port)}
+             ::clave-aleph/config
+             {:domains [domain]
+              :issuers
+              [{:directory-url
+                "https://acme-staging-v02.api.letsencrypt.org/directory"
+                :email email}]}}))]
+    {:wrapped-router router
      :ctx            ctx
      :stop!          (fn stop [& [_opts]]
-                       (java.io.Closeable/.close server)
+                       (clave-aleph/stop server)
                        (->> ctx ::stop!
                          (run! (fn [stop!] (stop!)))))}))

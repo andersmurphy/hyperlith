@@ -5,6 +5,9 @@
 
   ;; HTTP
   aleph/aleph {:mvn/version "0.9.9"}
+  com.outskirtslabs/clave
+  {:git/url "https://github.com/outskirtslabs/clave.git"
+   :git/sha "04f7bf854bcbe379df14e3f9d7221af9d0c030d6"}
 
   ;; COMPRESSION
   com.aayushatharva.brotli4j/brotli4j            {:mvn/version "1.18.0"}

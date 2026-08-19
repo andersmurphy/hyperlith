@@ -572,15 +572,18 @@
 
 (defonce app_ (atom nil))
 
-(defn -main [& _]
+(defn -main [& {:keys [dev?]}]
   (reset! app_
     (h/start-app
       {:ctx-start     ctx-start
        :batch-fn      #'batch-fn
-       :batch-tick-ms 50})))
+       :batch-tick-ms 50
+       :email         (h/env :email)
+       :domain        (h/env :domain)
+       :dev?          dev?})))
 
 (comment
-  (do (-main) nil)
+  (do (-main :dev? true) nil)
   ;; (clojure.java.browse/browse-url "https://localhost:3030/")
 
   ;; stop server
