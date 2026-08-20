@@ -1,7 +1,6 @@
 (ns hyperlith.extras.sqlite
   (:require [hyperlith.impl.namespaces :refer [import-vars]]
             [sqlite4clj.core :as d]
-            [sqlite4clj.litestream]
             [honey.sql :as hsql]))
 
 (import-vars
@@ -9,10 +8,7 @@
    init-db!
    with-read-tx
    with-write-tx
-   create-function]
-  [sqlite4clj.litestream
-   restore-then-replicate!
-   restore-to-path!])
+   create-function])
 
 (defmacro q [db [query-type query :as string-query] & [params]]
   (if (string? query-type)

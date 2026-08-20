@@ -546,12 +546,6 @@
 
 (defn ctx-start []
   (let [db-name "cells.db"
-        _       (d/restore-then-replicate! db-name
-                  {:s3-access-key-id     (h/env :s3-access-key-id)
-                   :s3-access-secret-key (h/env :s3-access-secret-key)
-                   :bucket               "hyperlith"
-                   :endpoint             "https://nbg1.your-objectstorage.com"
-                   :region               "nbg1"})
         {:keys [writer reader] :as db-obj}
         (d/init-db! db-name
           {:pool-size 4})]
@@ -580,7 +574,7 @@
 
 (comment
   (do (start-app! :dev? true) nil)
-  ;; (clojure.java.browse/browse-url "https://localhost:3030/")
+  ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
   ;; stop server
   ((@app_ :stop!))

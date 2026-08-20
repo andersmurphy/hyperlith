@@ -548,21 +548,7 @@
         @chunk-cache))))
 
 (defn ctx-start []
-  (let [db-name "database-new.db"
-        _       (d/restore-then-replicate! db-name
-                  {:s3-access-key-id     (h/env :s3-access-key-id)
-                   :s3-access-secret-key (h/env :s3-access-secret-key)
-                   :config-yml
-                   (h/edn->json
-                     {:dbs
-                      [{:path db-name
-                        :replicas
-                        [{:type          "s3"
-                          :bucket        "hyperlith"
-                          :endpoint      "https://nbg1.your-objectstorage.com"
-                          :region        "nbg1"
-                          :sync-interval "1s"}]}]}
-                     :escape-slash false)})
+  (let [db-name                 "database-new.db"
         {:keys [writer reader]} (d/init-db! db-name {:pool-size 4})]
     ;; Run migrations
     (migrations writer)
@@ -587,7 +573,7 @@
 
 (comment
   (do (start-app! :dev? true) nil)
-  ;; (clojure.java.browse/browse-url "https://localhost:3030/")
+  ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
   ;; stop server
   ((@app_ :stop!))
