@@ -155,7 +155,7 @@
 
 (defonce app_ (atom nil))
 
-(defn -main [& {:keys [dev?]}]
+(defn start-app! [& {:keys [dev?]}]
   (reset! app_
     (h/start-app
       {:ctx-start     ctx-start
@@ -165,8 +165,11 @@
        :domain        (h/env :domain)
        :dev?          dev?})))
 
+(defn -main [& _]
+  (start-app!))
+
 (comment
-  (do (-main :dev? true) nil)
+  (do (start-app! :dev? true) nil)
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
   ;; stop server

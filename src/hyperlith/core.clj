@@ -187,7 +187,7 @@
              {:domains [domain]
               :issuers
               [{:directory-url
-                "https://acme-staging-v02.api.letsencrypt.org/directory"
+                "https://acme-v02.api.letsencrypt.org/directory"
                 :email email}]}}))]
     {:wrapped-router router
      :ctx            ctx

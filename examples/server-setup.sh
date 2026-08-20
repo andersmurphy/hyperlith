@@ -2,12 +2,10 @@
 set -x
 set -e
 
-# Needed because Ubuntu 24.04 doesn't have java 23+
-add-apt-repository ppa:openjdk-r/ppa 
 # Dependencies
 apt-get update
 apt-get upgrade
-apt-get -y install openjdk-23-jre-headless ufw
+apt-get -y install openjdk-25-jre-headless ufw
 
 # App user (you cannot login as this user)
 useradd -rms /usr/sbin/nologin app
@@ -24,6 +22,8 @@ ConditionPathExists=/home/app/app.jar
 User=app
 Restart=on-failure
 RestartSec=5s
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 WorkingDirectory=/home/app
 ExecStart=/usr/bin/java -Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl}" -jar app.jar -m app.main -Duser.timezone=UTC -XX:+UseZGC -XX:InitialRAMPercentage 75.0 -XX:MaxRAMPercentage 75.0 -XX:MinRAMPercentage 75.0 -XX:+UseCompactObjectHeaders
 
