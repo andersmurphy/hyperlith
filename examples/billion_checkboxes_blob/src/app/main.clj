@@ -250,7 +250,7 @@
                               :data ?new-data}]}
         {:sid sid :new-data new-data}))))
 
-(def blank-chunk
+(def ^byte/1 blank-chunk
   (byte-array (* chunk-size chunk-size)))
 
 (defaction handler-scroll
@@ -310,10 +310,11 @@
                                    '{insert-into chunk-html
                                      values      [{chunk-id ?chunk-id}]}
                                    {:chunk-id chunk-id})
-                                 blank-chunk))]
+                                 (java.util.Arrays/copyOf blank-chunk
+                                   (alength blank-chunk))))]
               (swap! chunk-cache assoc chunk-id
                 (do (aset-byte chunk cell-id
-                      (if (= (byte 0) (aget ^byte/1 chunk cell-id))
+                      (if (= (byte 0) (aget (bytes chunk) cell-id))
                         (byte user-color)
                         (byte 0)))
                     chunk)))))))))
@@ -392,7 +393,7 @@
                                 where  [= chunk.id ?chunk-id]}
                               {:chunk-id chunk-id})]
                         (-> (if id
-                              (String. (br/decompress ^byte/1 html))
+                              (br/decompress ^byte/1 html)
                               (EmptyChunk chunk-id))
                           h/html-raw-str)))))})
 
