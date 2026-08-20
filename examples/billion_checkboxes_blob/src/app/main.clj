@@ -299,21 +299,18 @@
                                              where  [= id ?chunk-id]}
                                      {:chunk-id chunk-id})
                                  first)
-                               (and (d/q db
-                                      '{insert-into chunk
-                                        values      [{id   ?chunk-id
-                                                      data ?blank-chunk}]}
-                                      {:chunk-id    chunk-id
-                                       :blank-chunk blank-chunk})
+                               (do
+                                 (d/q db
+                                   '{insert-into chunk
+                                     values      [{id   ?chunk-id
+                                                   data ?blank-chunk}]}
+                                   {:chunk-id    chunk-id
+                                    :blank-chunk blank-chunk})
                                  (d/q db
                                    '{insert-into chunk-html
                                      values      [{chunk-id ?chunk-id}]}
-                                   {:chunk-id chunk-id}))
-                               (-> (d/q db '{select [data]
-                                             from   chunk
-                                             where  [= id ?chunk-id]}
-                                     {:chunk-id chunk-id})
-                                 first))]
+                                   {:chunk-id chunk-id})
+                                 blank-chunk))]
               (swap! chunk-cache assoc chunk-id
                 (do (aset-byte chunk cell-id
                       (if (= (byte 0) (aget ^byte/1 chunk cell-id))
@@ -711,4 +708,7 @@
    (d/q db-write ["DROP TABLE chunk"])
    (d/q db-write ["ALTER TABLE newchunk RENAME TO chunk"])
 
-   (d/q db-write '{select * from chunk where [= id 0]}))
+   (d/q db-write '{select * from chunk where [= id 0]})
+
+   (d/q db-write '{select [[[count *]]] from chunk})
+   (d/q db-write '{select [[[count *]]] from chunk-html}))

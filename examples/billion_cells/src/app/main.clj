@@ -219,17 +219,14 @@
                                   where  [= id ?chunk-id]}
                           {:chunk-id chunk-id})
                       first)
-                    (d/q db
-                      '{insert-into chunk
-                        values      [{id   ?chunk-id
-                                      data ?blank-chunk}]}
-                      {:chunk-id    chunk-id
-                       :blank-chunk blank-chunk})
-                    (-> (d/q db '{select [data]
-                                  from   chunk
-                                  where  [= id ?chunk-id]}
-                          {:chunk-id chunk-id})
-                      first))
+                    (do
+                      (d/q db
+                        '{insert-into chunk
+                          values      [{id   ?chunk-id
+                                        data ?blank-chunk}]}
+                        {:chunk-id    chunk-id
+                         :blank-chunk blank-chunk})
+                      blank-chunk))
         new-chunk (update-fn old-chunk)]
     (swap! chunk-cache assoc chunk-id new-chunk)))
 
