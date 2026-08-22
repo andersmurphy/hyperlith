@@ -37,11 +37,6 @@
   ;; UTIL
   [hyperlith.impl.util
    load-resource
-   assoc-if-missing
-   assoc-in-if-missing
-   qualify-keys
-   modulo-pick
-   thread
    try-parse-long]
   ;; HTML
   [hyperlith.impl.html
@@ -161,10 +156,8 @@
         wrap-ctx (fn [handler]
                    (fn [req]
                      (handler
-                       (-> (into {} req)
-                         ;; TODO: context should be it's own submap
-                         ;; to avoid merge.
-                         (u/merge ctx)))))
+                       ;; Faster than merge
+                       (reduce-kv assoc (or req {}) ctx))))
         ;; Middleware make for messy error stacks.
         router   (-> router/router
                    wrap-ctx
