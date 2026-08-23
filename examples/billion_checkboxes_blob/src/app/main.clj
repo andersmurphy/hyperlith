@@ -342,8 +342,7 @@
   (h/html
     [:div.box
      {:data-color  state
-      :data-id     local-id
-      :data-action handler-check}]))
+      :data-id     local-id}]))
 
 (defn xy->chunk-id [x y]
   (+ x (* y board-size)))
@@ -360,7 +359,8 @@
     [:div.chunk
      {:id          (str "chunk-" chunk-id)
       :data-ignore true
-      :data-id     chunk-id}
+      :data-id     chunk-id
+      :data-action handler-check}
      (into []
        (map-indexed (fn [local-id box] (Checkbox local-id box)))
        chunk-cells)]))
@@ -442,11 +442,11 @@
        [:main#morph.main
         {:data-on:mousedown
          (str
-           "if (evt.target.dataset.action) {"
+           "if (evt.target.dataset.action || evt.target.parentElement.dataset.action) {"
            "evt.target.classList.add('pop');"
            "$targetid = evt.target.dataset.id;"
            "$parentid = evt.target.parentElement.dataset.id;"
-           "@post(`${evt.target.dataset.action}`);"
+           "@post(`${evt.target.dataset.action || evt.target.parentElement.dataset.action}`);"
            "setTimeout(() => evt.target.classList.remove('pop'), 300)"
            "}")}
         [:div.view-wrapper

@@ -14,7 +14,7 @@
    "Accept-Encoding" "zstd"
    "sec-fetch-site"  "same-origin"})
 
-(def latency-threshold-ms 100)
+(def latency-threshold-ms 150)
 (def stats (atom {:count 0 :max 0 :threshold-breaches 0}))
 
 (defn record-latency! [ms]
@@ -65,7 +65,7 @@
   (Thread/sleep (* n 5)))
 
 (views "http://localhost:8080/?u="
-  200)
+  1000)
 (actions "http://localhost:8080/t_rqnpSL_NvK8EJhoBwkc6TNJ4VsLi1Fs"
   2000)
 (println @stats)
