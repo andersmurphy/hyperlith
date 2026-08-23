@@ -11,7 +11,7 @@
 
 (def headers
   {"Cookie"          "__Host-sid=vtwl34jCOZDoGVIORWfiCBKg0U0"
-   "Accept-Encoding" "br"
+   "Accept-Encoding" "zstd"
    "sec-fetch-site"  "same-origin"})
 
 (def latency-threshold-ms 100)

@@ -1,5 +1,5 @@
 {:paths   ["src" "resources"]
- :deps    {org.clojure/clojure {:mvn/version "1.12.2"}
+ :deps    {org.clojure/clojure {:mvn/version "1.12.5"}
            hyperlith/hyperlith {:local/root "../../../hyperlith"}}
  :aliases {:dev   {:jvm-opts
                    ["--enable-native-access=ALL-UNNAMED"

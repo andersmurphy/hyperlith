@@ -4,7 +4,7 @@
             [hyperlith.core :as h :refer [defaction defview]]
             [hyperlith.extras.sqlite :as d]
             [hyperlith.extras.ui.virtual-scroll :as vs]
-            [hyperlith.impl.brotli :as br]
+            [hyperlith.impl.zstd :as zstd]
             [clj-async-profiler.core :as prof]
             [clojure.math :as math]))
 
@@ -393,7 +393,7 @@
                                 where  [= chunk.id ?chunk-id]}
                               {:chunk-id chunk-id})]
                         (-> (if id
-                              (br/decompress ^byte/1 html)
+                              (String/new (zstd/decompress ^byte/1 html))
                               (EmptyChunk chunk-id))
                           h/html-raw-str)))))})
 
@@ -540,9 +540,9 @@
                 {:chunk-id  chunk-id
                  :new-chunk new-chunk
                  :new-html  (-> (Chunk chunk-id new-chunk)
-                             h/html->str
-                             String/.getBytes
-                             (br/compress {:quality 3 :window-size 20}))}))
+                              h/html->str
+                              String/.getBytes
+                              (zstd/compress 3))}))
         @chunk-cache))))
 
 (defn ctx-start []
@@ -684,9 +684,9 @@
         '{insert-into chunk-html
           values      [{chunk-id ?chunk-id data ?data}]}
         {:chunk-id id
-         :data     (br/compress 
+         :data     (zstd/compress
                      (String/.getBytes (h/html->str (Chunk id chunk)))
-                     {:quality 3 :window-size 20})}))
+                     3)}))
     (d/q db-write '{select * from chunk}))
 
   (d/q db-write '{select * from chunk-html})

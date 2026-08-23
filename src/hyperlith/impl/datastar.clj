@@ -3,7 +3,7 @@
    [clojure.main :refer [repl-caught]]
    [clojure.string :as str]
    [hyperlith.impl.assets :refer [static-asset]]
-   [hyperlith.impl.brotli :as br]
+   [hyperlith.impl.zstd :as zstd]
    [hyperlith.impl.crypto :as crypto]
    [hyperlith.impl.headers
              :refer [default-headers strict-transport]]
@@ -76,8 +76,8 @@
                       [:main {:id "morph"}]]]])
                h/html->str)]
     (-> {:status  200
-         :headers (assoc default-headers "Content-Encoding" "br")
-         :body    (-> body (br/compress {:quality 11 :window-size 24}))}
+         :headers (assoc default-headers "Content-Encoding" "zstd")
+         :body    (-> body (zstd/compress 22))}
       ;; Etags ensure the shim is only sent again if it's contents have changed
       (assoc-in [:headers "ETag"] (crypto/digest body)))))
 
@@ -110,22 +110,13 @@
     root))
 
 (defn render-handler
-  [path render-fn &
-   {:keys [on-close on-open br-window-size]
-    :as   _opts
-    :or   {;; Window size can be tuned to trade memory
-           ;; for reduced bandwidth and compute.
-           ;; The right window size can significantly improve
-           ;; compression of highly variable streams of data.
-           ;; (br/window-size->kb 18) => 262KB
-           br-window-size 18}}]
+  [path render-fn & {:keys [on-close on-open] :as _opts}]
   (router/add-route! [:post path]
     (fn handler [req]
       (let [out       (ByteArrayOutputStream/new 4096)
             sw        (OutputStreamWriter/new
                         ^OutputStream
-                        (br/compress-out-stream out
-                          {:window-size br-window-size})
+                        (zstd/compress-out-stream out 3)
                         StandardCharsets/UTF_8)
             w         (BufferedWriter/new sw 4096)
             conns     (req :hyperlith.core/conns)
@@ -158,7 +149,7 @@
          :headers (assoc default-headers
                     "Content-Type"  "text/event-stream"
                     "Cache-Control" "no-store"
-                    "Content-Encoding" "br")
+                    "Content-Encoding" "zstd")
          :body    stream}))))
 
 (defn patch-signals [signals]
