@@ -572,7 +572,6 @@
 (comment
   (do (start-app! :dev? true) nil)
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
-
   ;; stop server
   ((@app_ :stop!))
 
@@ -642,6 +641,7 @@
 
 (comment ;; Profiling
 
+  (prof/start {:event :alloc})
   (prof/start)
   (prof/stop)
   (prof/serve-ui 7777)

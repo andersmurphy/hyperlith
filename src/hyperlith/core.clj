@@ -2,7 +2,6 @@
   (:require
    [aleph.http :as http]
    [clojure.main :refer [repl-caught]]
-   [ol.clave.ext.aleph :as clave-aleph]
    [hyperlith.impl.assets]
    [hyperlith.impl.blocker :refer [wrap-blocker]]
    [hyperlith.impl.codec :as codec]
@@ -17,11 +16,16 @@
    [hyperlith.impl.router :as router]
    [hyperlith.impl.session :refer [wrap-session]]
    [hyperlith.impl.trace]
-   [hyperlith.impl.util :as u])
+   [hyperlith.impl.util :as u]
+   [ol.clave.ext.aleph :as clave-aleph])
   (:import
    (java.net ServerSocket)
-   (java.util.concurrent ConcurrentHashMap Executors LinkedBlockingQueue)
-   (java.util ArrayList)))
+   (java.util ArrayList)
+   (java.util.concurrent
+    ConcurrentHashMap
+    Executors
+    LinkedBlockingQueue
+    ThreadPoolExecutor)))
 
 ;; Make futures use virtual threads
 (set-agent-send-executor!
@@ -123,7 +127,7 @@
                     (try
                       (batch-fn ctx (seq batch))
                       ;; Refresh connections
-                      (.invokeAll render-pool
+                      (ThreadPoolExecutor/.invokeAll render-pool
                         (sort-by System/identityHashCode
                           (ConcurrentHashMap/.keySet conns)))
                       (catch Throwable t
