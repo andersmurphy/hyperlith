@@ -395,7 +395,7 @@
                                 where  [= chunk.id ?chunk-id]}
                               {:chunk-id chunk-id})]
                         (-> (if id
-                              (String/new (zstd/decompress ^byte/1 html))
+                              (String/new ^byte/1 html)
                               (EmptyChunk chunk-id))
                           h/html-raw-str)))))})
 
@@ -618,9 +618,7 @@
             '{insert-into chunk-html
               values      [{chunk-id ?chunk-id data ?data}]}
             {:chunk-id id
-             :data     (zstd/compress
-                         (String/.getBytes (h/html->str (Chunk id chunk)))
-                         3)}))
+             :data     (String/.getBytes (h/html->str (Chunk id chunk)))}))
         (d/q db '{select * from chunk}))
       (-> (d/q db '{select [[[count *]]] from chunk-html})
         pprint/pprint)))
