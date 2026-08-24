@@ -7,8 +7,7 @@
    [clojure.pprint :as pprint]
    [hyperlith.core :as h :refer [defaction defview]]
    [hyperlith.extras.ui.virtual-scroll :as vs]
-   [hyperlith.impl.sqlite :as d]
-   [hyperlith.impl.zstd :as zstd]))
+   [hyperlith.impl.sqlite :as d]))
 
 (set! *warn-on-reflection* true)
 ;; (set! *unchecked-math* :warn-on-boxed)
@@ -542,8 +541,7 @@
                  :new-chunk new-chunk
                  :new-html  (-> (Chunk chunk-id new-chunk)
                               h/html->str
-                              String/.getBytes
-                              (zstd/compress 3))}))
+                              String/.getBytes)}))
         @chunk-cache))))
 
 (defonce app_ (atom nil))
