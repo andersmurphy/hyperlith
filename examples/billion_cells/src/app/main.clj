@@ -1,10 +1,12 @@
 (ns app.main
   (:gen-class)
-  (:require [hyperlith.core :as h :refer [defaction defview]]
-            [hyperlith.extras.sqlite :as d]
-            [clojure.math :as math]
-            [hyperlith.extras.ui.virtual-scroll :as vs]
-            [clojure.string :as str]))
+  (:require
+   [clojure.math :as math]
+   [clojure.pprint :as pprint]
+   [clojure.string :as str]
+   [hyperlith.core :as h :refer [defaction defview]]
+   [hyperlith.extras.ui.virtual-scroll :as vs]
+   [hyperlith.impl.sqlite :as d]))
 
 (def cell-width-px (* 32 4))
 (def cell-height-px 32)
@@ -524,14 +526,11 @@
   (d/q db
     ["CREATE TABLE IF NOT EXISTS chunk(id INTEGER PRIMARY KEY, data BLOB)"])
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"])
-  (d/q db
-    ["CREATE VIRTUAL TABLE IF NOT EXISTS chunk_fts USING fts5(data, content='chunk', content_rowid='id');"]))
+    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"]))
 
-(defn batch-fn [{:keys [db-write]} thunks]
-  #_{:clj-kondo/ignore [:unresolved-symbol]}
+(defn batch-fn [{:keys [db]} thunks]
   (let [chunk-cache (atom {})]
-    (d/with-write-tx [db db-write]
+    (d/with-write-tx [db db]
       (run! (fn [thunk] (thunk db chunk-cache)) thunks)
       (run! (fn [[chunk-id new-chunk]]
               (d/q db '{update chunk
@@ -541,25 +540,12 @@
                  :new-chunk new-chunk}))
         @chunk-cache))))
 
-(defn ctx-start []
-  (let [db-name "cells.db"
-        {:keys [writer reader] :as db-obj}
-        (d/init-db! db-name
-          {:pool-size 4})]
-    (d/create-function db-obj "prep_chunk_fts" #'prep-chunk-fts
-      {:deterministic? true})
-    ;; Run migrations
-    (migrations writer)
-    {:db       reader
-     :db-read  reader
-     :db-write writer}))
-
 (defonce app_ (atom nil))
 
 (defn start-app! [& {:keys [dev?]}]
   (reset! app_
     (h/start-app
-      {:ctx-start     ctx-start
+      {:dbs           {:db {:name "cells.db"}}
        :batch-fn      #'batch-fn
        :batch-tick-ms 100
        :email         (h/env :email)
@@ -575,75 +561,15 @@
 
   ;; stop server
   ((@app_ :stop!))
-
-  (def db (-> @app_ :ctx :db))
-  (d/q db '{select [[[count *]]] from session})
-  (+ 7698)
-
-
   ,)
 
 (comment
-  ;; clear out empty chunks
-  (def db-write (-> @app_ :ctx :db-write))
-  (d/q db-write '{select [[[count *]]] from chunk})
+  (def tx! (-> @app_ :ctx ::h/tx!))
+  
+  (tx!
+    (fn [db _]
+      (-> (d/q db '{select [[[count *]]] from chunk})
+        pprint/pprint)))
 
-  (run! (fn [chunk-id]
-          (when (= blank-chunk (-> (d/q db-write
-                                     '{select [data]
-                                       from   chunk
-                                       where  [= id ?chunk-id]}
-                                     {:chunk-id chunk-id})
-                                 first))
-            (d/q db-write '{delete-from chunk
-                            where       [= id ?chunk-id]}
-              {:chunk-id chunk-id})))
-    (range (* board-size board-size)))
-
-  )
-
-(comment
-  (def db-write (-> @app_ :ctx :db-write))
-  ;; Free up space (slow)
-  ;; (time (d/q db-write ["VACUUM"]))
-  ;; Checkpoint the WAL
-  (d/q db-write ["PRAGMA wal_checkpoint(PASSIVE)"])
-  (d/q db-write ["PRAGMA wal_checkpoint(TRUNCATE)"])
-  )
-
-(comment
-
-  (def db-write (-> @app_ :ctx :db-write))
-
-
-  (d/q db-write ["select data from chunk"])
-
-  (count
-
-    (d/q db-write ["select * from chunk_fts where chunk_fts match 'cool'"]))
-
-  (d/q db-write ["select count(*) from chunk_fts"])
-
-  (d/q db-write
-    ["INSERT INTO chunk_fts(chunk_fts) VALUES('delete-all')"])
-  (d/q db-write
-    ["insert into chunk_fts(rowid, data) select id, prep_chunk_fts(data) from chunk"])
-
-  )
-
-(comment ;; Example migration of for changing column type
-
-  (def db-write (-> @app_ :ctx :db-write))
-  (d/q db-write
-    ["CREATE TABLE IF NOT EXISTS newchunk(id INTEGER PRIMARY KEY, data BLOB)"])
-  (d/q db-write ["INSERT INTO newchunk SELECT * FROM chunk"])
-  (d/q db-write ["DROP TABLE chunk"])
-  (d/q db-write ["ALTER TABLE newchunk RENAME TO chunk"])
-
-  (d/q db-write
-    ["DROP TABLE chunk_fts;"])
-
-  (d/q db-write
-    ["CREATE VIRTUAL TABLE IF NOT EXISTS chunk_fts USING fts5(data, content='chunk', content_rowid='id');"])
   )
 

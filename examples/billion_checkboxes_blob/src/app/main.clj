@@ -1,12 +1,14 @@
 (ns app.main
   (:gen-class)
-  (:require [app.qrcode :as qrcode]
-            [hyperlith.core :as h :refer [defaction defview]]
-            [hyperlith.extras.sqlite :as d]
-            [hyperlith.extras.ui.virtual-scroll :as vs]
-            [hyperlith.impl.zstd :as zstd]
-            [clj-async-profiler.core :as prof]
-            [clojure.math :as math]))
+  (:require
+   [app.qrcode :as qrcode]
+   [clj-async-profiler.core :as prof]
+   [clojure.math :as math]
+   [clojure.pprint :as pprint]
+   [hyperlith.core :as h :refer [defaction defview]]
+   [hyperlith.extras.ui.virtual-scroll :as vs]
+   [hyperlith.impl.sqlite :as d]
+   [hyperlith.impl.zstd :as zstd]))
 
 (set! *warn-on-reflection* true)
 ;; (set! *unchecked-math* :warn-on-boxed)
@@ -523,10 +525,9 @@
   (d/q db
     ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"]))
 
-(defn batch-fn [{:keys [db-write]} thunks]
-  #_{:clj-kondo/ignore [:unresolved-symbol]}
+(defn batch-fn [{:keys [db]} thunks]
   (let [chunk-cache (atom {})]
-    (d/with-write-tx [db db-write]
+    (d/with-write-tx [db db]
       (run! (fn [thunk] (thunk db chunk-cache)) thunks)
       (run! (fn [[chunk-id new-chunk]]
               (d/q db '{update chunk
@@ -545,26 +546,19 @@
                               (zstd/compress 3))}))
         @chunk-cache))))
 
-(defn ctx-start []
-  (let [db-name                 "database-new.db"
-        {:keys [writer reader]} (d/init-db! db-name {:pool-size 4})]
-    ;; Run migrations
-    (migrations writer)
-    {:db       reader
-     :db-read  reader
-     :db-write writer}))
-
 (defonce app_ (atom nil))
 
 (defn start-app! [& {:keys [dev?]}]
   (reset! app_
     (h/start-app
-      {:ctx-start     ctx-start
+      {:dbs           {:db {:name "database-new.db"}}
        :batch-fn      #'batch-fn
        :batch-tick-ms 100
        :email         (h/env :email)
        :domain        (h/env :domain)
-       :dev?          dev?})))
+       :dev?          dev?}))
+  (let [{{:keys [::h/tx!]} :ctx} @app_]
+    (tx! (fn [db _] (migrations db)))))
 
 (defn -main [& _]
   (start-app!))
@@ -575,67 +569,27 @@
   ;; stop server
   ((@app_ :stop!))
 
-  (def db (-> @app_ :ctx :db))
-
   ,)
 
 (comment
-  (def db (-> @app_ :ctx :db))
-  (d/pragma-check db)
+  (def tx! (-> @app_ :ctx ::h/tx!))
 
-  ;; Execution time mean : 78.177554 ms
-  ;; Execution time mean : 34.990452 ms
-  ;; Execution time mean : 25.271390 ms
-  (user/bench
-    (->> (mapv
-           (fn [n]
-             (future
-               (let [n (mod n board-size)]
-                 (UserView db {:x-offset-items   0 :y-offset-items   0
-                               :x-rendered-items 7 :y-rendered-items 7})
-
-                 ;; we don't want to hold onto the object
-                 ;; not realistic
-                 nil)))
-           (range 0 100))
-      (run! (fn [x] @x))))
-
-  ;; Execution time mean : 2.424361 ms
-  ;; Execution time mean : 1.159274 ms
-  ;; Execution  time mean : 686.989437 µs
-  (user/bench
-    (do
-      (UserView db {:x-offset-items   0 :y-offset-items   0
-                    :x-rendered-items 7 :y-rendered-items 7}) nil))
-
-
-  (d/table-info db :chunk)
-  (d/table-list db)
-  (d/q db '{select [[[count *]]] from session}) ;; 5624
-
-  ;; (+ 17209)
-
-  ,)
-
-(comment
-
-  (def tab-state (-> @app_ :ctx :tab))
-
-  (count @tab-state)
-
-  (def db-write (-> @app_ :ctx :db-write))
-
-  (d/q db-write
-    '{update chunk
-      set    {data ?blank-chunk}
-      where  [= id 0]}
-    {:blank-chunk blank-chunk})
+  (tx!
+    (fn [db _]
+      (d/q db
+        '{update chunk
+          set    {data ?blank-chunk}
+          where  [= id 0]}
+        {:blank-chunk blank-chunk})))
 
   ;; Free up space (slow)
-  ;; (time (d/q db-write ["VACUUM"]))
   ;; Checkpoint the WAL
-  (d/q db-write ["PRAGMA wal_checkpoint(PASSIVE)"])
-  (d/q db-write ["PRAGMA wal_checkpoint(TRUNCATE)"])
+  (tx!
+    (fn [db _]
+      (d/escape-write-tx [db db]
+        (d/q db ["VACUUM"])
+        ;; (d/q db ["PRAGMA wal_checkpoint(PASSIVE)"])
+        (d/q db ["PRAGMA wal_checkpoint(TRUNCATE)"]))))
 
   ,)
 
@@ -648,68 +602,38 @@
   ;; (clojure.java.browse/browse-url "http://localhost:7777/")
   )
 
-(comment  
-  (def db-write (-> @app_ :ctx :db-write))
-  
-  (user/bench
-    (do (d/q db-write '{select * from chunk})
-        nil))
-
-  (d/q db-write '{select * from chunk where [= id 0]})
-
-  ;; Vector of longs encoded as edn
-  ;; 24.146393 ms
-  ;; 3.9M
-
-  ;; Byte array
-  ;; 1.9M 51% smaller
-  ;; 1.369069 ms 17.6x faster  
-  )
-
 (comment ;; Example projection generation
 
-  (def db-write (-> @app_ :ctx :db-write))
+  (tx!
+    (fn [db _]
+      (-> (d/q db '{select * from chunk where [= id 0]})
+        pprint/pprint)))
 
-  (d/q db-write '{select * from chunk where [= id 0]})
-
-  (d/q db-write ["ALTER TABLE chunk DROP COLUMN html;"])
-
-  (d/q db-write ["DROP TABLE chunk_html;"])
-
-  (d/q db-write '{delete-from chunk-html})
-
-  (run!
-    (fn [[id chunk]]
-      (d/q db-write
-        '{insert-into chunk-html
-          values      [{chunk-id ?chunk-id data ?data}]}
-        {:chunk-id id
-         :data     (zstd/compress
-                     (String/.getBytes (h/html->str (Chunk id chunk)))
-                     3)}))
-    (d/q db-write '{select * from chunk}))
-
-  (d/q db-write '{select * from chunk-html})
-
-  (d/q db-write '{select [chunk-html.id chunk-html.data]
-                  from   chunk
-                  join   [:chunk_html [= chunk-id chunk.id]]
-                  where  [= chunk.id ?chunk-id]}
-    {:chunk-id 1})
-
-
+  (tx!
+    (fn [db _]
+      (d/q db '{delete-from chunk-html})
+      (run!
+        (fn [[id chunk]]
+          (d/q db
+            '{insert-into chunk-html
+              values      [{chunk-id ?chunk-id data ?data}]}
+            {:chunk-id id
+             :data     (zstd/compress
+                         (String/.getBytes (h/html->str (Chunk id chunk)))
+                         3)}))
+        (d/q db '{select * from chunk}))
+      (-> (d/q db '{select [[[count *]]] from chunk-html})
+        pprint/pprint)))
   )
 
 (comment ;; Example migration of for changing column type
 
-   (def db-write (-> @app_ :ctx :db-write))
-   (d/q db-write
-     ["CREATE TABLE IF NOT EXISTS newchunk(id INTEGER PRIMARY KEY, data BLOB, html BLOB)"])
-   (d/q db-write ["INSERT INTO newchunk SELECT * FROM chunk"])
-   (d/q db-write ["DROP TABLE chunk"])
-   (d/q db-write ["ALTER TABLE newchunk RENAME TO chunk"])
-
-   (d/q db-write '{select * from chunk where [= id 0]})
-
-   (d/q db-write '{select [[[count *]]] from chunk})
-   (d/q db-write '{select [[[count *]]] from chunk-html}))
+  (tx!
+    (fn [db _]
+      (d/q db
+        ["CREATE TABLE IF NOT EXISTS newchunk(id INTEGER PRIMARY KEY, data BLOB)"])
+      (d/q db ["INSERT INTO newchunk SELECT * FROM chunk"])
+      (d/q db ["DROP TABLE chunk"])
+      (d/q db ["ALTER TABLE newchunk RENAME TO chunk"])
+      (-> (d/q db '{select [[[count *]]] from chunk})
+        pprint/pprint))))

@@ -10,7 +10,8 @@
    [hyperlith.impl.html :as h]
    [hyperlith.impl.json :as json]
    [hyperlith.impl.router :as router]
-   [hyperlith.impl.util :as util]
+   [hyperlith.impl.util :as u]
+   [hyperlith.impl.sqlite :as sqlite]
    [manifold.deferred :as d]
    [manifold.stream :as s])
   (:import
@@ -24,14 +25,14 @@
 
 (def datastar-source-map
   (static-asset
-    {:body         (util/load-resource "datastar.js.map")
+    {:body         (u/load-resource "datastar.js.map")
      :content-type "text/javascript"
      :compress?    true}))
 
 (def datastar
   (static-asset
     {:body
-     (-> (util/load-resource "datastar.js") slurp
+     (-> (u/load-resource "datastar.js") slurp
        ;; Make sure we point to the right source map
        (str/replace "datastar.js.map" datastar-source-map))
      :content-type "text/javascript"
@@ -129,7 +130,8 @@
                   ;; Only render again if previous event was sent
                   ;; this gives you back pressure and frame dropping.
                   (when (or (nil? @last-put_) (d/realized? @last-put_))
-                    (when-some [new-view (render-fn req)]
+                    (when-some [new-view (render-fn
+                                           (u/fast-merge req sqlite/*dbs*))]
                       (html->stream! w new-view)
                       (BufferedWriter/.flush w)
                       (let [result (.toByteArray out)]

@@ -29,6 +29,9 @@
     (assert res (str path " not found."))
     `(resource->bytes (io/resource ~path))))
 
+(defn fast-merge [m1 m2]
+  (reduce-kv assoc (or m1 {}) m2))
+
 (defn modulo-pick
   "Given a coll and a value x. Returns a random value from coll.
   Always returns the same value for a given coll and value."

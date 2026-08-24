@@ -17,22 +17,17 @@
    [hyperlith.impl.session :refer [wrap-session]]
    [hyperlith.impl.trace]
    [hyperlith.impl.util :as u]
+   [hyperlith.impl.sqlite :as sqlite]
    [ol.clave.ext.aleph :as clave-aleph])
   (:import
    (java.net ServerSocket)
    (java.util ArrayList)
    (java.util.concurrent
-    ConcurrentHashMap
-    Executors
-    LinkedBlockingQueue
-    ThreadPoolExecutor)))
-
-;; Make futures use virtual threads
-(set-agent-send-executor!
-  (Executors/newVirtualThreadPerTaskExecutor))
-
-(set-agent-send-off-executor!
-  (Executors/newVirtualThreadPerTaskExecutor))
+     TimeUnit
+     ConcurrentHashMap
+     Executors
+     LinkedBlockingQueue
+     ThreadPoolExecutor)))
 
 (import-vars
   ;; ENV
@@ -41,7 +36,8 @@
   ;; UTIL
   [hyperlith.impl.util
    load-resource
-   try-parse-long]
+   try-parse-long
+   modulo-pick]
   ;; HTML
   [hyperlith.impl.html
    html
@@ -115,9 +111,10 @@
 
 (defn start-batch-loop!
   [{:keys [::conns ::render-pool] :as ctx}
-   {:keys [batch-fn batch-tick-ms]}]
-  (let [q (LinkedBlockingQueue/new)
-        t (Thread/startVirtualThread
+   {:keys [batch-fn batch-tick-ms dbs]}]
+  (let [q   (LinkedBlockingQueue/new)
+        ctx (merge ctx dbs)
+        t   (Thread/startVirtualThread
             (bound-fn* ;; binding conveyance
               (fn batch-thread []
                 (while (not (Thread/interrupted))
@@ -142,26 +139,37 @@
       (update ::stop!
         conj (fn [] (Thread/.interrupt t))))))
 
+(defn- render-thread-factory [dbs]
+  (let [base (Executors/defaultThreadFactory)]
+    (reify java.util.concurrent.ThreadFactory
+      (newThread [_ r]
+        (.newThread base
+          ;; TODO: Make sqlite connections closable?
+          #(binding [sqlite/*dbs* (sqlite/create-read-connections! dbs)]
+             (.run ^Runnable r)))))))
+
 (defn start-app
   [{:keys [port ctx-start batch-fn batch-tick-ms
-           domain email dev?]
-    :or   {port 8080 batch-tick-ms 50}}]
+           domain email dev? dbs]
+    :or   {port 8080 batch-tick-ms 50 ctx-start (fn [] {})}}]
   (assert (not (nil? batch-fn)))
   (throw-if-port-in-use! 8080)
-  (let [ctx      (-> (ctx-start)
+  (let [ncores   (Runtime/.availableProcessors (Runtime/getRuntime))
+        ctx      (-> (ctx-start)
                    (assoc
                      ::conns (ConcurrentHashMap.)
                      ::render-pool
-                     (Executors/newFixedThreadPool
-                       (Runtime/.availableProcessors (Runtime/getRuntime))))
+                     (ThreadPoolExecutor.
+                       ncores ncores
+                       0 TimeUnit/MILLISECONDS
+                       (LinkedBlockingQueue.) (render-thread-factory dbs)))
                    (start-batch-loop!
-                     {:batch-fn      batch-fn
+                     {:dbs           (sqlite/create-write-connections! dbs)
+                      :batch-fn      batch-fn
                       :batch-tick-ms batch-tick-ms}))
         wrap-ctx (fn [handler]
                    (fn [req]
-                     (handler
-                       ;; Faster than merge
-                       (reduce-kv assoc (or req {}) ctx))))
+                     (handler (u/fast-merge req ctx))))
         ;; Middleware make for messy error stacks.
         router   (-> router/router
                    wrap-ctx
@@ -196,3 +204,5 @@
                        (clave-aleph/stop server)
                        (->> ctx ::stop!
                          (run! (fn [stop!] (stop!)))))}))
+
+
