@@ -117,7 +117,7 @@
       (let [out       (ByteArrayOutputStream/new 4096)
             sw        (OutputStreamWriter/new
                         ^OutputStream
-                        (zstd/compress-out-stream out 3)
+                        (zstd/compress-out-stream out 1)
                         StandardCharsets/UTF_8)
             w         (BufferedWriter/new sw 4096)
             conns     (req :hyperlith.core/conns)
