@@ -64,8 +64,7 @@
     (Thread/sleep 5))
   (Thread/sleep (* n 5)))
 
-(views "http://localhost:8080/?u="
-  1000)
+(views "http://localhost:8080/?u=" 1000)
 (actions "http://localhost:8080/t_rqnpSL_NvK8EJhoBwkc6TNJ4VsLi1Fs"
   2000)
 (println @stats)

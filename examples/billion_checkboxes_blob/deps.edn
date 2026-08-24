@@ -10,7 +10,10 @@
                     "-XX:+ZGenerational"                    
                     "-XX:+UseCompactObjectHeaders"
                     "-Djdk.attach.allowAttachSelf"
-                    "-XX:+EnableDynamicAgentLoading"]}
+                    "-XX:+EnableDynamicAgentLoading"
+                    ;; For analysing GC pauses
+                    ;; "-Xlog:gc*:file=gc.log"
+                    ]}
            :build {:deps       {io.github.clojure/tools.build
                                 {:git/tag "v0.10.5" :git/sha "2a21b7a"}}
                    :ns-default build}}}
