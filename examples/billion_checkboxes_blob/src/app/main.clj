@@ -393,9 +393,7 @@
                                 join   [:chunk-html [= chunk-id chunk.id]]
                                 where  [= chunk.id ?chunk-id]}
                               {:chunk-id chunk-id})]
-                        (-> (if id
-                              (String/new ^byte/1 html)
-                              (EmptyChunk chunk-id))
+                        (-> (if id html (EmptyChunk chunk-id))
                           h/html-raw-str)))))})
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
@@ -540,8 +538,7 @@
                 {:chunk-id  chunk-id
                  :new-chunk new-chunk
                  :new-html  (-> (Chunk chunk-id new-chunk)
-                              h/html->str
-                              String/.getBytes)}))
+                              h/html->str)}))
         @chunk-cache))))
 
 (defonce app_ (atom nil))
@@ -569,28 +566,6 @@
 
   ,)
 
-(comment
-  (def tx! (-> @app_ :ctx ::h/tx!))
-
-  (tx!
-    (fn [db _]
-      (d/q db
-        '{update chunk
-          set    {data ?blank-chunk}
-          where  [= id 0]}
-        {:blank-chunk blank-chunk})))
-
-  ;; Free up space (slow)
-  ;; Checkpoint the WAL
-  (tx!
-    (fn [db _]
-      (d/escape-write-tx [db db]
-        (d/q db ["VACUUM"])
-        ;; (d/q db ["PRAGMA wal_checkpoint(PASSIVE)"])
-        (d/q db ["PRAGMA wal_checkpoint(TRUNCATE)"]))))
-
-  ,)
-
 (comment ;; Profiling
 
   (prof/start {:event :alloc})
@@ -601,6 +576,7 @@
   )
 
 (comment ;; Example projection generation
+  (def tx! (-> @app_ :ctx ::h/tx!))
 
   (tx!
     (fn [db _]
@@ -609,17 +585,28 @@
 
   (tx!
     (fn [db _]
-      (d/q db '{delete-from chunk-html})
+      (d/q db ["DROP TABLE chunk_html"])
+      (d/q db
+        ["CREATE TABLE IF NOT EXISTS chunk_html(chunk_id INTEGER PRIMARY KEY, data BLOB, FOREIGN KEY(chunk_id) REFERENCES chunk(id))"])
       (run!
         (fn [[id chunk]]
           (d/q db
             '{insert-into chunk-html
               values      [{chunk-id ?chunk-id data ?data}]}
             {:chunk-id id
-             :data     (String/.getBytes (h/html->str (Chunk id chunk)))}))
+             :data     (h/html->str (Chunk id chunk))}))
         (d/q db '{select * from chunk}))
       (-> (d/q db '{select [[[count *]]] from chunk-html})
         pprint/pprint)))
+
+  ;; Free up space (slow)
+  ;; Checkpoint the WAL
+  (tx!
+    (fn [db _]
+      (d/escape-write-tx [db db]
+        (d/q db ["VACUUM"])
+        ;; (d/q db ["PRAGMA wal_checkpoint(PASSIVE)"])
+        (d/q db ["PRAGMA wal_checkpoint(TRUNCATE)"]))))
   )
 
 (comment ;; Example migration of for changing column type
@@ -633,3 +620,14 @@
       (d/q db ["ALTER TABLE newchunk RENAME TO chunk"])
       (-> (d/q db '{select [[[count *]]] from chunk})
         pprint/pprint))))
+
+(comment ;; clearing a chunk
+  (def tx! (-> @app_ :ctx ::h/tx!))
+
+  (tx!
+    (fn [db _]
+      (d/q db
+        '{update chunk
+          set    {data ?blank-chunk}
+          where  [= id 0]}
+        {:blank-chunk blank-chunk}))),)

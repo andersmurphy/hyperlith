@@ -7,14 +7,15 @@
 
 (def client
   (http/client
-    (assoc-in http/default-client-opts [:ssl-context :insecure] true)))
+    (-> (assoc-in http/default-client-opts [:ssl-context :insecure] true)
+      (assoc :version :http1.1))))
 
 (def headers
   {"Cookie"          "__Host-sid=vtwl34jCOZDoGVIORWfiCBKg0U0"
    "Accept-Encoding" "zstd"
    "sec-fetch-site"  "same-origin"})
 
-(def latency-threshold-ms 150)
+(def latency-threshold-ms 200)
 (def stats (atom {:count 0 :max 0 :threshold-breaches 0}))
 
 (defn record-latency! [ms]
@@ -64,7 +65,9 @@
     (Thread/sleep 5))
   (Thread/sleep (* n 5)))
 
-(views "http://localhost:8080/?u=" 1000)
-(actions "http://localhost:8080/t_rqnpSL_NvK8EJhoBwkc6TNJ4VsLi1Fs"
-  2000)
-(println @stats)
+(let [url "http://localhost:8080"]
+  (println "Running against..." url)
+  (views (str url "/?u=") 1000)
+  (actions (str url"/t_rqnpSL_NvK8EJhoBwkc6TNJ4VsLi1Fs")
+    2000)
+  (println @stats))

@@ -13,5 +13,12 @@
   (Zstd/decompress data (int (Zstd/decompressedSize data))))
 
 (defn compress-out-stream ^OutputStream
-  [^ByteArrayOutputStream out-stream level]
-  (ZstdOutputStreamNoFinalizer/new out-stream (int level)))
+  [^ByteArrayOutputStream out level]
+  (-> (ZstdOutputStreamNoFinalizer/new out)
+    (.setLevel (int level))
+    ;; 256 KB window (overrides L3's 2 MB default)
+    (.setWindowLog 18)
+    ;; skip frame checksum (TLS covers integrity)
+    (.setChecksum false)
+    ;; keep block open across flushes (better ratio)
+    (.setCloseFrameOnFlush false)))
