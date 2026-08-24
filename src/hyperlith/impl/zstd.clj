@@ -16,7 +16,7 @@
   [^ByteArrayOutputStream out level]
   (-> (ZstdOutputStreamNoFinalizer/new out)
     (.setLevel (int level))
-    (.setWindowLog 20) ;; 2^20 1MB window 
+    (.setWindowLog 19) ;; 2^20 1MB window 
     ;; skip frame checksum (TLS covers integrity)
     (.setChecksum false)
     ;; keep block open across flushes (better ratio)

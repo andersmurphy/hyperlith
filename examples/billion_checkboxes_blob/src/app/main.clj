@@ -452,15 +452,15 @@
          [::vs/virtual#view
           {:data-ref              "_view"
            :v/x                   {:item-size          chunk-size-px
-                                   :buffer-items       2
-                                   :max-rendered-items 7
+                                   :buffer-items       1
+                                   :max-rendered-items 5
                                    :scroll-pos         x
                                    :view-size          width
                                    :item-count-fn      (fn [] board-size)
                                    :chunk-size         chunk-size}
            :v/y                   {:item-size          chunk-size-px
-                                   :buffer-items       2
-                                   :max-rendered-items 7
+                                   :buffer-items       1
+                                   :max-rendered-items 5
                                    :scroll-pos         y
                                    :view-size          height
                                    :item-count-fn      (fn [] board-size)
