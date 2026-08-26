@@ -170,8 +170,10 @@
            pool-size (Runtime/.availableProcessors (Runtime/getRuntime))}}]
   (assert (not (nil? batch-fn)))
   (throw-if-port-in-use! 8080)
-  (let [ctx      (-> (ctx-start)
+  (let [vt-executor (Executors/newVirtualThreadPerTaskExecutor)
+        ctx         (-> (ctx-start)
                    (assoc
+                     ::vt-executor vt-executor
                      ::conns (ConcurrentHashMap.)
                      ::render-pool
                      (ThreadPoolExecutor. pool-size pool-size
@@ -181,11 +183,11 @@
                      {:dbs           (sqlite/create-write-connections! dbs)
                       :batch-fn      batch-fn
                       :batch-tick-ms batch-tick-ms}))
-        wrap-ctx (fn [handler]
+        wrap-ctx    (fn [handler]
                    (fn [req]
                      (handler (u/fast-merge req ctx))))
         ;; Middleware make for messy error stacks.
-        router   (-> router/router
+        router      (-> router/router
                    wrap-ctx
                    ;; Wrap error here because req params/body/session
                    ;; have been handled (and provide useful context).
@@ -201,8 +203,7 @@
           (http/start-server router {:port port})
           (clave-aleph/start-server router
             {;; virtual thread executor
-             :executor
-             (Executors/newVirtualThreadPerTaskExecutor)
+             :executor                  vt-executor
              :port                      443
              :http-versions             [:http2 :http1]
              ::clave-aleph/http-options {:port 80}

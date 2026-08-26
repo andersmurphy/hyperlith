@@ -3,15 +3,15 @@
    [clojure.main :refer [repl-caught]]
    [clojure.string :as str]
    [hyperlith.impl.assets :refer [static-asset]]
-   [hyperlith.impl.zstd :as zstd]
    [hyperlith.impl.crypto :as crypto]
    [hyperlith.impl.headers
              :refer [default-headers strict-transport]]
    [hyperlith.impl.html :as h]
    [hyperlith.impl.json :as json]
    [hyperlith.impl.router :as router]
-   [hyperlith.impl.util :as u]
    [hyperlith.impl.sqlite :as sqlite]
+   [hyperlith.impl.util :as u]
+   [hyperlith.impl.zstd :as zstd]
    [manifold.deferred :as d]
    [manifold.stream :as s])
   (:import
@@ -114,15 +114,16 @@
   [path render-fn & {:keys [on-close on-open] :as _opts}]
   (router/add-route! [:post path]
     (fn handler [req]
-      (let [out       (ByteArrayOutputStream/new 4096)
-            sw        (OutputStreamWriter/new
-                        ^OutputStream
-                        (zstd/compress-out-stream out 1)
-                        StandardCharsets/UTF_8)
-            w         (BufferedWriter/new sw 4096)
-            conns     (req :hyperlith.core/conns)
-            stream    (s/stream)
-            last-put_ (atom nil)
+      (let [out         (ByteArrayOutputStream/new 4096)
+            sw          (OutputStreamWriter/new
+                          ^OutputStream
+                          (zstd/compress-out-stream out 1)
+                          StandardCharsets/UTF_8)
+            w           (BufferedWriter/new sw 4096)
+            conns       (req :hyperlith.core/conns)
+            vt-executor (req :hyperlith.core/executor)
+            stream      (s/stream 0 nil vt-executor)
+            last-put_   (atom nil)
             render
             (fn render []
               (try
@@ -136,9 +137,10 @@
                       (BufferedWriter/.flush w)
                       (let [result (.toByteArray out)]
                         (.reset out)
-                        (reset! last-put_ (s/put! stream result)))))
+                        (let [r (s/put! stream result)]
+                          (reset! last-put_ r)))))
                   (do
-                    (ConcurrentHashMap/.remove conns 
+                    (ConcurrentHashMap/.remove conns
                       (System/identityHashCode render))
                     (.close out)
                     (.close sw)
