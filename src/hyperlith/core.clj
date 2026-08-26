@@ -165,17 +165,16 @@
 
 (defn start-app
   [{:keys [port ctx-start batch-fn batch-tick-ms
-           domain email dev? dbs]
-    :or   {port 8080 batch-tick-ms 50 ctx-start (fn [] {})}}]
+           domain email dev? dbs pool-size]
+    :or   {port      8080 batch-tick-ms 50 ctx-start (fn [] {})
+           pool-size (Runtime/.availableProcessors (Runtime/getRuntime))}}]
   (assert (not (nil? batch-fn)))
   (throw-if-port-in-use! 8080)
-  (let [ncores   (Runtime/.availableProcessors (Runtime/getRuntime))
-        ctx      (-> (ctx-start)
+  (let [ctx      (-> (ctx-start)
                    (assoc
                      ::conns (ConcurrentHashMap.)
                      ::render-pool
-                     (ThreadPoolExecutor.
-                       ncores ncores
+                     (ThreadPoolExecutor. pool-size pool-size
                        0 TimeUnit/MILLISECONDS
                        (LinkedBlockingQueue.) (render-thread-factory dbs)))
                    (start-batch-loop!
