@@ -605,7 +605,6 @@
     (fn [db _]
       (d/escape-write-tx [db db]
         (d/q db ["VACUUM"])
-        ;; (d/q db ["PRAGMA wal_checkpoint(PASSIVE)"])
         (d/q db ["PRAGMA wal_checkpoint(TRUNCATE)"]))))
   )
 

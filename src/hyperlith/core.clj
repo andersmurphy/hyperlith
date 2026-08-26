@@ -114,25 +114,40 @@
    {:keys [batch-fn batch-tick-ms dbs]}]
   (let [q   (LinkedBlockingQueue/new)
         ctx (merge ctx dbs)
+        n   (.getCorePoolSize render-pool)
         t   (Thread/startVirtualThread
-            (bound-fn* ;; binding conveyance
-              (fn batch-thread []
-                (while (not (Thread/interrupted))
-                  (let [next-tick (+ (System/currentTimeMillis) batch-tick-ms)
-                        batch     (ArrayList/new)]
-                    (.drainTo q batch)
-                    (try
-                      (batch-fn ctx (seq batch))
-                      ;; Refresh connections
-                      (ThreadPoolExecutor/.invokeAll render-pool
-                        (sort-by System/identityHashCode
-                          (ConcurrentHashMap/.keySet conns)))
-                      (catch Throwable t
-                        (repl-caught t)
-                        (flush)))
-                    (Thread/sleep ;; sleep 0 to let other tasks run
-                      (int (max 0 (- next-tick
-                                    (System/currentTimeMillis))))))))))]
+              (bound-fn* ;; binding conveyance
+                (fn batch-thread []
+                  (while (not (Thread/interrupted))
+                    (let [next-tick (+ (System/currentTimeMillis) batch-tick-ms)
+                          batch     (ArrayList/new)]
+                      (.drainTo q batch)
+                      (try
+                        (batch-fn ctx (seq batch))
+                        ;; Refresh connections
+                        (let [v (->> (ConcurrentHashMap/.entrySet conns)
+                                  (sort-by java.util.Map$Entry/.getKey)
+                                  (mapv java.util.Map$Entry/.getValue))]
+                          (->> (range n)
+                            (mapv (fn [i]
+                                    ^java.util.concurrent.Callable
+                                    (fn []
+                                      (run! sqlite/start-read-tx
+                                        (vals sqlite/*dbs*))
+                                      (loop [k 0]
+                                        (let [idx (+ i (* n k))]
+                                          (when (< idx (count v))
+                                            ((nth v idx))
+                                            (recur (inc k)))))
+                                      (run! sqlite/end-read-tx
+                                        (vals sqlite/*dbs*)))))
+                            (ThreadPoolExecutor/.invokeAll render-pool)))
+                        (catch Throwable t
+                          (repl-caught t)
+                          (flush)))
+                      (Thread/sleep ;; sleep 0 to let other tasks run
+                        (int (max 0 (- next-tick
+                                      (System/currentTimeMillis))))))))))]
     (-> (assoc ctx
           ::tx!
           (fn tx! [thunk] (LinkedBlockingQueue/.offer q thunk)) )

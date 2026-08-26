@@ -67,7 +67,7 @@
 
 (let [url "http://localhost:8080"]
   (println "Running against..." url)
-  (views (str url "/?u=") 1000)
+  (views (str url "/?u=") 1500)
   (actions (str url"/t_rqnpSL_NvK8EJhoBwkc6TNJ4VsLi1Fs")
     2000)
   (println @stats))

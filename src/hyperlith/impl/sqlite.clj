@@ -170,28 +170,34 @@
   (into {} (map (fn [[k opts]] [k (new-conn! (assoc opts :read-only true))]))
     dbs))
 
+(defn start-read-tx [db]
+  (q* db ["BEGIN DEFERRED"]))
+
+(defn end-read-tx [db]
+  (q* db ["COMMIT"]))
+
 (defmacro with-write-tx
   {:clj-kondo/lint-as 'clojure.core/with-open}
   [[tx db] & body]
   `(let [~tx ~db]
      (try
-       (q ~tx ["BEGIN IMMEDIATE"])
+       (q* ~tx ["BEGIN IMMEDIATE"])
        ~@(butlast body)
        (let [r# ~(last body)]
-         (q ~tx ["COMMIT"])
+         (q* ~tx ["COMMIT"])
          r#)
        (catch Throwable t#
          ;; Handles non SQLITE errors crashing a transaction
-         (q ~tx ["ROLLBACK"])
+         (q* ~tx ["ROLLBACK"])
          (throw t#)))))
 
 (defmacro escape-write-tx
   {:clj-kondo/lint-as 'clojure.core/with-open}
   [[tx db] & body]
   `(let [~tx ~db]
-     (q ~tx ["COMMIT"])
+     (q* ~tx ["COMMIT"])
      ~@body
-     (q ~tx ["BEGIN IMMEDIATE"])))
+     (q* ~tx ["BEGIN IMMEDIATE"])))
 
 (defmacro q [db [query-type query :as string-query] & [params]]
   (if (string? query-type)

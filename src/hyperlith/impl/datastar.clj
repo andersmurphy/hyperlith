@@ -138,14 +138,16 @@
                         (.reset out)
                         (reset! last-put_ (s/put! stream result)))))
                   (do
-                    (ConcurrentHashMap/.remove conns render)
+                    (ConcurrentHashMap/.remove conns 
+                      (System/identityHashCode render))
                     (.close out)
                     (.close sw)
                     (.close w)
                     (when on-close (on-close req))))
                 (catch Throwable t
                   (repl-caught t))))]
-        (ConcurrentHashMap/.put conns render :present)
+        (ConcurrentHashMap/.put conns
+          (System/identityHashCode render) render)
         (when on-open (on-open req))
         {:status  200
          :headers (assoc default-headers
