@@ -114,7 +114,7 @@
    {:keys [batch-fn batch-tick-ms dbs]}]
   (let [q   (LinkedBlockingQueue/new)
         ctx (merge ctx dbs)
-        n   (.getCorePoolSize render-pool)
+        n   (ThreadPoolExecutor/.getCorePoolSize render-pool)
         t   (Thread/startVirtualThread
               (bound-fn* ;; binding conveyance
                 (fn batch-thread []
