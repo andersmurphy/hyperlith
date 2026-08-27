@@ -1,5 +1,6 @@
 (ns hyperlith.impl.cache
-  "Simple unbounded cache that avoids thundering heard."
+  "Simple unbounded cache that avoids thundering herd. Designed to be
+  cleared every tick/frame."
   (:refer-clojure :exclude [get])
   (:import (java.util.concurrent ConcurrentHashMap)))
 
