@@ -552,8 +552,7 @@
       {:dbs           {:db {:name          "cells.db"
                             :pragma-writer {:cache_size 8000}
                             :pragma
-                            {:journal_mode "TRUNCATE"
-                             :cache_size   2000
+                            {:cache_size   2000
                              :page_size    (* 4096 4)
                              :mmap_size    268435456}}}
        :batch-fn      #'batch-fn
