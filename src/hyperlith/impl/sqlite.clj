@@ -1,6 +1,6 @@
 (ns hyperlith.impl.sqlite
   (:require [hyperlith.impl.cache :as cache]
-            [sqlite4clj.impl.api :as api]
+            [hyperlith.impl.sqlite.api :as api]
             [honey.sql :as hsql]))
 
 (defn- bind [stmt params]
@@ -18,18 +18,7 @@
 
 (defn- prepare
   ([pdb sql]
-   (let [stmt      (api/prepare-v3 pdb sql)
-         col-count (int #_{:clj-kondo/ignore [:type-mismatch]}
-                     (api/column-count stmt))]
-     (cond-> {:stmt stmt}
-       (> col-count 0)
-       (assoc :col-metadata
-         (mapv (fn [c]
-                 {:database (api/column-database-name stmt c)
-                  :table    (api/column-table-name stmt c)
-                  :origin   (api/column-origin-name stmt c)
-                  :alias    (api/column-name stmt c)})
-           (range 0 col-count)))))))
+   {:stmt (api/prepare-v3 pdb sql)}))
 
 (defn- prepare-cached [{:keys [pdb stmt-cache]} query]
   (let [sql    (first query)
@@ -87,21 +76,21 @@
           (conj! cols (get-column-val stmt n)))))))
 
 (defn- unwrap-result-set-fn
-  [col-metadata result-set]
-  (let [result (if (= (count col-metadata) 1)
+  [col-count result-set]
+  (let [result (if (= col-count 1)
                  (into [] cat result-set)
                  (into [] result-set))]
     (when (seq result) result)))
 
 (defn q* [conn query]
-  (let [{:keys [stmt col-metadata]} (prepare-cached conn query)]
+  (let [{:keys [stmt]} (prepare-cached conn query)]
     (with-stmt-reset [stmt stmt]
       (let [n-cols        (int
                             #_{:clj-kondo/ignore [:type-mismatch]}
                             (api/column-count stmt))
             ;; Could be passed in but keeping it simple for now.
             result-set-fn unwrap-result-set-fn]
-        (result-set-fn col-metadata
+        (result-set-fn (api/column-count stmt)
           (reify
             clojure.lang.IReduceInit
             (reduce [_ f init]
@@ -222,5 +211,3 @@
         (q db ["pragma page_size"])
         (q db ["pragma cache_size"])
         (q db ["pragma temp_store"])]))
-
-;;

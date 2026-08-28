@@ -189,26 +189,29 @@
   (-> (d/q db
         '{select [data]
           from   session
-          where  [= id ?sid]}
+          where  [= id ?sid]
+          limit 1}
         {:sid sid})
-    first))
+    first
+    h/json->edn))
 
 (defn get-tab-data [db sid tabid]
-  (-> (get-session-data db sid) :tabs (get tabid)))
+  (-> (get-session-data db sid) :tabs (get (keyword tabid))))
 
 (defn update-tab-data! [db sid tabid update-fn]
-  (let [old-data (get-session-data db sid)
+  (let [tabid    (keyword tabid)
+        old-data (get-session-data db sid)
         new-data (update-in old-data [:tabs tabid] update-fn)]
     (if old-data
       (d/q db '{update session
                 set    {data ?new-data}
                 where  [= id ?sid]}
-        {:sid sid :new-data new-data})
+        {:sid sid :new-data (h/edn->json new-data)})
       (d/q db '{insert-into session
                 values      [{id   ?sid
                               data ?new-data}]}
         {:sid      sid
-         :new-data (assoc new-data :sid sid)}))))
+         :new-data (h/edn->json (assoc new-data :sid sid))}))))
 
 (def blank-chunk
   (-> (repeat (* chunk-size chunk-size) {})
@@ -220,14 +223,15 @@
                                   from   chunk
                                   where  [= id ?chunk-id]}
                           {:chunk-id chunk-id})
-                      first)
+                      first
+                      h/json->edn)
                     (do
                       (d/q db
                         '{insert-into chunk
                           values      [{id   ?chunk-id
                                         data ?blank-chunk}]}
                         {:chunk-id    chunk-id
-                         :blank-chunk blank-chunk})
+                         :blank-chunk (h/edn->json blank-chunk)})
                       blank-chunk))
         new-chunk (update-fn old-chunk)]
     (swap! chunk-cache assoc chunk-id new-chunk)))
@@ -413,7 +417,7 @@
                                              where  [= id ?chunk-id]}
                                      {:chunk-id chunk-id})]
                   (if id
-                    (Chunk id chunk sid)
+                    (Chunk id (h/json->edn chunk) sid)
                     (EmptyChunk chunk-id))))))])})
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://cells.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
@@ -537,7 +541,7 @@
                         set    {data ?new-chunk}
                         where  [= id ?chunk-id]}
                 {:chunk-id  chunk-id
-                 :new-chunk new-chunk}))
+                 :new-chunk (h/edn->json new-chunk)}))
         @chunk-cache))))
 
 (defonce app_ (atom nil))
@@ -565,11 +569,16 @@
 
 (comment
   (def tx! (-> @app_ :ctx ::h/tx!))
-  
+
   (tx!
     (fn [db _]
-      (-> (d/q db '{select [[[count *]]] from chunk})
-        pprint/pprint)))
+      (pprint/pprint (d/q db '{select * from chunk}))))
 
-  )
+  (tx!
+    (fn [db _]
+      (d/q db '{delete-from session})))
+
+  (tx!
+    (fn [db _]
+      (d/q db '{delete-from chunk}))))
 

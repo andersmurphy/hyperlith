@@ -15,11 +15,10 @@
   ;; TEMPLATING
   dev.onionpancakes/chassis {:mvn/version "1.0.365"}
 
-  ;; SQLITE
-  andersmurphy/sqlite4clj
-  ;; {:local/root "../sqlite4clj"}
-  {:git/url "https://github.com/andersmurphy/sqlite4clj"
-   :git/sha "ca06ba7ad5c864cf44813413fba04f6731a2f786"}
+  ;; FFI
+  org.suskalo/coffi
+  {:git/url "https://github.com/IGJoshua/coffi"
+   :git/sha "03d74aedecfc7b38238f1cf8b676c1f7a00e1788"}
   com.github.seancorfield/honeysql {:mvn/version "2.7.1437"}}
  :aliases
  {:dev

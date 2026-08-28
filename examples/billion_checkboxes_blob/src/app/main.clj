@@ -7,7 +7,9 @@
    [clojure.pprint :as pprint]
    [hyperlith.core :as h :refer [defaction defview]]
    [hyperlith.extras.ui.virtual-scroll :as vs]
-   [hyperlith.impl.sqlite :as d]))
+   [hyperlith.impl.sqlite :as d])
+  (:import
+   [java.util Arrays]))
 
 (set! *warn-on-reflection* true)
 ;; (set! *unchecked-math* :warn-on-boxed)
@@ -106,7 +108,7 @@
         {:gap            :5px
          :display        :flex
          :flex-direction :column}]
-       
+
        [:.chunk
         {:background               white
          :display                  :grid
@@ -132,15 +134,15 @@
            :border-radius  :0.15em
            :display        :grid
            :place-content  :center
-           :pointer-events :all}])       
-       
+           :pointer-events :all}])
+
        (map-indexed
          (fn [i x]
            [(str " :is(.box, .palette-item)[data-color='" (inc i) "']")
             {:background-color
              (format "#%06X" x)}])
          palette)
-       
+
        [".box[data-color]:not([data-color='0'])::before"
         {:content    "\"\""
          :width      "0.50em"
@@ -231,25 +233,28 @@
 (defn get-session-data [db sid]
   (-> (d/q db '{select [data]
                 from   session
-                where  [= id ?sid]}
+                where  [= id ?sid]
+                limit  1}
         {:sid sid})
-    first))
+    first
+    h/json->edn))
 
 (defn get-tab-data [db sid tabid]
-  (-> (get-session-data db sid) :tabs (get tabid)))
+  (-> (get-session-data db sid) :tabs (get (keyword tabid))))
 
 (defn update-tab-data! [db sid tabid update-fn]
-  (let [old-data (get-session-data db sid)
+  (let [tabid    (keyword tabid)
+        old-data (get-session-data db sid)
         new-data (update-in old-data [:tabs tabid] update-fn)]
     (if old-data
       (d/q db '{update session
                 set    {data ?new-data}
                 where  [= id ?sid]}
-        {:sid sid :new-data new-data})
+        {:sid sid :new-data (h/edn->json new-data)})
       (d/q db '{insert-into session
                 values      [{:id   ?sid
                               :data ?new-data}]}
-        {:sid sid :new-data new-data}))))
+        {:sid sid :new-data (h/edn->json new-data)}))))
 
 (def ^byte/1 blank-chunk
   (byte-array (* chunk-size chunk-size)))
@@ -342,8 +347,8 @@
 (defn Checkbox [local-id state]
   (h/html
     [:div.box
-     {:data-color  state
-      :data-id     local-id}]))
+     {:data-color state
+      :data-id    local-id}]))
 
 (defn xy->chunk-id [x y]
   (+ x (* y board-size)))
@@ -430,12 +435,12 @@
   [{:keys         [db sid tabid]
     {:strs [x y]} :query-params
     :as           _req}]
-  (let [init-jump-x               (h/try-parse-long x 0)
-        init-jump-y               (h/try-parse-long y 0)
-        tab-data                  (get-tab-data db sid tabid)
+  (let [init-jump-x                                     (h/try-parse-long x 0)
+        init-jump-y                                     (h/try-parse-long y 0)
+        tab-data                                        (get-tab-data db sid tabid)
         {:keys [x y height width share-id
                 share-x share-y jump-x jump-y jump-id]} tab-data
-        palette                   (Palette (or (:color tab-data) 1))]
+        palette                                         (Palette (or (:color tab-data) 1))]
     [(h/html [:link#css {:rel "stylesheet" :type "text/css" :href css}])
      (h/html
        [:main#morph.main
@@ -520,7 +525,7 @@
   (d/q db
     ["CREATE TABLE IF NOT EXISTS chunk_html(chunk_id INTEGER PRIMARY KEY, data BLOB, FOREIGN KEY(chunk_id) REFERENCES chunk(id))"])
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"]))
+    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data TEXT) WITHOUT ROWID"]))
 
 (defn batch-fn [{:keys [db]} thunks]
   (let [chunk-cache (atom {})]
@@ -551,9 +556,9 @@
              :pragma-writer {:cache_size 15625}
              :pragma
              {;; :journal_mode "TRUNCATE"
-              :cache_size   2000
-              :page_size    4096
-              :mmap_size    268435456}}}
+              :cache_size 2000
+              :page_size  4096
+              :mmap_size  268435456}}}
        :batch-fn      #'batch-fn
        :batch-tick-ms 100
        :email         (h/env :email)
@@ -612,7 +617,7 @@
               values      [{chunk-id ?chunk-id data ?data}]}
             {:chunk-id id
              :data     (-> (Chunk id chunk)
-                     h/html->str)}))
+                         h/html->str)}))
         (d/q db '{select * from chunk}))
       (-> (d/q db '{select [[[count *]]] from chunk-html})
         pprint/pprint)))
@@ -648,3 +653,35 @@
           set    {data ?blank-chunk}
           where  [= id 0]}
         {:blank-chunk blank-chunk}))),)
+
+;; migrate tab data
+;; drop leading byte
+
+(comment
+  (def tx! (-> @app_ :ctx ::h/tx!))
+
+  (tx!
+    (fn [db _]
+      (pprint/pprint
+        (h/json->edn
+          (first (d/q db '{select data from session}))))))
+
+  (tx!
+    (fn [db _]
+      (d/q db '{delete-from session})))
+
+  (tx!
+    (fn [db _]
+      (run!
+        (fn [[id chunk]]
+          (d/q db
+            '{update chunk
+              set    {data ?data}
+              where  [= id ?chunk-id]}
+            {:chunk-id id
+             :data     (if (> (count chunk) (* 16 16))
+                         (Arrays/copyOfRange chunk 1 (alength chunk))
+                         chunk)}))
+        (d/q db '{select * from chunk}))
+      (-> (d/q db '{select [[[count *]]] from chunk})
+        pprint/pprint))))
