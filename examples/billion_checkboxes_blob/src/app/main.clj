@@ -658,24 +658,4 @@
     (fn [db _]
       (pprint/pprint
         (h/json->edn
-          (first (d/q db '{select data from session}))))))
-
-  (tx!
-    (fn [db _]
-      (d/q db '{delete-from session})))
-
-  (tx!
-    (fn [db _]
-      (run!
-        (fn [[id chunk]]
-          (d/q db
-            '{update chunk
-              set    {data ?data}
-              where  [= id ?chunk-id]}
-            {:chunk-id id
-             :data     (if (> (count chunk) (* 16 16))
-                         (Arrays/copyOfRange chunk 1 (alength chunk))
-                         chunk)}))
-        (d/q db '{select * from chunk}))
-      (-> (d/q db '{select [[[count *]]] from chunk})
-        pprint/pprint))))
+          (first (d/q db '{select data from session})))))))

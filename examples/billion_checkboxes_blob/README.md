@@ -32,3 +32,8 @@ ssh root@checkboxes.andersmurphy.com "reboot"
 ssh root@checkboxes.andersmurphy.com "nc localhost:5555"
 ```
 
+## Force Restart Service (optional)
+
+```
+ssh root@checkboxes.andersmurphy.com "systemctl restart app.service"
+```

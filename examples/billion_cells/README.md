@@ -32,3 +32,8 @@ ssh root@cells.andersmurphy.com "reboot"
 ssh root@cells.andersmurphy.com "nc localhost:5555"
 ```
 
+## Force Restart Service (optional)
+
+```
+ssh root@cells.andersmurphy.com "systemctl restart app.service"
+```

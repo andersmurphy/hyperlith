@@ -583,13 +583,5 @@
 
   (tx!
     (fn [db _]
-      (pprint/pprint (d/q db '{select * from chunk}))))
-
-  (tx!
-    (fn [db _]
-      (d/q db '{delete-from session})))
-
-  (tx!
-    (fn [db _]
-      (d/q db '{delete-from chunk}))))
+      (pprint/pprint (d/q db '{select * from chunk})))))
 
