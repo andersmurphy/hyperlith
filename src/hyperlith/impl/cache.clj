@@ -7,7 +7,7 @@
 (defn new []
   (ConcurrentHashMap/new))
 
-(defn get [^ConcurrentHashMap cache k f]
+(defn lookup-or-miss [^ConcurrentHashMap cache k f]
   (ConcurrentHashMap/.computeIfAbsent cache k f))
 
 (defn clear! [^ConcurrentHashMap cache]

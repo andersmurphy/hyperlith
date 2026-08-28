@@ -1,6 +1,6 @@
 (ns hyperlith.impl.sqlite
-  (:require [sqlite4clj.impl.api :as api]
-            [clojure.core.cache.wrapped :as cache]
+  (:require [hyperlith.impl.cache :as cache]
+            [sqlite4clj.impl.api :as api]
             [honey.sql :as hsql]))
 
 (defn- bind [stmt params]
@@ -148,7 +148,7 @@
                           ;; SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
                           (bit-or 0x00000002 0x00000004))
         *pdb            (api/open-v2 db-name flags nil)
-        statement-cache (cache/fifo-cache-factory {} :threshold 512)
+        statement-cache (cache/new)
         conn            {:pdb        *pdb
                          :stmt-cache statement-cache}]
     (->> (pragma->set-pragma-query pragma)
@@ -156,10 +156,10 @@
     conn))
 
 (defn new-conn!
-  [{:keys [name :pragma writer-pragma read-only]}]
+  [{:keys [name pragma pragma-writer read-only]}]
   (new-conn!* name
     {:read-only             read-only
-     :pragma                (merge pragma writer-pragma)}))
+     :pragma                (merge pragma pragma-writer)}))
 
 (def ^:dynamic *dbs* nil)
 

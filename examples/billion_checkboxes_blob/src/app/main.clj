@@ -546,7 +546,14 @@
 (defn start-app! [& {:keys [dev?]}]
   (reset! app_
     (h/start-app
-      {:dbs           {:db {:name "database-new.db"}}
+      {:dbs
+       {:db {:name          "database-new.db"
+             :pragma-writer {:cache_size 15625}
+             :pragma
+             {;; :journal_mode "TRUNCATE"
+              :cache_size   2000
+              :page_size    4096
+              :mmap_size    268435456}}}
        :batch-fn      #'batch-fn
        :batch-tick-ms 100
        :email         (h/env :email)
@@ -580,6 +587,16 @@
 
   (tx!
     (fn [db _]
+      (-> (d/q db ["pragma journal_mode"])
+        pprint/pprint)))
+
+  (tx!
+    (fn [db _]
+      (-> (d/q db ["pragma page_size"])
+        pprint/pprint)))
+
+  (tx!
+    (fn [db _]
       (-> (d/q db '{select * from chunk where [= id 0]})
         pprint/pprint)))
 
@@ -587,14 +604,15 @@
     (fn [db _]
       (d/q db ["DROP TABLE chunk_html"])
       (d/q db
-        ["CREATE TABLE IF NOT EXISTS chunk_html(chunk_id INTEGER PRIMARY KEY, data BLOB, FOREIGN KEY(chunk_id) REFERENCES chunk(id))"])
+        ["CREATE TABLE IF NOT EXISTS chunk_html(chunk_id INTEGER PRIMARY KEY, data TEXT, FOREIGN KEY(chunk_id) REFERENCES chunk(id))"])
       (run!
         (fn [[id chunk]]
           (d/q db
             '{insert-into chunk-html
               values      [{chunk-id ?chunk-id data ?data}]}
             {:chunk-id id
-             :data     (h/html->str (Chunk id chunk))}))
+             :data     (-> (Chunk id chunk)
+                     h/html->str)}))
         (d/q db '{select * from chunk}))
       (-> (d/q db '{select [[[count *]]] from chunk-html})
         pprint/pprint)))
