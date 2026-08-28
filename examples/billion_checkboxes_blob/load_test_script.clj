@@ -52,22 +52,24 @@
                         (recur now buf)))))))))))))
 
 (defn actions [url n]
-  (dotimes [_ n]
-    (Thread/startVirtualThread
-      (fn []
-        (http/post url
-          {:client  client
-           :headers (assoc headers "Content-Type" "application/json")
-           :body    (json/encode
-                      {"tabid"    "7dc673ca"
-                       "targetid" (str (rand-int 255))
-                       "parentid" (str 0)})})))
-    (Thread/sleep 5))
-  (Thread/sleep (* n 5)))
+  (Thread/startVirtualThread
+    (fn []
+      (dotimes [_ n]
+        (Thread/startVirtualThread
+          (fn []
+            (http/post url
+              {:client  client
+               :headers (assoc headers "Content-Type" "application/json")
+               :body    (json/encode
+                          {"tabid"    "7dc673ca"
+                           "targetid" (str (rand-int 255))
+                           "parentid" (str 0)})})))
+        (Thread/sleep 5)))))
 
 (let [url "http://localhost:8080"]
   (println "Running against..." url)
-  (views (str url "/?u=") 1500)
+  (views (str url "/?u=") 2000)
   (actions (str url"/t_rqnpSL_NvK8EJhoBwkc6TNJ4VsLi1Fs")
     2000)
+  (Thread/sleep 20000)
   (println @stats))
