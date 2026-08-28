@@ -553,19 +553,22 @@
     (h/start-app
       {:dbs
        {:db {:name          "database-new.db"
-             :pragma-writer {:cache_size 15625}
+             :pragma-writer {:cache_size 8000}
              :pragma
-             {;; :journal_mode "TRUNCATE"
-              :cache_size 2000
-              :page_size  4096
-              :mmap_size  268435456}}}
+             {:journal_mode "TRUNCATE"
+              :cache_size   2000
+              :page_size    (* 4096 4)
+              :mmap_size    268435456}}}
        :batch-fn      #'batch-fn
        :batch-tick-ms 100
        :email         (h/env :email)
        :domain        (h/env :domain)
        :dev?          dev?}))
   (let [{{:keys [::h/tx!]} :ctx} @app_]
-    (tx! (fn [db _] (migrations db)))))
+    (tx! (fn [db _] (migrations db)
+           (d/escape-write-tx [db db]
+             (d/q db ["PRAGMA wal_checkpoint(TRUNCATE)"])
+             (d/q db ["VACUUM"]))))))
 
 (defn -main [& _]
   (start-app!))
@@ -620,16 +623,7 @@
                          h/html->str)}))
         (d/q db '{select * from chunk}))
       (-> (d/q db '{select [[[count *]]] from chunk-html})
-        pprint/pprint)))
-
-  ;; Free up space (slow)
-  ;; Checkpoint the WAL
-  (tx!
-    (fn [db _]
-      (d/escape-write-tx [db db]
-        (d/q db ["VACUUM"])
-        (d/q db ["PRAGMA wal_checkpoint(TRUNCATE)"]))))
-  )
+        pprint/pprint))))
 
 (comment ;; Example migration of for changing column type
 

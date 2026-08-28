@@ -549,12 +549,23 @@
 (defn start-app! [& {:keys [dev?]}]
   (reset! app_
     (h/start-app
-      {:dbs           {:db {:name "cells.db"}}
+      {:dbs           {:db {:name          "cells.db"
+                            :pragma-writer {:cache_size 8000}
+                            :pragma
+                            {:journal_mode "TRUNCATE"
+                             :cache_size   2000
+                             :page_size    (* 4096 4)
+                             :mmap_size    268435456}}}
        :batch-fn      #'batch-fn
        :batch-tick-ms 100
        :email         (h/env :email)
        :domain        (h/env :domain)
-       :dev?          dev?})))
+       :dev?          dev?}))
+  (let [{{:keys [::h/tx!]} :ctx} @app_]
+    (tx! (fn [db _] (migrations db)
+           (d/escape-write-tx [db db]
+             (d/q db ["PRAGMA wal_checkpoint(TRUNCATE)"])
+             (d/q db ["VACUUM"]))))))
 
 (defn -main [& _]
   (start-app!))
