@@ -4,6 +4,9 @@
            (java.io ByteArrayOutputStream OutputStream)))
 
 (defn compress ^byte/1 [data level]
+  ;; Browser spec only support up to 8MB window which means
+  ;; level 19 is the max we can use. See RFC 9659.
+  (assert (<= 1 level 19)) 
   (let [^bytes data (if (string? data) (String/.getBytes data) data)]
     (with-open [ctx (ZstdCompressCtx/new)]
       (.setLevel ctx (int level))
