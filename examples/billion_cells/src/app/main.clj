@@ -436,7 +436,8 @@
    :on-open           (fn [{:keys [::h/tx!]}]
                         ;; This will trigger a batch on new user connect
                         ;; But not actually update the database
-                        (tx! (fn [& _] nil)))}
+                        (tx! (fn [& _] nil)))
+   :zstd-window       20}
   [{:keys         [db sid tabid]
     {:strs [x y]} :query-params
     :as           _req}]

@@ -111,13 +111,17 @@
     root))
 
 (defn render-handler
-  [path render-fn & {:keys [on-close on-open] :as _opts}]
+  [path render-fn & {:keys [on-close on-open zstd-level zstd-window] :as _opts
+                     :or   {zstd-level 1 
+                            zstd-window 19}}]
   (router/add-route! [:post path]
     (fn handler [req]
       (let [out         (ByteArrayOutputStream/new 4096)
             sw          (OutputStreamWriter/new
                           ^OutputStream
-                          (zstd/compress-out-stream out 1)
+                          (zstd/compress-out-stream out
+                            zstd-level
+                            zstd-window)
                           StandardCharsets/UTF_8)
             w           (BufferedWriter/new sw 4096)
             conns       (req :hyperlith.core/conns)
