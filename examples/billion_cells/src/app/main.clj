@@ -449,8 +449,8 @@
   [{:keys         [db sid tabid]
     {:strs [x y]} :query-params
     :as           _req}]
-  (let [init-jump-x      (h/try-parse-long x 0)
-        init-jump-y      (h/try-parse-long y 0)
+  (let [init-jump-x      (h/parse-long x 0)
+        init-jump-y      (h/parse-long y 0)
         tab-data         (get-tab-data db sid tabid)
         {:keys [x y height width share-id share-x share-y jump-id jump-x
                 jump-y]} tab-data]

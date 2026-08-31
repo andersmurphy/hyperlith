@@ -14,10 +14,11 @@
         [cur val])
       val)))
 
-(defn try-parse-long
-  ([x] (try-parse-long x nil))
+(defn parse-long
+  ([x]
+   (parse-long x nil))
   ([x default]
-   (or (try (parse-long x) (catch Throwable _ default)) default)))
+   (if (string? x) (parse-long x) default)))
 
 (defn resource->bytes [resource]
   (-> resource io/input-stream InputStream/.readAllBytes))

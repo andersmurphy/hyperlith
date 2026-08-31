@@ -1,4 +1,5 @@
 (ns hyperlith.core
+  (:refer-clojure :exclude [parse-long])
   (:require
    [aleph.http :as http]
    [clojure.main :refer [repl-caught]]
@@ -36,7 +37,7 @@
   ;; UTIL
   [hyperlith.impl.util
    load-resource
-   try-parse-long
+   parse-long
    modulo-pick]
   ;; HTML
   [hyperlith.impl.html
