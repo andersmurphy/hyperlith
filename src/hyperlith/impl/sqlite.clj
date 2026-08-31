@@ -16,18 +16,13 @@
     1 ;; starts at 1
     params))
 
-(defn- prepare
-  ([pdb sql]
-   {:stmt (api/prepare-v3 pdb sql)}))
-
 (defn- prepare-cached [{:keys [pdb stmt-cache]} query]
   (let [sql    (first query)
         params (subvec query 1)
-        {:keys [stmt] :as m}
-        (cache/lookup-or-miss stmt-cache sql
-          (fn [_] (prepare pdb sql)))]
+        stmt   (cache/lookup-or-miss stmt-cache sql
+               (fn [_] (api/prepare-v3 pdb sql)))]
     (bind stmt params)
-    m))
+    stmt))
 
 (defmacro with-stmt-reset
   {:clj-kondo/lint-as 'clojure.core/with-open}
@@ -47,7 +42,7 @@
 
 (defn q*
   ([conn query]
-   (let [{:keys [stmt]} (prepare-cached conn query)]
+   (let [stmt (prepare-cached conn query)]
      (with-stmt-reset [stmt stmt]
        (let [code (int
                     #_{:clj-kondo/ignore [:type-mismatch]}
@@ -59,7 +54,7 @@
                     {:sql    (first query)
                      :params (subvec query 1)})))))))
   ([conn query result-set-fn]
-   (let [{:keys [stmt]} (prepare-cached conn query)]
+   (let [stmt (prepare-cached conn query)]
      (with-stmt-reset [stmt stmt]
        (result-set-reducer result-set-fn
          (reify
