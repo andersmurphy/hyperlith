@@ -32,3 +32,8 @@ ssh root@example.andersmurphy.com "reboot"
 ssh root@example.andersmurphy.com "nc localhost:5555"
 ```
 
+## Force Restart Service (optional)
+
+```
+fssh root@example.andersmurphy.com "systemctl restart app.service"
+```

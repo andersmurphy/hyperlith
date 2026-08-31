@@ -107,7 +107,8 @@
       h/html->str
       h/html-raw-str)))
 
-(defview render-home {:path "/" :shim-headers shim-headers}
+(defview render-home {:path        "/" :shim-headers shim-headers
+                      :zstd-window 20}
   [{:keys [board-cache _sid] :as _req}]
   [(h/html
      [:link#css {:rel "stylesheet" :type "text/css" :href css}]
@@ -164,6 +165,7 @@
        :email         (h/env :email)
        :domain        (h/env :domain)
        :dev?          dev?})))
+
 
 (defn -main [& _]
   (start-app!))

@@ -112,7 +112,7 @@
 
 (defn render-handler
   [path render-fn & {:keys [on-close on-open zstd-level zstd-window] :as _opts
-                     :or   {zstd-level 1 
+                     :or   {zstd-level -1 ;; twice as fast as 1
                             zstd-window 19}}]
   (router/add-route! [:post path]
     (fn handler [req]
