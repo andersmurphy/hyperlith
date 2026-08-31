@@ -393,17 +393,15 @@
   {:content
    (->> (xy->chunk-ids offset-data)
      (mapv (fn [chunk-id]
-             (d/q db
-               '{select [chunk-html.chunk-id chunk-html.data]
-                 from   chunk
-                 join   [:chunk-html [= chunk-id chunk.id]]
-                 where  [= chunk.id ?chunk-id]}
-               {:chunk-id chunk-id}
-               (fn [stmt]
-                 (let [id   (d/int stmt 0)
-                       html (d/text stmt 1)]
-                   (-> (if id html (EmptyChunk chunk-id))
-                     h/html-raw-str)))))))})
+             (-> (or (first (d/q db
+                              '{select [chunk-html.data]
+                                from   chunk
+                                join   [:chunk-html [= chunk-id chunk.id]]
+                                where  [= chunk.id ?chunk-id]}
+                              {:chunk-id chunk-id}
+                              (fn [stmt]  (d/text stmt 0))))
+                   (EmptyChunk chunk-id))
+               h/html-raw-str))))})
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
