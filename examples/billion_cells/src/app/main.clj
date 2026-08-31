@@ -190,10 +190,12 @@
         '{select [data]
           from   session
           where  [= id ?sid]
-          limit 1}
-        {:sid sid})
-    first
-    h/json->edn))
+          limit  1}
+        {:sid sid}
+        (fn [stmt]
+          (-> (d/text stmt 0)
+            h/json->edn)))
+    first))
 
 (defn get-tab-data [db sid tabid]
   (-> (get-session-data db sid) :tabs (get (keyword tabid))))
@@ -222,9 +224,11 @@
                     (-> (d/q db '{select [data]
                                   from   chunk
                                   where  [= id ?chunk-id]}
-                          {:chunk-id chunk-id})
-                      first
-                      h/json->edn)
+                          {:chunk-id chunk-id}
+                          (fn [stmt]
+                            (-> (d/text stmt 0)
+                              h/json->edn)))
+                      first)
                     (do
                       (d/q db
                         '{insert-into chunk
@@ -380,8 +384,10 @@
      empty-cells]))
 
 (defn UserView
-  [db sid {:keys                                     [x-offset-items y-offset-items
-                  x-rendered-items y-rendered-items] :as offset-data}]
+  [db sid
+   {:keys [x-offset-items y-offset-items
+           x-rendered-items y-rendered-items]
+    :as   offset-data}]
   {:corner  (h/html [:div {:style {:background white}}])
    :header  (mapv (fn [x] (h/html
                             [:div {:style {:background  black
@@ -412,13 +418,15 @@
                     :grid-area     "1/1/-1/-1"}}
       (->> (xy->chunk-ids offset-data)
         (mapv (fn [chunk-id]
-                (let [[[id chunk]] (d/q db '{select [id data]
-                                             from   chunk
-                                             where  [= id ?chunk-id]}
-                                     {:chunk-id chunk-id})]
-                  (if id
-                    (Chunk id (h/json->edn chunk) sid)
-                    (EmptyChunk chunk-id))))))])})
+                (or (-> (d/q db '{select [id data]
+                                  from   chunk
+                                  where  [= id ?chunk-id]}
+                          {:chunk-id chunk-id}
+                          (fn [stmt]
+                            (Chunk (d/int stmt 0) (h/json->edn (d/text stmt 1))
+                              sid)))
+                      first)
+                  (EmptyChunk chunk-id)))))])})
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://cells.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
@@ -583,5 +591,8 @@
 
   (tx!
     (fn [db _]
-      (pprint/pprint (d/q db '{select * from chunk})))))
+      (d/q db '{select [id] from chunk}
+        (fn [stmt]
+          (pprint/pprint
+            (d/int stmt 0)))))))
 

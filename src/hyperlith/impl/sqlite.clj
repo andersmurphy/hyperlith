@@ -39,74 +39,45 @@
          (api/reset ~stmt-binding)
          (api/clear-bindings ~stmt-binding)))))
 
-(defn- get-column-val [stmt n]
-  (case (int #_{:clj-kondo/ignore [:type-mismatch]}
-          (api/column-type stmt n))
-    ;; See type codes here: https://sqlite.org/c3ref/c_blob.html
-    1 (api/column-int    stmt n)
-    2 (api/column-double stmt n)
-    3 (api/column-text   stmt n)
-    4 (api/column-blob   stmt n)
-    5 nil))
+(defn result-set-reducer [result-set-fn result-set]
+  (reduce (fn [result stmt]
+            (conj result (result-set-fn stmt)))
+    []
+    result-set))
 
-(defn- column [stmt n-cols]
-  (case n-cols
-    0 nil
-    1 [(get-column-val stmt 0)]
-    2 [(get-column-val stmt 0)
-       (get-column-val stmt 1)]
-    3 [(get-column-val stmt 0)
-       (get-column-val stmt 1)
-       (get-column-val stmt 2)]
-    4 [(get-column-val stmt 0)
-       (get-column-val stmt 1)
-       (get-column-val stmt 2)
-       (get-column-val stmt 3)]
-    5 [(get-column-val stmt 0)
-       (get-column-val stmt 1)
-       (get-column-val stmt 2)
-       (get-column-val stmt 3)
-       (get-column-val stmt 4)]
-    ;; After 5 params it's worth iterating
-    (loop [n    0
-           cols (transient [])]
-      (if (>= n n-cols)
-        (persistent! cols)
-        (recur (inc n)
-          (conj! cols (get-column-val stmt n)))))))
-
-(defn- unwrap-result-set-fn
-  [col-count result-set]
-  (let [result (if (= col-count 1)
-                 (into [] cat result-set)
-                 (into [] result-set))]
-    (when (seq result) result)))
-
-(defn q* [conn query]
-  (let [{:keys [stmt]} (prepare-cached conn query)]
-    (with-stmt-reset [stmt stmt]
-      (let [n-cols        (int
+(defn q*
+  ([conn query]
+   (let [{:keys [stmt]} (prepare-cached conn query)]
+     (with-stmt-reset [stmt stmt]
+       (let [code (int
+                    #_{:clj-kondo/ignore [:type-mismatch]}
+                    (api/step stmt))]
+         (case code
+           100 nil
+           101 nil
+           (throw (api/sqlite-ex-info (:pdb conn) code
+                    {:sql    (first query)
+                     :params (subvec query 1)})))))))
+  ([conn query result-set-fn]
+   (let [{:keys [stmt]} (prepare-cached conn query)]
+     (with-stmt-reset [stmt stmt]
+       (result-set-reducer result-set-fn
+         (reify
+           clojure.lang.IReduceInit
+           (reduce [_ f init]
+             (loop [ret init]
+               (let [code (int
                             #_{:clj-kondo/ignore [:type-mismatch]}
-                            (api/column-count stmt))
-            ;; Could be passed in but keeping it simple for now.
-            result-set-fn unwrap-result-set-fn]
-        (result-set-fn (api/column-count stmt)
-          (reify
-            clojure.lang.IReduceInit
-            (reduce [_ f init]
-              (loop [ret init]
-                (let [code (int
-                             #_{:clj-kondo/ignore [:type-mismatch]}
-                             (api/step stmt))]
-                  (case code
-                    100 (let [result (f ret (column stmt n-cols))]
-                          (if (reduced? result)
-                            @result
-                            (recur result)))
-                    101 ret
-                    (throw (api/sqlite-ex-info (:pdb conn) code
-                             {:sql    (first query)
-                              :params (subvec query 1)}))))))))))))
+                            (api/step stmt))]
+                 (case code
+                   100 (let [result (f ret stmt)]
+                         (if (reduced? result)
+                           @result
+                           (recur result)))
+                   101 ret
+                   (throw (api/sqlite-ex-info (:pdb conn) code
+                            {:sql    (first query)
+                             :params (subvec query 1)}))))))))))))
 
 (def default-pragma
   {:cache_size   15625
@@ -147,8 +118,8 @@
 (defn new-conn!
   [{:keys [name pragma pragma-writer read-only]}]
   (new-conn!* name
-    {:read-only             read-only
-     :pragma                (merge pragma pragma-writer)}))
+    {:read-only read-only
+     :pragma    (merge pragma pragma-writer)}))
 
 (def ^:dynamic *dbs* nil)
 
@@ -188,26 +159,22 @@
      ~@body
      (q* ~tx ["BEGIN IMMEDIATE"])))
 
-(defmacro q [db [query-type query :as string-query] & [params]]
-  (if (string? query-type)
-    `(q* ~db ~string-query)
-    `(q* ~db ~(hsql/format query {:params params}))))
+(defmacro q
+  [db [query-type query :as string-query] & [a b]]
+  (let [params        (when (map? a) a)
+        result-set-fn (or (when-not (map? a) a)
+                        (when-not (map? b) b))]
+    (if (string? query-type)
+      (if result-set-fn
+        `(q* ~db ~string-query ~result-set-fn)
+        `(q* ~db ~string-query))
+      (if result-set-fn
+        `(q* ~db ~(hsql/format query {:params params}) ~result-set-fn)
+        `(q* ~db ~(hsql/format query {:params params}))))))
 
 (def format-query hsql/format)
 
-;;; - UTILITY -
-
-(defn table-info [db table-name]
-  (let [t-name (-> table-name name)]
-    (q db ["PRAGMA table_info(?);" t-name])))
-
-(defn table-list [db]
-  (q db ["PRAGMA table_list;"]))
-
-(defn pragma-check [db]
-  (->> [(q db ["pragma foreign_keys"])
-        (q db ["pragma journal_mode"])
-        (q db ["pragma synchronous"])
-        (q db ["pragma page_size"])
-        (q db ["pragma cache_size"])
-        (q db ["pragma temp_store"])]))
+(def text api/column-text)
+(def int api/column-int)
+(def blob api/column-blob)
+(def real  api/column-double)

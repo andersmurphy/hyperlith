@@ -7,9 +7,7 @@
    [clojure.pprint :as pprint]
    [hyperlith.core :as h :refer [defaction defview]]
    [hyperlith.extras.ui.virtual-scroll :as vs]
-   [hyperlith.impl.sqlite :as d])
-  (:import
-   [java.util Arrays]))
+   [hyperlith.impl.sqlite :as d]))
 
 (set! *warn-on-reflection* true)
 ;; (set! *unchecked-math* :warn-on-boxed)
@@ -235,9 +233,11 @@
                 from   session
                 where  [= id ?sid]
                 limit  1}
-        {:sid sid})
-    first
-    h/json->edn))
+        {:sid sid}
+        (fn [stmt]
+          (-> (d/text stmt 0)
+            h/json->edn)))
+    first))
 
 (defn get-tab-data [db sid tabid]
   (-> (get-session-data db sid) :tabs (get (keyword tabid))))
@@ -303,7 +303,8 @@
                                (-> (d/q db '{select [data]
                                              from   chunk
                                              where  [= id ?chunk-id]}
-                                     {:chunk-id chunk-id})
+                                     {:chunk-id chunk-id}
+                                     (fn [stmt] (d/blob stmt 0)))
                                  first)
                                (do
                                  (d/q db
@@ -389,17 +390,20 @@
 
 (defn UserView
   [db offset-data]
-  {:content (->> (xy->chunk-ids offset-data)
-              (mapv (fn [chunk-id]
-                      (let [[[id html]]
-                            (d/q db
-                              '{select [chunk-html.chunk-id chunk-html.data]
-                                from   chunk
-                                join   [:chunk-html [= chunk-id chunk.id]]
-                                where  [= chunk.id ?chunk-id]}
-                              {:chunk-id chunk-id})]
-                        (-> (if id html (EmptyChunk chunk-id))
-                          h/html-raw-str)))))})
+  {:content
+   (->> (xy->chunk-ids offset-data)
+     (mapv (fn [chunk-id]
+             (d/q db
+               '{select [chunk-html.chunk-id chunk-html.data]
+                 from   chunk
+                 join   [:chunk-html [= chunk-id chunk.id]]
+                 where  [= chunk.id ?chunk-id]}
+               {:chunk-id chunk-id}
+               (fn [stmt]
+                 (let [id   (d/int stmt 0)
+                       html (d/text stmt 1)]
+                   (-> (if id html (EmptyChunk chunk-id))
+                     h/html-raw-str)))))))})
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
@@ -594,18 +598,22 @@
 
   (tx!
     (fn [db _]
-      (-> (d/q db ["pragma journal_mode"])
-        pprint/pprint)))
+      (d/q db ["pragma journal_mode"]
+        (fn [stmt]
+          (pprint/pprint (d/text stmt 0))))))
 
   (tx!
     (fn [db _]
-      (-> (d/q db ["pragma page_size"])
-        pprint/pprint)))
+      (d/q db ["pragma page_size"]
+        (fn [stmt]
+          (pprint/pprint (d/text stmt 0))))))
 
   (tx!
     (fn [db _]
-      (-> (d/q db '{select * from chunk where [= id 0]})
-        pprint/pprint)))
+      (d/q db '{select [id data] from chunk where [= id 0]}
+        (fn [stmt]
+          (pprint/pprint (d/int stmt 0))
+          (pprint/pprint (d/blob stmt 1))))))
 
   (tx!
     (fn [db _]
@@ -620,9 +628,13 @@
             {:chunk-id id
              :data     (-> (Chunk id chunk)
                          h/html->str)}))
-        (d/q db '{select * from chunk}))
-      (-> (d/q db '{select [[[count *]]] from chunk-html})
-        pprint/pprint))))
+        (d/q db '{select [id data] from chunk}
+          (fn [stmt]
+            [(d/int stmt 0)
+             (d/text stmt 1)])))
+      (d/q db '{select [[[count *]]] from chunk-html}
+        (fn [stmt]
+          (pprint/pprint (d/int stmt 0)))))))
 
 (comment ;; Example migration of for changing column type
 
@@ -633,8 +645,9 @@
       (d/q db ["INSERT INTO newchunk SELECT * FROM chunk"])
       (d/q db ["DROP TABLE chunk"])
       (d/q db ["ALTER TABLE newchunk RENAME TO chunk"])
-      (-> (d/q db '{select [[[count *]]] from chunk})
-        pprint/pprint))))
+      (d/q db '{select [[[count *]]] from chunk-html}
+        (fn [stmt]
+          (pprint/pprint (d/int stmt 0)))))))
 
 (comment ;; clearing a chunk
   (def tx! (-> @app_ :ctx ::h/tx!))
@@ -647,14 +660,10 @@
           where  [= id 0]}
         {:blank-chunk blank-chunk}))),)
 
-;; migrate tab data
-;; drop leading byte
-
 (comment
   (def tx! (-> @app_ :ctx ::h/tx!))
 
-  (tx!
-    (fn [db _]
-      (pprint/pprint
-        (h/json->edn
-          (first (d/q db '{select data from session})))))))
+  (tx! (fn [db _]
+         (d/escape-write-tx [db db]
+           (d/q db ["PRAGMA wal_checkpoint(TRUNCATE)"])
+           (d/q db ["VACUUM"])))))
