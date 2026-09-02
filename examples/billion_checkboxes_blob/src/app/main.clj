@@ -373,10 +373,12 @@
        chunk-cells)]))
 
 (def empty-checks
-  (h/html
-    (into []
-      (map-indexed (fn [local-id box] (Checkbox local-id box)))
-      blank-chunk)))
+  (-> (h/html
+        (into []
+          (map-indexed (fn [local-id box] (Checkbox local-id box)))
+          blank-chunk))
+    h/html->str
+    h/html-raw-str))
 
 (defn EmptyChunk [chunk-id]
   (-> (h/html
@@ -665,3 +667,19 @@
          (d/escape-write-tx [db db]
            (d/q db ["PRAGMA wal_checkpoint(TRUNCATE)"])
            (d/q db ["VACUUM"])))))
+
+(comment ;; Generate load test data
+  (def tx! (-> @app_ :ctx ::h/tx!))
+
+  (def data (atom nil))
+
+  (tx! (fn [db _]
+         (binding [*print-length* nil]
+           (->> (d/q db '{select id from chunk}
+                  (fn [stmt]
+                    (let [id (d/int stmt 0)]
+                      [(* (quot id board-size)
+                         chunk-size cell-size-px)
+                       (* (rem id board-size)
+                         chunk-size cell-size-px)])))
+             (spit "load-test-data.edn"))))))

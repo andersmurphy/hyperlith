@@ -3,16 +3,26 @@
 ;; run with: bb load_test_script.clj
 (require
   '[babashka.http-client :as http]
-  '[cheshire.core :as json])
+  '[cheshire.core :as json]
+  '[clojure.edn :as edn])
 
 (def client
   (http/client
     (-> (assoc-in http/default-client-opts [:ssl-context :insecure] true)
       (assoc :version :http1.1))))
 
+(defn gen-users [n]
+  (mapv (fn [i] (str "__Host-sid=" "test-user-" i))
+    (range 0 n)))
+
+(def tiles-with-data (edn/read-string (slurp "load-test-data.edn")))
+
+(let [positions (atom tiles-with-data)]
+  (defn next-xy []
+    (peek (swap! positions pop))))
+
 (def headers
-  {"Cookie"          "__Host-sid=vtwl34jCOZDoGVIORWfiCBKg0U0"
-   "Accept-Encoding" "zstd"
+  {"Accept-Encoding" "zstd"
    "sec-fetch-site"  "same-origin"})
 
 (def latency-threshold-ms 200)
@@ -27,13 +37,16 @@
           (update :max max ms)
           (update :threshold-breaches #(if breach? (inc %) %)))))))
 
-(defn views [url n]
-  (dotimes [_ n]
+(defn views [users url]
+  (dotimes [i (count users)]
     (Thread/startVirtualThread
       (fn []
         (let [resp (http/post url
                      {:client  client
-                      :headers headers
+                      :headers (assoc headers
+                                 "Cookie" (users i)
+                                 "Content-Type" "application/json")
+                      :body    (json/encode {"tabid" "7dc673ca"})
                       :as      :stream})]
           (with-open [in (:body resp)]
             (loop [last-time (System/currentTimeMillis)
@@ -51,25 +64,37 @@
                         (Thread/sleep 10)
                         (recur now buf)))))))))))))
 
-(defn actions [url n]
+(defn actions [users url data-generator]
   (Thread/startVirtualThread
     (fn []
-      (dotimes [_ n]
+      (dotimes [i (count users)]
         (Thread/startVirtualThread
           (fn []
             (http/post url
               {:client  client
-               :headers (assoc headers "Content-Type" "application/json")
-               :body    (json/encode
-                          {"tabid"    "7dc673ca"
-                           "targetid" (str (rand-int 255))
-                           "parentid" (str 0)})})))
+               :headers (assoc headers
+                          "Content-Type" "application/json"
+                          "Cookie" (users i))
+               :body    (json/encode (data-generator))})))
         (Thread/sleep 5)))))
 
-(let [url "http://localhost:8080"]
+(let [url   "http://localhost:8080"
+      users (gen-users 2000)]
   (println "Running against..." url)
-  (views (str url "/?u=") 2000)
-  (actions (str url"/t_rqnpSL_NvK8EJhoBwkc6TNJ4VsLi1Fs")
-    2000)
+  (views users (str url "/?u="))
+  ;; (actions users
+  ;;   (str url "/t_rqnpSL_NvK8EJhoBwkc6TNJ4VsLi1Fs")
+  ;;   (fn []
+  ;;     {"tabid"    "7dc673ca"
+  ;;      "targetid" (str (rand-int 255))
+  ;;      "parentid" (str 0)}))
+  (actions users
+    (str url "/wp4BXB8NeCPWmq9C5rgU7-zyDP57-yYBk")
+    (fn []
+      (let [[x y] (next-xy)]
+        {"tabid"  "7dc673ca"
+         "view-x" x
+         "view-y" y
+         })))
   (Thread/sleep 20000)
   (println @stats))
