@@ -1,14 +1,11 @@
 (ns hyperlith.impl.cache
-  "Simple unbounded cache that avoids thundering herd. Designed to be
-  cleared every tick/frame."
-  (:refer-clojure :exclude [get])
-  (:import (java.util.concurrent ConcurrentHashMap)))
+  (:import [com.github.benmanes.caffeine.cache Caffeine Cache]))
 
-(defn new []
-  (ConcurrentHashMap/new))
+(defn init ^Cache
+  ([max-size]
+   (-> (Caffeine/newBuilder)
+     (.maximumSize max-size)
+     (.build))))
 
-(defn lookup-or-miss [^ConcurrentHashMap cache k f]
-  (ConcurrentHashMap/.computeIfAbsent cache k f))
-
-(defn clear! [^ConcurrentHashMap cache]
-  (ConcurrentHashMap/.clear cache))
+(defn lookup-or-miss [^Cache cache k f]
+  (.get cache k f))

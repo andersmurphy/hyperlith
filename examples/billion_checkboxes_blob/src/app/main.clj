@@ -7,7 +7,8 @@
    [clojure.pprint :as pprint]
    [hyperlith.core :as h :refer [defaction defview]]
    [hyperlith.extras.ui.virtual-scroll :as vs]
-   [hyperlith.impl.sqlite :as d]))
+   [hyperlith.impl.sqlite :as d]
+   [hyperlith.impl.cache :as cache]))
 
 (set! *warn-on-reflection* true)
 ;; (set! *unchecked-math* :warn-on-boxed)
@@ -313,10 +314,6 @@
                                                    data ?blank-chunk}]}
                                    {:chunk-id    chunk-id
                                     :blank-chunk blank-chunk})
-                                 (d/q db
-                                   '{insert-into chunk-html
-                                     values      [{chunk-id ?chunk-id}]}
-                                   {:chunk-id chunk-id})
                                  (java.util.Arrays/copyOf blank-chunk
                                    (alength blank-chunk))))]
               (swap! chunk-cache assoc chunk-id
@@ -388,22 +385,27 @@
           :data-ignore       true
           :data-id           chunk-id}
          empty-checks])
-    h/html->str))
+    h/html->str
+    h/html-raw-str))
 
 (defn UserView
-  [db offset-data]
+  [html-cache db offset-data]
   {:content
    (->> (xy->chunk-ids offset-data)
      (mapv (fn [chunk-id]
-             (-> (or (first (d/q db
-                              '{select [chunk-html.data]
-                                from   chunk
-                                join   [:chunk-html [= chunk-id chunk.id]]
-                                where  [= chunk.id ?chunk-id]}
-                              {:chunk-id chunk-id}
-                              (fn [stmt]  (d/text stmt 0))))
-                   (EmptyChunk chunk-id))
-               h/html-raw-str))))})
+             (or (d/q db
+                   '{select [id data]
+                     from   chunk
+                     where  [= id ?chunk-id]}
+                   {:chunk-id chunk-id}
+                   (fn [stmt]
+                     (let [id (d/int stmt 0) data (d/blob stmt 1)]
+                       (cache/lookup-or-miss html-cache [id (seq data)]
+                         (fn [_]
+                           (-> (Chunk id data)
+                             h/html->str
+                             h/html-raw-str))))))
+               (EmptyChunk chunk-id)))))})
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
@@ -436,7 +438,7 @@
                         ;; This will trigger a batch on new user connect
                         ;; But not actually update the database
                         (tx! (fn [& _] nil)))}
-  [{:keys         [db sid tabid]
+  [{:keys         [db sid tabid html-cache]
     {:strs [x y]} :query-params
     :as           _req}]
   (let [init-jump-x                                     (h/parse-long x 0)
@@ -474,7 +476,7 @@
                                    :view-size          height
                                    :item-count-fn      (fn [] board-size)
                                    :chunk-size         chunk-size}
-           :v/item-fn             (partial UserView db)
+           :v/item-fn             (partial UserView html-cache db)
            :v/scroll-handler-path handler-scroll
            :v/resize-handler-path handler-resize}]]
         [:div.controls-wrapper
@@ -539,15 +541,7 @@
               (d/q db '{update chunk
                         set    {id ?chunk-id data ?new-chunk}
                         where  [= id ?chunk-id]}
-                {:chunk-id chunk-id :new-chunk new-chunk})
-              (d/q db '{update chunk_html
-                        set    {chunk-id ?chunk-id
-                                data     ?new-html}
-                        where  [= chunk-id ?chunk-id]}
-                {:chunk-id  chunk-id
-                 :new-chunk new-chunk
-                 :new-html  (-> (Chunk chunk-id new-chunk)
-                              h/html->str)}))
+                {:chunk-id chunk-id :new-chunk new-chunk}))
         @chunk-cache))))
 
 (defonce app_ (atom nil))
@@ -555,13 +549,14 @@
 (defn start-app! [& {:keys [dev?]}]
   (reset! app_
     (h/start-app
-      {:dbs
+      {:ctx-start     (fn [] {:html-cache (cache/init 3000)})
+       :dbs
        {:db {:name          "database-new.db"
-             :pragma-writer {:cache_size 8000}
+             :pragma-writer {:cache_size 15625}
              :pragma
-             {:cache_size   2000
-              :page_size    (* 4096 4)
-              :mmap_size    268435456}}}
+             {:cache_size 2000
+              :page_size  4096
+              :mmap_size  268435456}}}
        :batch-fn      #'batch-fn
        :batch-tick-ms 100
        :email         (h/env :email)
@@ -613,28 +608,7 @@
       (d/q db '{select [id data] from chunk where [= id 0]}
         (fn [stmt]
           (pprint/pprint (d/int stmt 0))
-          (pprint/pprint (d/blob stmt 1))))))
-
-  (tx!
-    (fn [db _]
-      (d/q db ["DROP TABLE chunk_html"])
-      (d/q db
-        ["CREATE TABLE IF NOT EXISTS chunk_html(chunk_id INTEGER PRIMARY KEY, data TEXT, FOREIGN KEY(chunk_id) REFERENCES chunk(id))"])
-      (run!
-        (fn [[id chunk]]
-          (d/q db
-            '{insert-into chunk-html
-              values      [{chunk-id ?chunk-id data ?data}]}
-            {:chunk-id id
-             :data     (-> (Chunk id chunk)
-                         h/html->str)}))
-        (d/q db '{select [id data] from chunk}
-          (fn [stmt]
-            [(d/int stmt 0)
-             (d/text stmt 1)])))
-      (d/q db '{select [[[count *]]] from chunk-html}
-        (fn [stmt]
-          (pprint/pprint (d/int stmt 0)))))))
+          (pprint/pprint (d/blob stmt 1)))))))
 
 (comment ;; Example migration of for changing column type
 
@@ -644,10 +618,7 @@
         ["CREATE TABLE IF NOT EXISTS newchunk(id INTEGER PRIMARY KEY, data BLOB)"])
       (d/q db ["INSERT INTO newchunk SELECT * FROM chunk"])
       (d/q db ["DROP TABLE chunk"])
-      (d/q db ["ALTER TABLE newchunk RENAME TO chunk"])
-      (d/q db '{select [[[count *]]] from chunk-html}
-        (fn [stmt]
-          (pprint/pprint (d/int stmt 0)))))))
+      (d/q db ["ALTER TABLE newchunk RENAME TO chunk"]))))
 
 (comment ;; clearing a chunk
   (def tx! (-> @app_ :ctx ::h/tx!))

@@ -15,6 +15,9 @@
   ;; TEMPLATING
   dev.onionpancakes/chassis {:mvn/version "1.0.365"}
 
+  ;; CACHING
+  com.github.ben-manes.caffeine/caffeine {:mvn/version "3.2.4"}
+
   ;; FFI
   org.suskalo/coffi
   {:git/url "https://github.com/IGJoshua/coffi"

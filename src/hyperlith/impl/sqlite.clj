@@ -103,7 +103,7 @@
                           ;; SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
                           (bit-or 0x00000002 0x00000004))
         *pdb            (api/open-v2 db-name flags nil)
-        statement-cache (cache/new)
+        statement-cache (cache/init 500)
         conn            {:pdb        *pdb
                          :stmt-cache statement-cache}]
     (->> (pragma->set-pragma-query pragma)
