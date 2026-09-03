@@ -6,12 +6,7 @@
   (swap! routes_ assoc-in [method path] handler)
   path)
 
-(defn router [req]
-  (let [fallback (fn [_] {:status 404})]
-    ((get (get @routes_ (:request-method req)) (:uri req) fallback) req)))
+(defn- fallback [_] {:status 404})
 
-(comment
-  (def req {:request-method :get :uri "foo"})
-  
-  (add-route! [:get "foo"] (fn [_] "hello"))
-  (user/bench (router req)))
+(defn router [req]
+  ((get (get @routes_ (:request-method req)) (:uri req) fallback) req))
