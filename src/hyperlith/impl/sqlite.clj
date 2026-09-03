@@ -35,10 +35,12 @@
          (api/clear-bindings ~stmt-binding)))))
 
 (defn result-set-reducer [result-set-fn result-set]
-  (reduce (fn [result stmt]
-            (conj result (result-set-fn stmt)))
-    []
-    result-set))
+  (let [result
+        (reduce (fn [result stmt]
+                  (conj result (result-set-fn stmt)))
+          []
+          result-set)]
+    (when (first result) result)))
 
 (defn q*
   ([conn query]
