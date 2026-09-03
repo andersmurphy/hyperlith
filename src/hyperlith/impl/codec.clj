@@ -41,15 +41,16 @@
   value is a string, a string is returned. If the encoded value is a map of
   parameters, a map is returned."
   [^String encoded]
-  (if-not (.contains encoded "=")
-    (form-decode-str encoded)
-    (reduce
-      (fn [m param]
-        (let [kv (split-key-value-pair param)
-              k  (form-decode-str (key kv))
-              v  (form-decode-str (val kv))]
-          (if (and k v)
-            (u/assoc-conj m k v)
-            m)))
-      {}
-      (tokenized encoded "&"))))
+  (when (string? encoded)
+    (if-not (.contains encoded "=")
+      (form-decode-str encoded)
+      (reduce
+        (fn [m param]
+          (let [kv (split-key-value-pair param)
+                k  (form-decode-str (key kv))
+                v  (form-decode-str (val kv))]
+            (if (and k v)
+              (u/assoc-conj m k v)
+              m)))
+        {}
+        (tokenized encoded "&")))))
