@@ -170,50 +170,56 @@
     :or   {port      8080 batch-tick-ms 50 ctx-start (fn [] {})
            pool-size (Runtime/.availableProcessors (Runtime/getRuntime))}}]
   (assert (not (nil? batch-fn)))
-  (throw-if-port-in-use! port)
-  (let [vt-executor (Executors/newVirtualThreadPerTaskExecutor)
+  (let [port        (if dev? port 443)
+        _           (throw-if-port-in-use! port)
+        vt-executor (Executors/newVirtualThreadPerTaskExecutor)
         ctx         (-> (ctx-start)
-                   (assoc
-                     ::vt-executor vt-executor
-                     ::conns (ConcurrentHashMap.)
-                     ::render-pool
-                     (ThreadPoolExecutor. pool-size pool-size
-                       0 TimeUnit/MILLISECONDS
-                       (LinkedBlockingQueue.) (render-thread-factory dbs)))
-                   (start-batch-loop!
-                     {:dbs           (sqlite/create-write-connections! dbs)
-                      :batch-fn      batch-fn
-                      :batch-tick-ms batch-tick-ms}))
+                      (assoc
+                        ::vt-executor vt-executor
+                        ::conns (ConcurrentHashMap.)
+                        ::render-pool
+                        (ThreadPoolExecutor. pool-size pool-size
+                          0 TimeUnit/MILLISECONDS
+                          (LinkedBlockingQueue.) (render-thread-factory dbs)))
+                      (start-batch-loop!
+                        {:dbs           (sqlite/create-write-connections! dbs)
+                         :batch-fn      batch-fn
+                         :batch-tick-ms batch-tick-ms}))
         wrap-ctx    (fn [handler]
-                   (fn [req]
-                     (handler (u/fast-merge req ctx))))
+                      (fn [req]
+                        (handler (u/fast-merge req ctx))))
         ;; Middleware make for messy error stacks.
         router      (-> router/router
-                   wrap-ctx
-                   ;; Wrap error here because req params/body/session
-                   ;; have been handled (and provide useful context).
-                   wrap-error
-                   ;; The handlers after this point do not throw errors
-                   ;; are robust/lenient.
-                   wrap-query-params
-                   wrap-session
-                   wrap-parse-json-body
-                   wrap-blocker)
+                      wrap-ctx
+                      ;; Wrap error here because req params/body/session
+                      ;; have been handled (and provide useful context).
+                      wrap-error
+                      ;; The handlers after this point do not throw errors
+                      ;; are robust/lenient.
+                      wrap-query-params
+                      wrap-session
+                      wrap-parse-json-body
+                      wrap-blocker)
+        config      {;; virtual thread executor
+                     :executor              vt-executor
+                     :port                  port
+                     ;; Actions payloads are small
+                     :max-request-body-size 4096
+                     :request-buffer-size   4096}
         server
         (if dev?
-          (http/start-server router {:port port})
+          (http/start-server router config)
           (clave-aleph/start-server router
-            {;; virtual thread executor
-             :executor                  vt-executor
-             :port                      443
-             :http-versions             [:http2 :http1]
-             ::clave-aleph/http-options {:port 80}
-             ::clave-aleph/config
-             {:domains [domain]
-              :issuers
-              [{:directory-url
-                "https://acme-v02.api.letsencrypt.org/directory"
-                :email email}]}}))]
+            (merge
+              config
+              {:http-versions             [:http2 :http1]
+               ::clave-aleph/http-options {:port 80}
+               ::clave-aleph/config
+               {:domains [domain]
+                :issuers
+                [{:directory-url
+                  "https://acme-v02.api.letsencrypt.org/directory"
+                  :email email}]}})))]
     {:wrapped-router router
      :ctx            ctx
      :stop!          (fn stop [& [_opts]]
