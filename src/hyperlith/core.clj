@@ -170,7 +170,7 @@
     :or   {port      8080 batch-tick-ms 50 ctx-start (fn [] {})
            pool-size (Runtime/.availableProcessors (Runtime/getRuntime))}}]
   (assert (not (nil? batch-fn)))
-  (throw-if-port-in-use! 8080)
+  (throw-if-port-in-use! port)
   (let [vt-executor (Executors/newVirtualThreadPerTaskExecutor)
         ctx         (-> (ctx-start)
                    (assoc
