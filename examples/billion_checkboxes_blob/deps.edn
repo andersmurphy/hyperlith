@@ -1,13 +1,13 @@
 {:paths   ["src" "resources"]
  :deps    {org.clojure/clojure                      {:mvn/version "1.12.5"}
            hyperlith/hyperlith                      {:local/root "../../../hyperlith"}
-           io.nayuki/qrcodegen                  {:mvn/version "1.8.0"}
+           io.nayuki/qrcodegen                      {:mvn/version "1.8.0"}
            com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.6.2"}}
  :aliases {:dev   {:jvm-opts
                    ["--enable-native-access=ALL-UNNAMED"
                     "-Duser.timezone=UTC"
                     "-XX:+UseZGC"
-                    "-XX:+ZGenerational"                    
+                    "-XX:+ZGenerational"
                     "-XX:+UseCompactObjectHeaders"
                     "-Djdk.attach.allowAttachSelf"
                     "-XX:+EnableDynamicAgentLoading"

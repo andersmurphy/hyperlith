@@ -542,7 +542,9 @@
                         set    {id ?chunk-id data ?new-chunk}
                         where  [= id ?chunk-id]}
                 {:chunk-id chunk-id :new-chunk new-chunk}))
-        @chunk-cache))))
+        @chunk-cache)))
+  (d/escape-write-tx [db db]
+    (d/q db ["PRAGMA wal_checkpoint(TRUNCATE)"])))
 
 (defonce app_ (atom nil))
 
