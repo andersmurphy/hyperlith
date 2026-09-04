@@ -543,8 +543,7 @@
                         where  [= id ?chunk-id]}
                 {:chunk-id chunk-id :new-chunk new-chunk}))
         @chunk-cache)))
-  (d/escape-write-tx [db db]
-    (d/q db ["PRAGMA wal_checkpoint(TRUNCATE)"])))
+  (d/q db ["PRAGMA wal_checkpoint(TRUNCATE)"]))
 
 (defonce app_ (atom nil))
 
@@ -558,7 +557,8 @@
              :pragma
              {:cache_size 2000
               :page_size  4096
-              :mmap_size  268435456}}}
+              ;; 100GB
+              :mmap_size  100000000000}}}
        :batch-fn      #'batch-fn
        :batch-tick-ms 100
        :email         (h/env :email)
@@ -656,3 +656,21 @@
                        (* (rem id board-size)
                          chunk-size cell-size-px)])))
              (spit "load-test-data.edn"))))))
+
+(comment ;; Fill all the chunks
+  (def tx! (-> @app_ :ctx ::h/tx!))
+
+  (run!
+    (fn [id]
+      (tx!
+        (fn [db _]
+          (d/q db
+            '{insert-into chunk
+              values      [{id   ?id
+                            data ?blank-chunk}]
+              on-conflict []
+              do-nothing  true}
+            {:blank-chunk blank-chunk :id id}))))
+    (range 0 (* board-size board-size)))
+
+  ,)
