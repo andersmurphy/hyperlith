@@ -1,13 +1,8 @@
 (ns hyperlith.impl.params
   (:require [hyperlith.impl.codec :as codec]))
 
-;; TODO: might want to parse datastar query param (json) to edn
-;; TODO: might want to keyword query params
-
 (defn parse-query-string [query-string]
-  (try
-    (codec/form-decode query-string)
-    (catch Throwable _)))
+  (codec/form-decode query-string))
 
 (defn wrap-query-params
   [handler]

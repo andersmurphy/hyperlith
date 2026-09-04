@@ -1,10 +1,12 @@
 (ns app.main
   (:gen-class)
-  (:require [hyperlith.core :as h :refer [defaction defview]]
-            [hyperlith.extras.sqlite :as d]
-            [clojure.math :as math]
-            [hyperlith.extras.ui.virtual-scroll :as vs]
-            [clojure.string :as str]))
+  (:require
+   [clojure.math :as math]
+   [clojure.pprint :as pprint]
+   [clojure.string :as str]
+   [hyperlith.core :as h :refer [defaction defview]]
+   [hyperlith.extras.ui.virtual-scroll :as vs]
+   [hyperlith.impl.sqlite :as d]))
 
 (def cell-width-px (* 32 4))
 (def cell-height-px 32)
@@ -23,8 +25,8 @@
 (def white "#FFF1E8")
 
 (def css
-  (let [accent          "#008751"
-        other           "#FF004D"]
+  (let [accent "#008751"
+        other  "#FF004D"]
     (h/static-css
       [["*, *::before, *::after"
         {:box-sizing :border-box
@@ -103,7 +105,7 @@
          :grid-row                 (str "span " chunk-size)
          ;; For how subgrid and contain interact see:
          ;; https://github.com/w3c/csswg-drafts/issues/7091
-         :content-visibility       :auto 
+         :content-visibility       :auto
          :contain                  :strict
          :contain-intrinsic-height (str (* chunk-size cell-height-px)"px")
          :contain-intrinsic-width  (str (* chunk-size cell-width-px)"px")}]
@@ -153,10 +155,10 @@
          :pointer-events :all}]
 
        [:.focus-cell
-        {:background  white
-         :border      (str "1px solid " black)
-         :position    :relative
-         :font-size   :1.2rem}]
+        {:background white
+         :border     (str "1px solid " black)
+         :position   :relative
+         :font-size  :1.2rem}]
 
        [:.focus-user
         {:font-size      :1.2rem
@@ -187,26 +189,31 @@
   (-> (d/q db
         '{select [data]
           from   session
-          where  [= id ?sid]}
-        {:sid sid})
+          where  [= id ?sid]
+          limit  1}
+        {:sid sid}
+        (fn [stmt]
+          (-> (d/text stmt 0)
+            h/json->edn)))
     first))
 
 (defn get-tab-data [db sid tabid]
-  (-> (get-session-data db sid) :tabs (get tabid)))
+  (-> (get-session-data db sid) :tabs (get (keyword tabid))))
 
 (defn update-tab-data! [db sid tabid update-fn]
-  (let [old-data (get-session-data db sid)
+  (let [tabid    (keyword tabid)
+        old-data (get-session-data db sid)
         new-data (update-in old-data [:tabs tabid] update-fn)]
     (if old-data
       (d/q db '{update session
                 set    {data ?new-data}
                 where  [= id ?sid]}
-        {:sid sid :new-data new-data})
+        {:sid sid :new-data (h/edn->json new-data)})
       (d/q db '{insert-into session
                 values      [{id   ?sid
                               data ?new-data}]}
         {:sid      sid
-         :new-data (assoc new-data :sid sid)}))))
+         :new-data (h/edn->json (assoc new-data :sid sid))}))))
 
 (def blank-chunk
   (-> (repeat (* chunk-size chunk-size) {})
@@ -217,25 +224,25 @@
                     (-> (d/q db '{select [data]
                                   from   chunk
                                   where  [= id ?chunk-id]}
-                          {:chunk-id chunk-id})
+                          {:chunk-id chunk-id}
+                          (fn [stmt]
+                            (-> (d/text stmt 0)
+                              h/json->edn)))
                       first)
-                    (d/q db
-                      '{insert-into chunk
-                        values      [{id   ?chunk-id
-                                      data ?blank-chunk}]}
-                      {:chunk-id    chunk-id
-                       :blank-chunk blank-chunk})
-                    (-> (d/q db '{select [data]
-                                  from   chunk
-                                  where  [= id ?chunk-id]}
-                          {:chunk-id chunk-id})
-                      first))
+                    (do
+                      (d/q db
+                        '{insert-into chunk
+                          values      [{id   ?chunk-id
+                                        data ?blank-chunk}]}
+                        {:chunk-id    chunk-id
+                         :blank-chunk (h/edn->json blank-chunk)})
+                      blank-chunk))
         new-chunk (update-fn old-chunk)]
     (swap! chunk-cache assoc chunk-id new-chunk)))
 
 (defaction handler-scroll
-  [{:keys [sid tabid tx-batch!] {:keys [view-x view-y]} :body}]
-  (tx-batch!
+  [{:keys [sid tabid ::h/tx!] {:keys [view-x view-y]} :body}]
+  (tx!
     (fn [db _]
       (update-tab-data! db sid tabid
         #(assoc %
@@ -243,9 +250,9 @@
            :y (max (int view-y) 0))))))
 
 (defaction handler-resize
-  [{:keys [sid tabid tx-batch!] {:keys [view-h view-w]} :body}]
+  [{:keys [sid tabid ::h/tx!] {:keys [view-h view-w]} :body}]
   (when (and view-h view-w)
-    (tx-batch!
+    (tx!
       (fn [db _]
         (update-tab-data! db sid tabid
           #(assoc %
@@ -261,14 +268,16 @@
         #(update % focus-cell-id dissoc :focus)))))
 
 (defaction handler-focused
-  [{:keys                       [sid tx-batch! tabid]
+  [{:keys                       [sid tabid ::h/tx!]
     {:keys [targetid parentid]} :body}]
   (when (and targetid parentid)
     (let [cell-id  (int (parse-long targetid))
           chunk-id (int (parse-long parentid))]
-      (when (>= (dec (* chunk-size chunk-size)) cell-id 0)
-        (tx-batch! (partial remove-focus! sid tabid))
-        (tx-batch!
+      (when (and
+              (>= (dec (* chunk-size chunk-size)) cell-id  0)
+              (>= (dec (* board-size board-size)) chunk-id 0))
+        (tx! (partial remove-focus! sid tabid))
+        (tx!
           (fn [db chunk-cache]
             (update-chunk! db chunk-cache chunk-id
               ;; Should this be tab id too?
@@ -278,13 +287,13 @@
                  :focus-cell-id cell-id))))))))
 
 (defaction handler-save-cell
-  [{:keys                                 [tx-batch!]
+  [{:keys                                 [::h/tx!]
     {:keys [targetid parentid cellvalue]} :body}]
   (when (and targetid parentid)
     (let [cell-id  (int (parse-long targetid))
           chunk-id (int (parse-long parentid))]
       (when (>= (dec (* chunk-size chunk-size)) cell-id 0)
-        (tx-batch!
+        (tx!
           (fn [db chunk-cache]
             (update-chunk! db chunk-cache chunk-id
               #(assoc-in % [cell-id :value]
@@ -295,16 +304,18 @@
     "," (int (* (/ y size) board-height-px)) ");"))
 
 (defaction handler-jump
-  [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
-  (h/execute-expr (scroll-to-xy-js jumpx jumpy)))
+  [{:keys [sid tabid ::h/tx!] {:keys [jumpx jumpy]} :body}]
+  (tx!
+    (fn [db _]
+      (update-tab-data! db sid tabid
+        #(assoc % :jump-x jumpx :jump-y jumpy :jump-id (h/new-uid))))))
 
 (defaction handler-share
-  [{:keys [_sid _tabid _tx-batch!] {:keys [jumpx jumpy]} :body}]
-  (h/html
-    [:div.toast {:data-on:load__delay.3s "el.remove()"}
-     [:div.button
-      [:p [:strong nil (str "X: " jumpx " Y: " jumpy)]]
-      [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]]]))
+  [{:keys [sid tabid ::h/tx!] {:keys [jumpx jumpy]} :body}]
+  (tx!
+    (fn [db _]
+      (update-tab-data! db sid tabid
+        #(assoc % :share-x jumpx :share-y jumpy :share-id (h/new-uid))))))
 
 (defn Cell [local-id {:keys [value focus]} sid]
   (cond
@@ -330,14 +341,14 @@
     (h/html
       [:div.focus-cell
        [:p.focus-other
-        {:data-id       local-id
-         :data-action   handler-focused}
+        {:data-id     local-id
+         :data-action handler-focused}
         value]])
 
     :else (h/html [:p.cell
-                   {:data-id       local-id
-                    :data-value    value
-                    :data-action   handler-focused}
+                   {:data-id     local-id
+                    :data-value  value
+                    :data-action handler-focused}
                    value])))
 
 (defn xy->chunk-id [x y]
@@ -352,8 +363,8 @@
 
 (defn Chunk [chunk-id chunk-cells sid]
   (h/html
-    [:div.chunk {:id          (str "chunk-" chunk-id)
-                 :data-id     chunk-id}
+    [:div.chunk {:id      (str "chunk-" chunk-id)
+                 :data-id chunk-id}
      (into []
        (map-indexed (fn [local-id box] (Cell local-id box sid)))
        chunk-cells)]))
@@ -373,9 +384,11 @@
      empty-cells]))
 
 (defn UserView
-  [db sid {:keys [x-offset-items y-offset-items
-                  x-rendered-items y-rendered-items] :as offset-data}]
-  {:corner (h/html [:div {:style {:background white}}])
+  [db sid
+   {:keys [x-offset-items y-offset-items
+           x-rendered-items y-rendered-items]
+    :as   offset-data}]
+  {:corner  (h/html [:div {:style {:background white}}])
    :header  (mapv (fn [x] (h/html
                             [:div {:style {:background  black
                                            :color       white
@@ -405,13 +418,15 @@
                     :grid-area     "1/1/-1/-1"}}
       (->> (xy->chunk-ids offset-data)
         (mapv (fn [chunk-id]
-                (let [[[id chunk]] (d/q db '{select [id data]
-                                             from   chunk
-                                             where  [= id ?chunk-id]}
-                                     {:chunk-id chunk-id})]
-                  (if id
-                    (Chunk id chunk sid)
-                    (EmptyChunk chunk-id))))))])})
+                (or (-> (d/q db '{select [id data]
+                                  from   chunk
+                                  where  [= id ?chunk-id]}
+                          {:chunk-id chunk-id}
+                          (fn [stmt]
+                            (Chunk (d/int stmt 0) (h/json->edn (d/text stmt 1))
+                              sid)))
+                      first)
+                  (EmptyChunk chunk-id)))))])})
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://cells.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
@@ -423,83 +438,94 @@
 
 (defview handler-root
   {:path              "/" :shim-headers shim-headers :br-window-size 24
-   :on-close          (fn [{:keys [tx-batch! sid tabid]}]
-               (tx-batch! (partial remove-focus! sid tabid)))
+   :on-close          (fn [{:keys [::h/tx! sid tabid]}]
+                        (tx! (partial remove-focus! sid tabid)))
    :render-on-connect false
-   :on-open           (fn [{:keys [tx-batch!]}]
+   :on-open           (fn [{:keys [::h/tx!]}]
                         ;; This will trigger a batch on new user connect
                         ;; But not actually update the database
-                        (tx-batch! (fn [& _] nil)))}
+                        (tx! (fn [& _] nil)))
+   :zstd-window       20}
   [{:keys         [db sid tabid]
     {:strs [x y]} :query-params
     :as           _req}]
-  (let [jump-x                     (h/try-parse-long x 0)
-        jump-y                     (h/try-parse-long y 0)
-        tab-data                   (get-tab-data db sid tabid)
-        {:keys [x y height width]} tab-data]
-    (h/html
-      [:link#css {:rel "stylesheet" :type "text/css" :href css}]
-      [:main#morph.main
-       {:data-on:mousedown
-        (str
-          "if (evt.target.dataset.action) {"
-          "evt.target.classList.add('pop');"
-          "$targetid = evt.target.dataset.id;"
-          "$parentid = evt.target.parentElement.dataset.id;"
-          "$gparentid = evt.target.parentElement.parentElement.dataset.id;"
-          "@post(`${evt.target.dataset.action}`);"
-          "setTimeout(() => evt.target.classList.remove('pop'), 300)"
-          "}")}
-       [:div.view-wrapper
-        [::vs/virtual-table#view
-         {:data-ref              "_view"
-          :v/x                   {:item-size          chunk-width-px
-                                  :buffer-items       1
-                                  :max-rendered-items 5
-                                  :scroll-pos         x
-                                  :view-size          width
-                                  :item-count-fn      (fn [] board-size)
-                                  :chunk-size         chunk-size}
-          :v/y                   {:item-size          chunk-height-px
-                                  :buffer-items       2
-                                  :max-rendered-items 7
-                                  :scroll-pos         y
-                                  :view-size          height
-                                  :item-count-fn      (fn [] board-size)
-                                  :chunk-size         chunk-size}
-          :v/item-fn             (partial UserView db sid)
-          :v/scroll-handler-path handler-scroll
-          :v/resize-handler-path handler-resize}]]
-       [:div.controls-wrapper
-        [:div.jump
-         [:h2 "X:"]
-         [:input.jump-input
-          {:type        "number" :data-bind "jumpx"
-           :data-effect (str "$jumpx = Math.round(($view-x/" board-width-px
-                          ")*" size ")")}]
-         [:h2 "Y:"]
-         [:input.jump-input
-          {:type        "number" :data-bind "jumpy"
-           :data-effect (str "$jumpy = Math.round(($view-y/" board-height-px
-                          ")*" size ")")}]
-         [:div.button {:data-action handler-jump}
-          [:strong.pe-none "GO"]]
-         [:div.button
-          {:data-action       handler-share
-           :data-on:mousedown copy-xy-to-clipboard-js}
-          [:strong.pe-none "SHARE"]]]
-        [:h1 "One Billion Cells"]
-        [:p "Built using "
-         [:a {:href "https://clojure.org/"} "Clojure"]
-         " and "
-         [:a {:href "https://data-star.dev"} "Datastar"]
-         " - "
-         [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_cells/src/app/main.clj" } "source"]
-         " - "
-         [:a {:href "https://andersmurphy.com/about"} "blog"]]]
-       [:div
-        {;; firefox sometimes preserves scroll on refresh and we don't want that
-         :data-init (scroll-to-xy-js jump-x jump-y)}]])))
+  (let [init-jump-x      (h/parse-long x 0)
+        init-jump-y      (h/parse-long y 0)
+        tab-data         (get-tab-data db sid tabid)
+        {:keys [x y height width share-id share-x share-y jump-id jump-x
+                jump-y]} tab-data]
+    [(h/html [:link#css {:rel "stylesheet" :type "text/css" :href css}])
+     (h/html
+       [:main#morph.main
+        {:data-on:mousedown
+         (str
+           "if (evt.target.dataset.action) {"
+           "evt.target.classList.add('pop');"
+           "$targetid = evt.target.dataset.id;"
+           "$parentid = evt.target.parentElement.dataset.id;"
+           "$gparentid = evt.target.parentElement.parentElement.dataset.id;"
+           "@post(`${evt.target.dataset.action}`);"
+           "setTimeout(() => evt.target.classList.remove('pop'), 300)"
+           "}")}
+        [:div.view-wrapper
+         [::vs/virtual-table#view
+          {:data-ref              "_view"
+           :v/x                   {:item-size          chunk-width-px
+                                   :buffer-items       1
+                                   :max-rendered-items 5
+                                   :scroll-pos         x
+                                   :view-size          width
+                                   :item-count-fn      (fn [] board-size)
+                                   :chunk-size         chunk-size}
+           :v/y                   {:item-size          chunk-height-px
+                                   :buffer-items       2
+                                   :max-rendered-items 7
+                                   :scroll-pos         y
+                                   :view-size          height
+                                   :item-count-fn      (fn [] board-size)
+                                   :chunk-size         chunk-size}
+           :v/item-fn             (partial UserView db sid)
+           :v/scroll-handler-path handler-scroll
+           :v/resize-handler-path handler-resize}]]
+        [:div.controls-wrapper
+         {;; firefox sometimes preserves scroll on refresh and we don't want that
+          :data-init (scroll-to-xy-js init-jump-x init-jump-y)}
+         [:div.jump
+          [:h2 "X:"]
+          [:input.jump-input
+           {:type "number" :data-bind "jumpx"
+            :data-effect
+            (str  "$view-x;@peek(() => {$jumpx = Math.round(($view-x/"
+              board-width-px")*"size")})")}]
+          [:h2 "Y:"]
+          [:input.jump-input
+           {:type "number" :data-bind "jumpy"
+            :data-effect
+            (str  "$view-y;@peek(() => {$jumpy = Math.round(($view-y/"
+              board-height-px")*"size")})")}]
+          [:div.button {:data-action handler-jump}
+           [:strong.pe-none "GO"]]
+          [:div.button
+           {:data-action       handler-share
+            :data-on:mousedown copy-xy-to-clipboard-js}
+           [:strong.pe-none "SHARE"]]]
+         [:h1 "One Billion Cells"]
+         [:p "Built using "
+          [:a {:href "https://clojure.org/"} "Clojure"]
+          " and "
+          [:a {:href "https://data-star.dev"} "Datastar"]
+          " - "
+          [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_cells/src/app/main.clj" } "source"]
+          " - "
+          [:a {:href "https://andersmurphy.com/about"} "blog"]]]
+        (when share-id
+          [:div {:id share-id :data-ignore-morph true}
+           [:div.toast {:data-init__delay.3s "el.remove()"}
+            [:div.button
+             [:p [:strong nil (str "X: " share-x " Y: " share-y)]]
+             [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]]]])
+        (when jump-id
+          (h/execute-expr jump-id (scroll-to-xy-js jump-x jump-y)))])]))
 
 (defn prep-chunk-fts [chunk]
   (->> (flatten chunk)
@@ -511,123 +537,62 @@
   ;; Create tables
   (println "Running migrations...")
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS chunk(id INT PRIMARY KEY, data BLOB)"])
+    ["CREATE TABLE IF NOT EXISTS chunk(id INTEGER PRIMARY KEY, data BLOB)"])
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"])
-  (d/q db
-    ["CREATE VIRTUAL TABLE IF NOT EXISTS chunk_fts USING fts5(data, content='chunk', content_rowid='id');"]))
+    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"]))
 
-(defn batch-fn [writer thunks]
-  #_{:clj-kondo/ignore [:unresolved-symbol]}
+(defn batch-fn [{:keys [db]} thunks]
   (let [chunk-cache (atom {})]
-    (d/with-write-tx [db writer]
+    (d/with-write-tx [db db]
       (run! (fn [thunk] (thunk db chunk-cache)) thunks)
       (run! (fn [[chunk-id new-chunk]]
               (d/q db '{update chunk
                         set    {data ?new-chunk}
                         where  [= id ?chunk-id]}
                 {:chunk-id  chunk-id
-                 :new-chunk new-chunk}))
-        @chunk-cache)))
-  (h/refresh-all!))
-
-(defn ctx-start []
-  (let [db-name "cells.db"
-        _       (d/restore-then-replicate! db-name
-                  {:s3-access-key-id     (h/env :s3-access-key-id)
-                   :s3-access-secret-key (h/env :s3-access-secret-key)
-                   :bucket               "hyperlith"
-                   :endpoint             "https://nbg1.your-objectstorage.com"
-                   :region               "nbg1"})
-        {:keys [writer reader] :as db-obj}
-        (d/init-db! db-name
-          {:pool-size 4})]
-    (d/create-function db-obj "prep_chunk_fts" #'prep-chunk-fts
-      {:deterministic? true})
-    ;; Run migrations
-    (migrations writer)
-    {:db-obj    db-obj
-     :db        reader
-     :db-read   reader
-     :db-write  writer
-     :tx-batch! (d/async-batcher-init! db-obj
-                  {:batch-fn        batch-fn
-                   :return-promise? false})}))
-
-(defn ctx-stop [ctx]
-  (.close (:db-write ctx))
-  (.close (:db-read ctx)))
+                 :new-chunk (h/edn->json new-chunk)}))
+        @chunk-cache))))
 
 (defonce app_ (atom nil))
 
-(defn -main [& _]
+(defn start-app! [& {:keys [dev?]}]
   (reset! app_
     (h/start-app
-      {:ctx-start      ctx-start
-       :ctx-stop       ctx-stop})))
+      {:dbs           {:db {:name          "cells.db"
+                            :pragma-writer {:cache_size 8000}
+                            :pragma
+                            {:cache_size   2000
+                             :page_size    (* 4096 4)
+                             :mmap_size    268435456}}}
+       :batch-fn      #'batch-fn
+       :batch-tick-ms 100
+       :email         (h/env :email)
+       :domain        (h/env :domain)
+       :dev?          dev?}))
+  (let [{{:keys [::h/tx!]} :ctx} @app_]
+    (tx! (fn [db _] (migrations db)
+           (d/escape-write-tx [db db]
+             (d/q db ["PRAGMA wal_checkpoint(TRUNCATE)"])
+             (d/q db ["VACUUM"]))))))
 
-;; Refresh app when you re-eval file
-(h/refresh-all!)
+(defn -main [& _]
+  (start-app!))
 
 (comment
-  (do (-main) nil)
-  ;; (clojure.java.browse/browse-url "https://localhost:3030/")
+  (do (start-app! :dev? true) nil)
+  ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
   ;; stop server
-  ((@app_ :stop))
-
-  (def db (-> @app_ :ctx :db))
-  (d/q db '{select [[[count *]]] from session})
-  (+ 7698)
-  
-
+  ((@app_ :stop!))
   ,)
 
 (comment
-  ;; clear out empty chunks
-  (def db-write (-> @app_ :ctx :db-write))
-  (d/q db-write '{select [[[count *]]] from chunk})
-  
-  (run! (fn [chunk-id]
-          (when (= blank-chunk (-> (d/q db-write
-                                     '{select [data]
-                                       from   chunk
-                                       where  [= id ?chunk-id]}
-                                     {:chunk-id chunk-id})
-                                 first))
-            (d/q db-write '{delete-from chunk
-                            where       [= id ?chunk-id]}
-              {:chunk-id chunk-id})))
-    (range (* board-size board-size)))
+  (def tx! (-> @app_ :ctx ::h/tx!))
 
-  )
-
-(comment
-  (def db-write (-> @app_ :ctx :db-write))
-  ;; Free up space (slow)
-  ;; (time (d/q db-write ["VACUUM"]))
-  ;; Checkpoint the WAL
-  (d/q db-write ["PRAGMA wal_checkpoint(PASSIVE)"])
-  (d/q db-write ["PRAGMA wal_checkpoint(TRUNCATE)"])
-  )
-
-(comment
-
-  (def db-write (-> @app_ :ctx :db-write))
-
-  
-  (d/q db-write ["select data from chunk"])
-
-  (count
-
-    (d/q db-write ["select * from chunk_fts where chunk_fts match 'cool'"]))
-  
-  (d/q db-write ["select count(*) from chunk_fts"])
-
-  (d/q db-write
-    ["INSERT INTO chunk_fts(chunk_fts) VALUES('delete-all')"])
-  (d/q db-write
-    ["insert into chunk_fts(rowid, data) select id, prep_chunk_fts(data) from chunk"])
-
-  )
+  (tx!
+    (fn [db _]
+      (d/q db '{select [id] from chunk}
+        (fn [stmt]
+          (pprint/pprint
+            (d/int stmt 0)))))))
 

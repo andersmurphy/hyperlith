@@ -1,5 +1,5 @@
 {:paths   ["src" "resources"]
- :deps    {org.clojure/clojure                      {:mvn/version "1.12.2"}
+ :deps    {org.clojure/clojure                      {:mvn/version "1.12.5"}
            hyperlith/hyperlith                      {:local/root "../../../hyperlith"}
            com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.6.2"}}
  :aliases {:dev   {:jvm-opts
@@ -7,6 +7,7 @@
                     "-Duser.timezone=UTC"
                     "-XX:+UseZGC"
                     "-XX:+ZGenerational"
+                    "-XX:+UseCompactObjectHeaders"
                     "-Djdk.attach.allowAttachSelf"
                     "-XX:+EnableDynamicAgentLoading"]}
            :build {:deps       {io.github.clojure/tools.build

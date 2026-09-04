@@ -14,36 +14,11 @@
         [cur val])
       val)))
 
-(defn try-parse-long
-  ([x] (try-parse-long x nil))
+(defn parse-long
+  ([x]
+   (parse-long x nil))
   ([x default]
-   (or (try (parse-long x) (catch Throwable _ default)) default)))
-
-(defn merge
-  "Faster merge."
-  [m1 m2]
-  (persistent! (reduce-kv assoc! (transient (or m1 {})) m2)))
-
-(defmacro thread
-  "Starts a virtual thread. Conveys bindings."
-  [& body]
-  `(Thread/startVirtualThread
-     (bound-fn* ;; binding conveyance
-       (fn [] ~@body))))
-
-(defmacro while-some
-  {:clj-kondo/lint-as 'clojure.core/let}
-  [bindings & body]
-  `(loop []
-     (when-some ~bindings
-       ~@body
-       (recur))))
-
-(defn assoc-if-missing [m k v]
-  (if-not (m k) (assoc m k v) m))
-
-(defn assoc-in-if-missing [m ks v]
-  (if-not (get-in m ks) (assoc-in m ks v) m))
+   (if (string? x) (parse-long x) default)))
 
 (defn resource->bytes [resource]
   (-> resource io/input-stream InputStream/.readAllBytes))
@@ -55,10 +30,8 @@
     (assert res (str path " not found."))
     `(resource->bytes (io/resource ~path))))
 
-(defn qualify-keys
-  "Adds qualifier to key. Overwrites existing qualifier. Is idempotent."
-  [m ns]
-  (update-keys m (fn [k] (keyword (name ns) (name k)))))
+(defn fast-merge [m1 m2]
+  (reduce-kv assoc (or m1 {}) m2))
 
 (defn modulo-pick
   "Given a coll and a value x. Returns a random value from coll.

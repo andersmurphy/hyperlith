@@ -20,7 +20,7 @@
 
 (defn parse-json-body? [req]
   (and (= (:request-method req) :post)
-    (= (:content-type req) "application/json")
+    (= (-> req :headers (get "content-type")) "application/json")
     (:body req)))
 
 (defn wrap-parse-json-body

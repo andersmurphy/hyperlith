@@ -1,64 +1,42 @@
 (ns hyperlith.impl.datastar
-  (:require [hyperlith.impl.assets :refer [static-asset]]
-            [hyperlith.impl.headers
+  (:require
+   [clojure.main :refer [repl-caught]]
+   [clojure.string :as str]
+   [hyperlith.impl.assets :refer [static-asset]]
+   [hyperlith.impl.crypto :as crypto]
+   [hyperlith.impl.headers
              :refer [default-headers strict-transport]]
-            [hyperlith.impl.util :as util]
-            [hyperlith.impl.brotli :as br]
-            [hyperlith.impl.crypto :as crypto]
-            [hyperlith.impl.html :as h]
-            [hyperlith.impl.error :as er]
-            [hyperlith.impl.json :as json]
-            [hyperlith.impl.router :as router]
-            [hyperlith.impl.cpu-pool :as cp]
-            [org.httpkit.server :as hk]
-            [clojure.string :as str]
-            [clojure.core.async :as a]))
+   [hyperlith.impl.html :as h]
+   [hyperlith.impl.json :as json]
+   [hyperlith.impl.router :as router]
+   [hyperlith.impl.sqlite :as sqlite]
+   [hyperlith.impl.util :as u]
+   [hyperlith.impl.zstd :as zstd]
+   [manifold.deferred :as d]
+   [manifold.stream :as s])
+  (:import
+   (java.io
+    BufferedWriter
+    ByteArrayOutputStream
+    OutputStream
+    OutputStreamWriter)
+   (java.nio.charset StandardCharsets)
+   (java.util.concurrent ConcurrentHashMap)))
 
 (def datastar-source-map
   (static-asset
-    {:body         (util/load-resource "datastar.js.map")
+    {:body         (u/load-resource "datastar.js.map")
      :content-type "text/javascript"
      :compress?    true}))
 
 (def datastar
   (static-asset
     {:body
-     (-> (util/load-resource "datastar.js") slurp
+     (-> (u/load-resource "datastar.js") slurp
        ;; Make sure we point to the right source map
        (str/replace "datastar.js.map" datastar-source-map))
      :content-type "text/javascript"
      :compress?    true}))
-
-(defn patch-elements [event-id elements]
-  (str "event: datastar-patch-elements"
-    "\nid: " event-id
-    "\ndata: elements " (str/replace elements "\n" "\ndata: elements ")
-    "\n\n\n"))
-
-(defn patch-append-body [elements]
-  (str "event: datastar-patch-elements"
-    "\ndata: selector body"
-    "\ndata: mode append"
-    "\ndata: elements " (str/replace elements "\n" "\ndata: elements ")
-    "\n\n\n"))
-
-(defn throttle [<in-ch msec]
-  (let [;; No buffer on the out-ch as the in-ch should be buffered
-        <out-ch (a/chan)]
-    (util/thread
-      (util/while-some [event (a/<!! <in-ch)]
-        (a/>!! <out-ch event)
-        (Thread/sleep ^long msec)))
-    <out-ch))
-
-(defn send! [ch event]
-  (hk/send! ch {:status  200
-                :headers (assoc default-headers
-                           "Content-Type"  "text/event-stream"
-                           "Cache-Control" "no-store"
-                           "Content-Encoding" "br")
-                :body    event}
-    false))
 
 (def on-load-js
   ;; Quirk with browsers is that cache settings are per URL not per
@@ -68,7 +46,7 @@
 
   ;; Retry Infinity means we always try to reconnect. The other defaults
   ;; mean that this will at most take 30s (default max backoff).
-  "@post(window.location.pathname + (window.location.search + '&u=').replace(/^&/,'?'), {retryMaxCount: Infinity})")
+  "@post(window.location.pathname + (window.location.search + '&u=').replace(/^&/,'?'), {retryMaxCount: Infinity, openWhenHidden: false, retry: 'error'})")
 
 (def tabid-js
   ;; Higher collision risk is acceptable here as it only needs to be
@@ -90,7 +68,7 @@
                               :content "width=device-width, initial-scale=1.0"}]]
                      [:body
                       [:div {:data-signals:tabid tabid-js}]
-                      [:div {:data-init           on-load-js
+                      [:div {:data-init              on-load-js
                              ;; Reconnect when the user comes online after
                              ;; being offline. Closes any existing connection
                              ;; from this div.
@@ -99,8 +77,8 @@
                       [:main {:id "morph"}]]]])
                h/html->str)]
     (-> {:status  200
-         :headers (assoc default-headers "Content-Encoding" "br")
-         :body    (-> body (br/compress :quality 11))}
+         :headers (assoc default-headers "Content-Encoding" "zstd")
+         :body    (-> body (zstd/compress 19))}
       ;; Etags ensure the shim is only sent again if it's contents have changed
       (assoc-in [:headers "ETag"] (crypto/digest body)))))
 
@@ -116,91 +94,78 @@
 (defn action-handler [path thunk]
   (router/add-route! [:post path]
     (fn handler [req]
-      (let [resp (thunk req)]
-        (if (h/chassis-data? resp)
-          {:status  200
-           :headers {"Content-Type"              "text/event-stream"
-                     "Cache-Control"             "no-store"
-                     "Content-Encoding"          "br"
-                     "Strict-Transport-Security" strict-transport}
-           :body    (-> (h/html->str resp)
-                      patch-append-body
-                      br/compress)}
-          ;; 204 needs even less
-          {:headers {"Strict-Transport-Security" strict-transport
-                     "Cache-Control"             "no-store"}
-           :status  204})))))
+      (thunk req)
+      {:headers {"Strict-Transport-Security" strict-transport
+                 "Cache-Control"             "no-store"}
+       :status  204})))
+
+(defn html->stream!
+  [^BufferedWriter out root]
+  (assert (vector? root))
+  (run!
+    (fn [node]
+      (BufferedWriter/.write out
+        "event: datastar-patch-elements\ndata: elements ")
+      (h/html->stream out node)
+      (BufferedWriter/.write out "\n\n"))
+    root))
 
 (defn render-handler
-  [path render-fn & {:keys                     [on-close on-open br-window-size
-                            render-on-connect] :as _opts
-                     :or                       {;; Window size can be tuned to trade memory
-                                                ;; for reduced bandwidth and compute.
-                                                ;; The right window size can significantly improve
-                                                ;; compression of highly variable streams of data.
-                                                ;; (br/window-size->kb 18) => 262KB
-                                                br-window-size    18
-                                                ;; If false does not render on connect  waits for
-                                                ;; next batch. Note this means you should do
-                                                ;; something on connect to trigger a batch.
-                                                ;; Otherwise the user will not see anything
-                                                ;; until a batch is triggered.
-                                                render-on-connect true}}]
+  [path render-fn & {:keys [on-close on-open zstd-level zstd-window] :as _opts
+                     :or   {zstd-level -1 ;; twice as fast as 1
+                            zstd-window 19}}]
   (router/add-route! [:post path]
     (fn handler [req]
-      (let [;; Dropping buffer is used here as we don't want a slow handler
-            ;; blocking other handlers. Mult distributes each event to all
-            ;; taps in parallel and synchronously, i.e. each tap must
-            ;; accept before the next item is distributed.
-            <ch     (a/tap (:hyperlith.core/refresh-mult req)
-                      (a/chan (a/dropping-buffer 1)))
-            ;; Ensures at least one render on connect when enabled
-            _       (when render-on-connect (a/>!! <ch :first-render))
-            ;; poison pill for work cancelling
-            <cancel (a/chan)]
-        (hk/as-channel req
-          {:on-open
-           (fn hk-on-open [ch]
-             (util/thread
-               (with-open [out (br/byte-array-out-stream)
-                           br  (br/compress-out-stream out
-                                 :window-size br-window-size)]
-                 (loop [last-view-hash ((:headers req) "last-event-id")]
-                   (a/alt!!
-                     [<cancel]
-                     (do (a/close! <ch) (a/close! <cancel))
-
-                     [<ch]
-                     ([_]
-                      (some-> ;; stop in case of error
-                        (cp/on-cpu-pool ;; CPU work on real threads
-                          (when-some ;; stop in case of error
-                              [new-view (er/try-on-error (render-fn req))]
-                            (let [new-view-str  (h/html->str new-view)
-                                  ;; This is a very fast hash
-                                  new-view-hash (Integer/toHexString
-                                                  (hash new-view-str))]
-                              ;; only send an event if the view has changed
-                              (when (not= last-view-hash new-view-hash)
-                                (->> (patch-elements
-                                       new-view-hash new-view-str)
-                                  (br/compress-stream out br)
-                                  (send! ch)))
-                              new-view-hash)))
-                        recur))
-                     ;; we want work cancelling to have higher priority
-                     :priority true))
-                 ;; Close channel on error or when thread stops
-                 (hk/close ch)))
-             (when on-open (on-open req)))
-           :on-close (fn hk-on-close [_ _]
-                       (a/>!! <cancel :cancel)
-                       (when on-close (on-close req)))})))))
+      (let [out         (ByteArrayOutputStream/new 4096)
+            sw          (OutputStreamWriter/new
+                          ^OutputStream
+                          (zstd/compress-out-stream out
+                            zstd-level
+                            zstd-window)
+                          StandardCharsets/UTF_8)
+            w           (BufferedWriter/new sw 4096)
+            conns       (req :hyperlith.core/conns)
+            vt-executor (req :hyperlith.core/executor)
+            stream      (s/stream 0 nil vt-executor)
+            last-put_   (atom nil)
+            render
+            (fn render []
+              (try
+                (if-not (s/closed? stream)
+                  ;; Only render again if previous event was sent
+                  ;; this gives you back pressure and frame dropping.
+                  (when (or (nil? @last-put_) (d/realized? @last-put_))
+                    (when-some [new-view (render-fn
+                                           (u/fast-merge req sqlite/*dbs*))]
+                      (html->stream! w new-view)
+                      (BufferedWriter/.flush w)
+                      (let [result (.toByteArray out)]
+                        (.reset out)
+                        (let [r (s/put! stream result)]
+                          (reset! last-put_ r)))))
+                  (do
+                    (ConcurrentHashMap/.remove conns
+                      (System/identityHashCode render))
+                    (.close out)
+                    (.close sw)
+                    (.close w)
+                    (when on-close (on-close req))))
+                (catch Throwable t
+                  (repl-caught t))))]
+        (ConcurrentHashMap/.put conns
+          (System/identityHashCode render) render)
+        (when on-open (on-open req))
+        {:status  200
+         :headers (assoc default-headers
+                    "Content-Type"  "text/event-stream"
+                    "Cache-Control" "no-store"
+                    "Content-Encoding" "zstd")
+         :body    stream}))))
 
 (defn patch-signals [signals]
   (h/html [:div {:data-signals (json/edn->json signals)
-                 :data-init "el.remove()"}]))
+                 :data-init    "el.remove()"}]))
 
-(defn execute-expr [expr]
-  (h/html [:div {:data-init (str expr ";el.remove()")}]))
-
+(defn execute-expr [id expr]
+  (h/html [:div {:id id :data-ignore-morph true}
+           [:div {:data-init (str expr ";el.remove()")}]]))

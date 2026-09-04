@@ -88,9 +88,9 @@
       (update :board fill-cell user-color (+ id 1))
       (update :board fill-cell user-color (+ id board-size)))))
 
-(defaction handler-tap-cell [{:keys [db sid] {:strs [id]} :query-params}]
+(defaction handler-tap-cell [{:keys [::h/tx! sid] {:strs [id]} :query-params}]
   (when id
-    (swap! db fill-cross (parse-long id) sid)))
+    (tx! (fn [db] (swap! db fill-cross (parse-long id) sid)))))
 
 (def shim-headers
   (h/html
@@ -100,35 +100,38 @@
 
 (defn board [snapshot]
   (let [view (board-state snapshot)]
-    (h/html
-      [:div {:data-on:pointerdown
-             (str "@post(`" handler-tap-cell "?id=${evt.target.dataset.id}`)")}
-       [:div.board nil view]])))
+    (-> (h/html
+          [:div {:data-on:pointerdown
+                 (str "@post(`" handler-tap-cell "?id=${evt.target.dataset.id}`)")}
+           [:div.board nil view]])
+      h/html->str
+      h/html-raw-str)))
 
-(defview render-home {:path "/" :shim-headers shim-headers}
+(defview render-home {:path        "/" :shim-headers shim-headers
+                      :zstd-window 20}
   [{:keys [board-cache _sid] :as _req}]
-  (h/html
-    [:link#css {:rel "stylesheet" :type "text/css" :href css}]
-    [:main#morph.main
-     [:h1 "Game of Life (multiplayer)"]
-     [:p "Built with ❤️ using "
-      [:a {:href "https://clojure.org/"} "Clojure"]
-      " and "
-      [:a {:href "https://data-star.dev"} "Datastar"]
-      "🚀"]
-     [:p "Source code can be found "
-      [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/game_of_life/main.clj"} "here"]
-      "-" [:a {:href "https://andersmurphy.com/about"} "blog"]]
-     @board-cache]))
+  [(h/html
+     [:link#css {:rel "stylesheet" :type "text/css" :href css}]
+     [:main#morph.main
+      [:h1 "Game of Life (multiplayer)"]
+      [:p "Built with ❤️ using "
+       [:a {:href "https://clojure.org/"} "Clojure"]
+       " and "
+       [:a {:href "https://data-star.dev"} "Datastar"]
+       "🚀"]
+      [:p "Source code can be found "
+       [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/app/main.clj"} "here"]
+       "-" [:a {:href "https://andersmurphy.com/about"} "blog"]]
+      @board-cache])])
 
 (defview render-home-embed {:path "/embed" :shim-headers shim-headers}
   [{:keys [board-cache _sid] :as _req}]
-  (h/html
-    [:link#css {:rel "stylesheet" :type "text/css" :href css}]
-    [:main#morph.main
-     [:h1 "Game of Life (multiplayer)"]
-     [:p "Built with ❤️ using Clojure and Datastar 🚀"]
-     @board-cache]))
+  [(h/html
+     [:link#css {:rel "stylesheet" :type "text/css" :href css}]
+     [:main#morph.main
+      [:h1 "Game of Life (multiplayer)"]
+      [:p "Built with ❤️ using Clojure and Datastar 🚀"]
+      @board-cache])])
 
 (defn next-gen-board [current-board]
   (game/next-gen-board
@@ -139,42 +142,40 @@
 (defn next-generation! [db]
   (swap! db update :board next-gen-board))
 
-(defn start-game! [db board-cache]
-  (let [running_ (atom true)]
-    (h/thread
-      (while @running_
-        (Thread/sleep 200) ;; 5 fps
-        (next-generation! db)
-        (reset! board-cache (board @db))
-        (h/refresh-all!)))
-    (fn stop-game! [] (reset! running_ false))))
+(defn batch-fn [{:keys [db board-cache]} thunks]
+  (run! (fn [thunk] (thunk db)) thunks)
+  (next-generation! db)
+  (reset! board-cache (board @db)))
 
 (defn ctx-start []
   (let [db_         (atom {:board (game/empty-board board-size board-size)
                            :users {}})
         board-cache (atom nil)]
     {:board-cache board-cache
-     :db          db_
-     :game-stop   (start-game! db_ board-cache)}))
+     :db          db_}))
 
 (defonce app_ (atom nil))
 
-(defn -main [& _]
+(defn start-app! [& {:keys [dev?]}]
   (reset! app_
     (h/start-app
-      {:max-refresh-ms 200
-       :ctx-start      ctx-start
-       :ctx-stop       (fn [{:keys [game-stop]}] (game-stop))})))
+      {:ctx-start     ctx-start
+       :batch-fn      #'batch-fn
+       :batch-tick-ms 200
+       :email         (h/env :email)
+       :domain        (h/env :domain)
+       :dev?          dev?})))
 
-;; Refresh app when you re-eval file
-(h/refresh-all!)
+
+(defn -main [& _]
+  (start-app!))
 
 (comment
-  (do (-main) nil)
+  (do (start-app! :dev? true) nil)
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
   ;; stop server
-  ((@app_ :stop))
+  ((@app_ :stop!))
 
   (def db (-> @app_ :ctx :db))
 

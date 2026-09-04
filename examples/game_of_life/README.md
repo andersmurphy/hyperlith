@@ -7,7 +7,7 @@ clojure -Srepro -T:build uber
 ## Run jar locally
 
 ```
-java -Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl}" -jar target/app.jar -m app.main -Duser.timezone=UTC -XX:+UseZGC -XX:+ZGenerational
+java -Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl}" -jar target/app.jar -m app.main -Duser.timezone=UTC -XX:+UseZGC -XX:+ZGenerational -XX:+UseCompactObjectHeaders
 ```
 
 ## Deploy
@@ -32,3 +32,8 @@ ssh root@example.andersmurphy.com "reboot"
 ssh root@example.andersmurphy.com "nc localhost:5555"
 ```
 
+## Force Restart Service (optional)
+
+```
+fssh root@example.andersmurphy.com "systemctl restart app.service"
+```

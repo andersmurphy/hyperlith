@@ -20,10 +20,15 @@
         "}")
       v)))
 
+(defn flatten-seq [xs]
+  (mapcat (fn [x] (if (and (seq? x) (vector? (first x))) x [x])) xs))
+
 (defn static-css [css-rules]
   (static-asset
     {:body         (if (vector? css-rules)
-                     (->> (map format-rule css-rules) (reduce str ""))
+                     (->> (flatten-seq css-rules)
+                       (map format-rule)
+                       (reduce str ""))
                      css-rules)
      :content-type "text/css"
      :compress?    true}))
