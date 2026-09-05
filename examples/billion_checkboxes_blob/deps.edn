@@ -8,7 +8,8 @@
                     "-Duser.timezone=UTC"
                     "-XX:+UseZGC"
                     "-XX:+ZGenerational"
-                    "-XX:+UseCompactObjectHeaders"
+                    "-XX:+UseCompactObjectHeaders"                    
+                    "-XX:+UseCompressedOops"
                     "-Djdk.attach.allowAttachSelf"
                     "-XX:+EnableDynamicAgentLoading"
                     ;; For analysing GC pauses
