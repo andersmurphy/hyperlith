@@ -36,7 +36,7 @@
   "max-age=63072000;includeSubDomains;preload")
 
 (def default-headers
-  {"Content-Type"              "text/html"
+  {"Content-Type"              "text/html; charset=utf-8"
    "Strict-Transport-Security" strict-transport
    "Content-Security-Policy"   (csp-data->str csp-data)
    "Referrer-Policy"           "no-referrer"
