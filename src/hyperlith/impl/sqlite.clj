@@ -101,15 +101,15 @@
           (mapv (fn [[k v]] [(str "pragma " (name k) "=" v)])))))
 
 (defn- new-conn!* [db-name {:keys [pragma read-only]}]
-  (let [flags           (if read-only
+  (let [flags      (if read-only
                           ;; SQLITE_OPEN_READONLY
                           0x00000001
                           ;; SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
                           (bit-or 0x00000002 0x00000004))
-        *pdb            (api/open-v2 db-name flags nil)
-        statement-cache (cache/init 500)
-        conn            {:pdb        *pdb
-                         :stmt-cache statement-cache}]
+        *pdb       (api/open-v2 db-name flags nil)
+        stmt-cache (cache/init {:max-entries 500})
+        conn       {:pdb        *pdb
+                    :stmt-cache stmt-cache}]
     (->> (pragma->set-pragma-query pragma)
       (run! #(q* conn %)))
     conn))

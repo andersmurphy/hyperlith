@@ -440,11 +440,6 @@
   {:path              "/" :shim-headers shim-headers :br-window-size 24
    :on-close          (fn [{:keys [::h/tx! sid tabid]}]
                         (tx! (partial remove-focus! sid tabid)))
-   :render-on-connect false
-   :on-open           (fn [{:keys [::h/tx!]}]
-                        ;; This will trigger a batch on new user connect
-                        ;; But not actually update the database
-                        (tx! (fn [& _] nil)))
    :zstd-window       20}
   [{:keys         [db sid tabid]
     {:strs [x y]} :query-params

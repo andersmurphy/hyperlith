@@ -393,19 +393,21 @@
   {:content
    (->> (xy->chunk-ids offset-data)
      (mapv (fn [chunk-id]
-             (or (d/q db
-                   '{select [id data]
-                     from   chunk
-                     where  [= id ?chunk-id]}
-                   {:chunk-id chunk-id}
-                   (fn [stmt]
-                     (let [id (d/int stmt 0) data (d/blob stmt 1)]
-                       (cache/lookup-or-miss html-cache [id (seq data)]
-                         (fn [_]
-                           (-> (Chunk id data)
-                             h/html->str
-                             h/html-raw-str))))))
-               (EmptyChunk chunk-id)))))})
+             (-> (or (first
+                       (d/q db
+                         '{select [id data]
+                           from   chunk
+                           where  [= id ?chunk-id]}
+                         {:chunk-id chunk-id}
+                         (fn [stmt]
+                           (let [id (d/int stmt 0) data (d/blob stmt 1)]
+                             (cache/lookup-or-miss html-cache
+                                [id (cache/blob->key data)]
+                               (fn [_]
+                                 (-> (Chunk id data)
+                                   h/html->str)))))))
+                   (EmptyChunk chunk-id))
+               h/html-raw-str))))})
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
@@ -432,12 +434,7 @@
   (str "Math.round((" n "/" board-size-px ")*" size ")"))
 
 (defview handler-root
-  {:path              "/" :shim-headers shim-headers :br-window-size 24
-   :render-on-connect false
-   :on-open           (fn [{:keys [::h/tx!]}]
-                        ;; This will trigger a batch on new user connect
-                        ;; But not actually update the database
-                        (tx! (fn [& _] nil)))}
+  {:path              "/" :shim-headers shim-headers :br-window-size 24}
   [{:keys         [db sid tabid html-cache]
     {:strs [x y]} :query-params
     :as           _req}]
@@ -550,7 +547,13 @@
 (defn start-app! [& {:keys [dev?]}]
   (reset! app_
     (h/start-app
-      {:ctx-start     (fn [] {:html-cache (cache/init 3000)})
+      {:ctx-start
+       (fn []
+         {:html-cache
+          (cache/init
+            {:max-weight (* 256 1024 1024) ;; 256MB
+             :weigher    (fn [_k v]
+                           (alength (String/.getBytes v)))})})
        :dbs
        {:db {:name          "database-new.db"
              :pragma-writer {:cache_size 15625}
