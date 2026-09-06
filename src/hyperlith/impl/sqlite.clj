@@ -16,10 +16,8 @@
     1 ;; starts at 1
     params))
 
-(defn- prepare-cached [{:keys [pdb stmt-cache]} query]
-  (let [sql    (first query)
-        params (subvec query 1)
-        stmt   (cache/lookup-or-miss stmt-cache sql
+(defn- prepare-cached [{:keys [pdb stmt-cache]} sql params]
+  (let [stmt   (cache/lookup-or-miss stmt-cache sql
                (fn [_] (api/prepare-v3 pdb sql)))]
     (bind stmt params)
     stmt))
@@ -43,8 +41,10 @@
     (when (first result) result)))
 
 (defn q*
-  ([conn query]
-   (let [stmt (prepare-cached conn query)]
+  ([conn sql]
+   (q* conn sql nil))
+  ([conn sql params]
+   (let [stmt (prepare-cached conn sql params)]
      (with-stmt-reset [stmt stmt]
        (let [code (int
                     #_{:clj-kondo/ignore [:type-mismatch]}
@@ -53,10 +53,10 @@
            100 nil
            101 nil
            (throw (api/sqlite-ex-info (:pdb conn) code
-                    {:sql    (first query)
-                     :params (subvec query 1)})))))))
-  ([conn query result-set-fn]
-   (let [stmt (prepare-cached conn query)]
+                    {:sql    sql
+                     :params params})))))))
+  ([conn sql params result-set-fn]
+   (let [stmt (prepare-cached conn sql params)]
      (with-stmt-reset [stmt stmt]
        (result-set-reducer result-set-fn
          (reify
@@ -73,8 +73,8 @@
                            (recur result)))
                    101 ret
                    (throw (api/sqlite-ex-info (:pdb conn) code
-                            {:sql    (first query)
-                             :params (subvec query 1)}))))))))))))
+                            {:sql    sql
+                             :params params}))))))))))))
 
 (def default-pragma
   {:cache_size   15625
@@ -98,7 +98,7 @@
 
 (defn- pragma->set-pragma-query [pragma]
   (conj (->> (merge default-pragma pragma)
-          (mapv (fn [[k v]] [(str "pragma " (name k) "=" v)])))))
+          (mapv (fn [[k v]] (str "pragma " (name k) "=" v))))))
 
 (defn- new-conn!* [db-name {:keys [pragma read-only]}]
   (let [flags      (if read-only
@@ -130,46 +130,45 @@
     dbs))
 
 (defn start-read-tx [db]
-  (q* db ["BEGIN DEFERRED"]))
+  (q* db "BEGIN DEFERRED"))
 
 (defn end-read-tx [db]
-  (q* db ["COMMIT"]))
+  (q* db "COMMIT"))
 
 (defmacro with-write-tx
   {:clj-kondo/lint-as 'clojure.core/with-open}
   [[tx db] & body]
   `(let [~tx ~db]
      (try
-       (q* ~tx ["BEGIN IMMEDIATE"])
+       (q* ~tx "BEGIN IMMEDIATE")
        ~@(butlast body)
        (let [r# ~(last body)]
-         (q* ~tx ["COMMIT"])
+         (q* ~tx "COMMIT")
          r#)
        (catch Throwable t#
          ;; Handles non SQLITE errors crashing a transaction
-         (q* ~tx ["ROLLBACK"])
+         (q* ~tx "ROLLBACK")
          (throw t#)))))
 
 (defmacro escape-write-tx
   {:clj-kondo/lint-as 'clojure.core/with-open}
   [[tx db] & body]
   `(let [~tx ~db]
-     (q* ~tx ["COMMIT"])
+     (q* ~tx "COMMIT")
      ~@body
-     (q* ~tx ["BEGIN IMMEDIATE"])))
+     (q* ~tx "BEGIN IMMEDIATE")))
 
 (defmacro q
   [db [query-type query :as string-query] & [a b]]
-  (let [params        (when (map? a) a)
-        result-set-fn (or (when-not (map? a) a)
-                        (when-not (map? b) b))]
-    (if (string? query-type)
-      (if result-set-fn
-        `(q* ~db ~string-query ~result-set-fn)
-        `(q* ~db ~string-query))
-      (if result-set-fn
-        `(q* ~db ~(hsql/format query {:params params}) ~result-set-fn)
-        `(q* ~db ~(hsql/format query {:params params}))))))
+  (let [params         (when (map? a) a)
+        result-set-fn  (or (when-not (map? a) a)
+                        (when-not (map? b) b))
+        [sql & params] (if (string? query-type)
+                          string-query
+                          (hsql/format query {:params params}))]
+    (if result-set-fn
+      `(q* ~db ~sql ~(vec params) ~result-set-fn)
+      `(q* ~db ~sql ~(vec params)))))
 
 (def format-query hsql/format)
 
@@ -177,3 +176,20 @@
 (def int api/column-int)
 (def blob api/column-blob)
 (def real  api/column-double)
+
+(comment
+  (hsql/format
+    '{select [data]
+      from   session
+      where  [= id ?sid]
+      limit  1}
+    {:params {:sid 3}})
+  
+  (macroexpand
+    '(q db
+       '{select [data]
+         from   session
+         where  [= id ?sid]
+         limit  1}
+       {:sid 1}
+       (fn []))))
