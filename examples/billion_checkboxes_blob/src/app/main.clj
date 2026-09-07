@@ -393,21 +393,22 @@
   {:content
    (->> (xy->chunk-ids offset-data)
      (mapv (fn [chunk-id]
-             (-> (or (first
-                       (d/q db
-                         '{select [id data]
-                           from   chunk
-                           where  [= id ?chunk-id]}
-                         {:chunk-id chunk-id}
-                         (fn [stmt]
-                           (let [id (d/int stmt 0) data (d/blob stmt 1)]
-                             (cache/lookup-or-miss html-cache
-                                [id (cache/blob->key data)]
-                               (fn [_]
-                                 (-> (Chunk id data)
-                                   h/html->str)))))))
-                   (EmptyChunk chunk-id))
-               h/html-raw-str))))})
+             (-> (or (-> (d/q db
+                           '{select [id data]
+                             from   chunk
+                             where  [= id ?chunk-id]}
+                           {:chunk-id chunk-id}
+                           (fn [stmt]
+                             (let [id (d/int stmt 0) data (d/blob stmt 1)]
+                               (cache/lookup-or-miss html-cache
+                                 [id (cache/blob->key data)]
+                                 (fn [_]
+                                   (-> (Chunk id data)
+                                     h/html->str
+                                     String/.getBytes))))))
+                       first
+                       h/html-raw-bytes)
+                   (EmptyChunk chunk-id))))))})
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
@@ -551,9 +552,8 @@
        (fn []
          {:html-cache
           (cache/init
-            {:max-weight (* 256 1024 1024) ;; 256MB
-             :weigher    (fn [_k v]
-                           (alength (String/.getBytes v)))})})
+            {:max-weight (* 512 1024 1024)
+             :weigher    (fn [_k ^bytes v] (alength v))})})
        :dbs
        {:db {:name          "database-new.db"
              :pragma-writer {:cache_size 15625}

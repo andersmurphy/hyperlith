@@ -16,11 +16,8 @@
    [manifold.stream :as s])
   (:import
    (java.io
-    BufferedWriter
     ByteArrayOutputStream
-    OutputStream
-    OutputStreamWriter)
-   (java.nio.charset StandardCharsets)
+    OutputStream)
    (java.util.concurrent ConcurrentHashMap)))
 
 (def datastar-source-map
@@ -100,14 +97,15 @@
        :status  204})))
 
 (defn html->stream!
-  [^BufferedWriter out root]
+  [^OutputStream out root]
   (assert (vector? root))
   (run!
     (fn [node]
-      (BufferedWriter/.write out
-        "event: datastar-patch-elements\ndata: elements ")
+      (OutputStream/.write out
+        (String/.getBytes "event: datastar-patch-elements\ndata: elements "))
       (h/html->stream out node)
-      (BufferedWriter/.write out "\n\n"))
+      (OutputStream/.write out
+        (String/.getBytes "\n\n")))
     root))
 
 (defn render-handler
@@ -117,13 +115,9 @@
   (router/add-route! [:post path]
     (fn handler [req]
       (let [out         (ByteArrayOutputStream/new 4096)
-            sw          (OutputStreamWriter/new
-                          ^OutputStream
-                          (zstd/compress-out-stream out
-                            zstd-level
-                            zstd-window)
-                          StandardCharsets/UTF_8)
-            w           (BufferedWriter/new sw 4096)
+            zstd-out        (zstd/compress-out-stream out
+                          zstd-level
+                          zstd-window)
             conns       (req :hyperlith.core/conns)
             vt-executor (req :hyperlith.core/executor)
             stream      (s/stream 0 nil vt-executor)
@@ -137,8 +131,8 @@
                   (when (or (nil? @last-put_) (d/realized? @last-put_))
                     (when-some [new-view (render-fn
                                            (u/fast-merge req sqlite/*dbs*))]
-                      (html->stream! w new-view)
-                      (BufferedWriter/.flush w)
+                      (html->stream! zstd-out new-view)
+                      (OutputStream/.flush zstd-out)
                       (let [result (.toByteArray out)]
                         (.reset out)
                         (let [r (s/put! stream result)]
@@ -147,8 +141,7 @@
                     (ConcurrentHashMap/.remove conns
                       (System/identityHashCode render))
                     (.close out)
-                    (.close sw)
-                    (.close w)
+                    (.close zstd-out)
                     (when on-close (on-close req))))
                 (catch Throwable t
                   (repl-caught t))))]
