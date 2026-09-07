@@ -94,16 +94,20 @@
                  "Cache-Control"             "no-store"}
        :status  204})))
 
+(def event-prefix
+  (String/.getBytes "event: datastar-patch-elements\ndata: elements "))
+
+(def event-sufix
+  (String/.getBytes "\n\n"))
+
 (defn html->stream!
   [^OutputStream out root]
   (assert (vector? root))
   (run!
     (fn [node]
-      (OutputStream/.write out
-        (String/.getBytes "event: datastar-patch-elements\ndata: elements "))
+      (OutputStream/.write out ^bytes event-prefix)
       (h/html->stream out node)
-      (OutputStream/.write out
-        (String/.getBytes "\n\n")))
+      (OutputStream/.write out ^bytes event-sufix))
     root))
 
 (defn render-handler
