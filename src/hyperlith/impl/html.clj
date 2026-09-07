@@ -43,6 +43,11 @@
 
 (def html->str h/html)
 
+(defn html->bytes [root]
+  (with-open [out (ByteArrayOutputStream/new 16384)]
+    (html->stream out root)
+    (.toByteArray out)))
+
 (def html-raw-str h/raw-string)
 
 (defn html-raw-bytes ^RawBytes [^bytes b]
@@ -55,11 +60,3 @@
     `(cc/compile ~node)))
 
 (def html-resolve-alias h/resolve-alias)
-
-(comment
-  (html [:div "fooo"])
-  (with-open [out (ByteArrayOutputStream/new 4096)]
-    (html->stream out
-      (html-raw-bytes (String/.getBytes (html->str [:div "fooo"]))))
-    (.toByteArray out))
-  )

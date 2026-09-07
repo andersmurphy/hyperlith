@@ -374,8 +374,8 @@
         (into []
           (map-indexed (fn [local-id box] (Checkbox local-id box)))
           blank-chunk))
-    h/html->str
-    h/html-raw-str))
+    h/html->bytes
+    h/html-raw-bytes))
 
 (defn EmptyChunk [chunk-id]
   (-> (h/html
@@ -384,31 +384,29 @@
           :data-ignore-morph true
           :data-ignore       true
           :data-id           chunk-id}
-         empty-checks])
-    h/html->str
-    h/html-raw-str))
+         empty-checks])))
 
 (defn UserView
   [html-cache db offset-data]
   {:content
    (->> (xy->chunk-ids offset-data)
      (mapv (fn [chunk-id]
-             (-> (or (-> (d/q db
-                           '{select [id data]
-                             from   chunk
-                             where  [= id ?chunk-id]}
-                           {:chunk-id chunk-id}
-                           (fn [stmt]
-                             (let [id (d/int stmt 0) data (d/blob stmt 1)]
-                               (cache/lookup-or-miss html-cache
-                                 [id (cache/blob->key data)]
-                                 (fn [_]
-                                   (-> (Chunk id data)
-                                     h/html->str
-                                     String/.getBytes))))))
-                       first
-                       h/html-raw-bytes)
-                   (EmptyChunk chunk-id))))))})
+             (or (first
+                   (d/q db
+                     '{select [id data]
+                       from   chunk
+                       where  [= id ?chunk-id]}
+                     {:chunk-id chunk-id}
+                     (fn [stmt]
+                       (let [id (d/int stmt 0) data (d/blob stmt 1)]
+                         (-> (cache/lookup-or-miss html-cache
+                               [id (cache/blob->key data)]
+                               (fn [_]
+                                 (-> (Chunk id data)
+                                   h/html->str
+                                   String/.getBytes)))
+                           h/html-raw-bytes)))))
+               (EmptyChunk chunk-id)))))})
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
@@ -660,7 +658,7 @@
                          chunk-size cell-size-px)])))
              (spit "load-test-data.edn"))))))
 
-(comment ;; Fill all the chunks
+(comment ;; Fill empty chunks
   (def tx! (-> @app_ :ctx ::h/tx!))
 
   (run!
@@ -675,5 +673,16 @@
               do-nothing  true}
             {:blank-chunk blank-chunk :id id}))))
     (range 0 (* board-size board-size)))
-
   ,)
+
+(comment ;; Clear empty chunks
+  (def tx! (-> @app_ :ctx ::h/tx!))
+
+  (tx!
+    (fn [db _]
+      (d/q db
+        '{delete-from chunk
+          where       [= data ?blank-chunk]}
+        {:blank-chunk blank-chunk})))
+  ,)
+

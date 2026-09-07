@@ -43,6 +43,7 @@
   [hyperlith.impl.html
    html
    html->str
+   html->bytes
    html-raw-str
    html-raw-bytes
    html-resolve-alias]
