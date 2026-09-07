@@ -15,9 +15,7 @@
    [manifold.deferred :as d]
    [manifold.stream :as s])
   (:import
-   (java.io
-    ByteArrayOutputStream
-    OutputStream)
+   (java.io BufferedOutputStream ByteArrayOutputStream OutputStream)
    (java.util.concurrent ConcurrentHashMap)))
 
 (def datastar-source-map
@@ -115,9 +113,11 @@
   (router/add-route! [:post path]
     (fn handler [req]
       (let [out         (ByteArrayOutputStream/new 4096)
-            zstd-out        (zstd/compress-out-stream out
-                          zstd-level
-                          zstd-window)
+            buf-out     (BufferedOutputStream/new
+                          (zstd/compress-out-stream out
+                            zstd-level
+                            zstd-window)
+                          16384)
             conns       (req :hyperlith.core/conns)
             vt-executor (req :hyperlith.core/executor)
             stream      (s/stream 0 nil vt-executor)
@@ -131,8 +131,8 @@
                   (when (or (nil? @last-put_) (d/realized? @last-put_))
                     (when-some [new-view (render-fn
                                            (u/fast-merge req sqlite/*dbs*))]
-                      (html->stream! zstd-out new-view)
-                      (OutputStream/.flush zstd-out)
+                      (html->stream! buf-out new-view)
+                      (OutputStream/.flush buf-out)
                       (let [result (.toByteArray out)]
                         (.reset out)
                         (let [r (s/put! stream result)]
@@ -141,7 +141,7 @@
                     (ConcurrentHashMap/.remove conns
                       (System/identityHashCode render))
                     (.close out)
-                    (.close zstd-out)
+                    (.close buf-out)
                     (when on-close (on-close req))))
                 (catch Throwable t
                   (repl-caught t))))]

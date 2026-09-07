@@ -3,7 +3,7 @@
    [dev.onionpancakes.chassis.compiler :as cc]
    [dev.onionpancakes.chassis.core :as h]) 
   (:import
-   [java.io BufferedOutputStream ByteArrayOutputStream OutputStream]
+   [java.io ByteArrayOutputStream OutputStream]
    [java.lang Appendable]
    [java.nio.charset StandardCharsets]))
 
@@ -37,10 +37,7 @@
   ([out root]
    (html->stream out java.nio.charset.StandardCharsets/UTF_8 root))
   ([^java.io.OutputStream out ^java.nio.charset.Charset charset root]
-   (let [buffered (BufferedOutputStream. out 16384)]
-     (h/write-html (->AppendableOutputStream buffered charset) root)
-     (.flush buffered)
-     out)))
+   (h/write-html (->AppendableOutputStream out charset) root)))
 
 (def doctype-html5 h/doctype-html5)
 
