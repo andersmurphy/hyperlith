@@ -1,14 +1,15 @@
 (ns hyperlith.impl.cache
   (:import [com.github.benmanes.caffeine.cache Caffeine Cache]
-           [java.util Arrays]))
+           [java.util Arrays]
+           [java.util HashMap]))
 
 (defn init ^Cache
-  ([{:keys [max-weight max-entries weigher]}]
-   (cond-> (Caffeine/newBuilder)
-     max-entries (.maximumSize   max-entries)
-     max-weight  (.maximumWeight max-weight)
-     weigher     (.weigher       weigher)
-     true        (.build))))
+  [{:keys [max-weight max-entries weigher]}]
+  (cond-> (Caffeine/newBuilder)
+    max-entries (.maximumSize   max-entries)
+    max-weight  (.maximumWeight max-weight)
+    weigher     (.weigher       weigher)
+    true        (.build)))
 
 (defn lookup-or-miss [^Cache cache k f]
   (.get cache k f))
@@ -23,7 +24,3 @@
 
 (defn blob->key [^bytes x]
   (->BlobKey x (int (Arrays/hashCode x))))
-
-
-
-

@@ -1,5 +1,4 @@
 (ns app.qrcode
-  (:require [hyperlith.core :as h])
   (:import [io.nayuki.qrcodegen QrCode QrCode$Ecc]))
 
 (defn url->qrcode-svg [url & {:keys [dark light]}]
@@ -13,7 +12,6 @@
                 (.toString sb))
         dark  (or dark :black)
         light (or light :white)]
-    (h/html
-      [:svg {:width "100%" :viewBox "0 0 33 33" :stroke :none}
-       [:rect {:height :100% :width :100% :fill dark}]
-       [:path {:d path :fill light}]])))
+    [:svg {:width "100%" :viewBox "0 0 33 33" :stroke :none}
+     [:rect {:height "100%" :width "100%" :fill dark}]
+     [:path {:d path :fill light}]]))

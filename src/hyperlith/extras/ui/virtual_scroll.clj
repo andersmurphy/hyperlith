@@ -1,5 +1,6 @@
 (ns hyperlith.extras.ui.virtual-scroll
   (:require [hyperlith.core :as h]
+            [hyperlith.impl.css :as css]
             [clojure.math :as math]))
 
 (defn resize-js [w-signal h-signal resize-handler-path]
@@ -76,10 +77,9 @@
     [threshold-low threshold-high offset-items
      max-size item-grid size rendered-items translate view-size]))
 
-(defmethod h/html-resolve-alias ::virtual-table
-  [_ {:keys   [id]
-      :v/keys [resize-handler-path scroll-handler-path item-fn x y]
-      :as     attrs} _]
+(defn virtual-table
+  [{:keys   [id data-ref]
+    :v/keys [resize-handler-path scroll-handler-path item-fn x y]}]
   (let [[x-threshold-low x-threshold-high x-offset-items
          x-max-size x-item-grid x-size x-rendered-items
          x-translate]
@@ -107,14 +107,14 @@
                   :y-rendered-items y-rendered-items})
         x-item-grid      (str "min-content min-content "x-item-grid" auto")
         y-item-grid      (str "min-content min-content "y-item-grid" auto")]
-    (h/html
-      [:div {:data-signals__ifmissing (h/edn->json {x-signal 0 y-signal 0})
+    [:div {:data-signals__ifmissing
+           (h/escape (h/edn->json {x-signal 0 y-signal 0}))
              :style                   {:width      :100%
                                        :height     :100%
                                        :max-width  x-max-size
                                        :max-height y-max-size}}
        [:div
-        (assoc attrs
+        (assoc {:id id :data-ref data-ref}
           ;; send up initial size on load
           :data-init
           (resize-js w-signal h-signal resize-handler-path)
@@ -174,12 +174,11 @@
                 :style {:display       :grid
                         :grid-template "subgrid/subgrid"
                         :grid-area     "3/3/-2/-2"}}
-          content]]]])))
+          content]]]]))
 
-(defmethod h/html-resolve-alias ::virtual
-  [_ {:keys   [id]
-      :v/keys [resize-handler-path scroll-handler-path item-fn x y]
-      :as     attrs} _]
+(defn virtual
+  [{:keys   [id data-ref]
+    :v/keys [resize-handler-path scroll-handler-path item-fn x y]}]
   (let [[x-threshold-low x-threshold-high x-offset-items
          x-max-size x-item-grid x-size x-rendered-items
          x-translate x-view-size]
@@ -205,51 +204,50 @@
                   :x-rendered-items x-rendered-items
                   :y-offset-items   y-offset-items
                   :y-rendered-items y-rendered-items})]
-    (h/html
-      [:div {:data-signals__ifmissing (h/edn->json {x-signal 0 y-signal 0})
-             :style                   {:width      :100%
-                                       :height     :100%
-                                       :max-width  x-max-size
-                                       :max-height y-max-size}}
-       [:div
-        (assoc attrs
-          ;; send up initial size on load
-          :data-init
-          (resize-js w-signal h-signal resize-handler-path)
-          :data-on:resize__debounce.100ms__window
-          (resize-js w-signal h-signal resize-handler-path)
-          :data-on:scroll (on-scroll-js x-signal y-signal)
-          ;; Handles user drag scrolling
-          :data-effect fetch-next-page?
-          :style {:scroll-behavior     :smooth
-                  :overscroll-behavior :contain
-                  :overflow-anchor     :none
-                  :overflow            :scroll
-                  :max-width           x-max-size
-                  :max-height          y-max-size
-                  :width               :100%
-                  :height              :100%})
-        [:div {:id    (str id "-virtual-table")
-               :style {:position                 :relative
-                       :width                    x-size
-                       :height                   y-size                       
-                       :contain                  :strict
-                       :pointer-events           :none}}
-         ;; Separate translate div to avoid recalculating style of grid
-         [:div {:id    (str id "-virtual-translate")
-                :style {:position                 :absolute
-                        :contain                  :strict
-                        :width                    x-view-size
-                        :height                   y-view-size
-                        :transform
-                        (str "translate("x-translate"px,"y-translate"px)")}}
-          [:div
-           {:id    (str id "-virtual-view")
-            :style {:display                  :grid
-                    :grid-template
-                    (str y-item-grid "/" x-item-grid)
-                    :width                    x-view-size
-                    :height                   y-view-size
-                    :contain                  :strict}}
-           content]]]]])))
-
+    [:div {:data-signals__ifmissing
+           (h/escape (h/edn->json {x-signal 0 y-signal 0}))
+           :style                   {:width      :100%
+                                     :height     :100%
+                                     :max-width  x-max-size
+                                     :max-height y-max-size}}
+     [:div
+      (assoc {:id id :data-ref data-ref}
+        ;; send up initial size on load
+        :data-init
+        (resize-js w-signal h-signal resize-handler-path)
+        :data-on:resize__debounce.100ms__window
+        (resize-js w-signal h-signal resize-handler-path)
+        :data-on:scroll (on-scroll-js x-signal y-signal)
+        ;; Handles user drag scrolling
+        :data-effect fetch-next-page?
+        :style {:scroll-behavior     :smooth
+                :overscroll-behavior :contain
+                :overflow-anchor     :none
+                :overflow            :scroll
+                :max-width           x-max-size
+                :max-height          y-max-size
+                :width               :100%
+                :height              :100%})
+      [:div {:id    (str id "-virtual-table")
+             :style {:position       :relative
+                     :width          x-size
+                     :height         y-size
+                     :contain        :strict
+                     :pointer-events :none}}
+       ;; Separate translate div to avoid recalculating style of grid
+       [:div {:id    (str id "-virtual-translate")
+              :style {:position :absolute
+                      :contain  :strict
+                      :width    x-view-size
+                      :height   y-view-size
+                      :transform
+                      (str "translate("x-translate"px,"y-translate"px)")}}
+        [:div
+         {:id    (str id "-virtual-view")
+          :style {:display :grid
+                  :grid-template
+                  (str y-item-grid "/" x-item-grid)
+                  :width   x-view-size
+                  :height  y-view-size
+                  :contain :strict}}
+         content]]]]]))

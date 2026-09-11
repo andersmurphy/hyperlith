@@ -70,7 +70,7 @@
     (comp
       (map-indexed
         (fn [id color-class]
-          (h/html [:div.tile {:class color-class :data-id id}]))))
+          [:div {:class (str (name color-class) " tile") :data-id id}])))
     (:board db)))
 
 (defn fill-cell [board color id]
@@ -93,45 +93,40 @@
     (tx! (fn [db] (swap! db fill-cross (parse-long id) sid)))))
 
 (def shim-headers
-  (h/html
-    [:link#css {:rel "stylesheet" :type "text/css" :href css}]
-    [:title nil "Game of Life"]
-    [:meta {:content "Conway's Game of Life" :name "description"}]))
+  [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
+   [:title "Game of Life"]
+   [:meta {:content "Conway's Game of Life" :name "description"}]])
 
 (defn board [snapshot]
   (let [view (board-state snapshot)]
-    (-> (h/html
-          [:div {:data-on:pointerdown
-                 (str "@post(`" handler-tap-cell "?id=${evt.target.dataset.id}`)")}
-           [:div.board nil view]])
-      h/html->str
-      h/html-raw-str)))
+    (-> [:div {:data-on:pointerdown
+               (str "@post(`" handler-tap-cell "?id=${evt.target.dataset.id}`)")}
+         [:div {:class "board"} view]]
+      (h/html->bytes true))))
 
 (defview render-home {:path        "/" :shim-headers shim-headers
                       :zstd-window 20}
   [{:keys [board-cache _sid] :as _req}]
-  [(h/html
-     [:link#css {:rel "stylesheet" :type "text/css" :href css}]
-     [:main#morph.main
-      [:h1 "Game of Life (multiplayer)"]
-      [:p "Built with ❤️ using "
-       [:a {:href "https://clojure.org/"} "Clojure"]
-       " and "
-       [:a {:href "https://data-star.dev"} "Datastar"]
-       "🚀"]
-      [:p "Source code can be found "
-       [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/app/main.clj"} "here"]
-       "-" [:a {:href "https://andersmurphy.com/about"} "blog"]]
-      @board-cache])])
+  [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
+   [:main {:class "main" :id "morph"}
+    [:h1 "Game of Life (multiplayer)"]
+    [:p "Built with ❤️ using "
+     [:a {:href "https://clojure.org/"} "Clojure"]
+     " and "
+     [:a {:href "https://data-star.dev"} "Datastar"]
+     "🚀"]
+    [:p "Source code can be found "
+     [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/app/main.clj"} "here"]
+     " - " [:a {:href "https://andersmurphy.com/about"} "blog"]]
+    @board-cache]])
 
 (defview render-home-embed {:path "/embed" :shim-headers shim-headers}
   [{:keys [board-cache _sid] :as _req}]
-  [(h/html
-     [:link#css {:rel "stylesheet" :type "text/css" :href css}]
-     [:main#morph.main
-      [:h1 "Game of Life (multiplayer)"]
-      [:p "Built with ❤️ using Clojure and Datastar 🚀"]
-      @board-cache])])
+  [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
+   [:main {:class "main" :id "morph"}
+    [:h1 "Game of Life (multiplayer)"]
+    [:p "Built with ❤️ using Clojure and Datastar 🚀"]
+    @board-cache]])
 
 (defn next-gen-board [current-board]
   (game/next-gen-board
@@ -165,7 +160,6 @@
        :email         (h/env :email)
        :domain        (h/env :domain)
        :dev?          dev?})))
-
 
 (defn -main [& _]
   (start-app!))

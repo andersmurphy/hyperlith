@@ -5,6 +5,7 @@
    [clojure.main :refer [repl-caught]]
    [hyperlith.impl.assets]
    [hyperlith.impl.blocker :refer [wrap-blocker]]
+   [hyperlith.impl.cache :as cache]
    [hyperlith.impl.codec :as codec]
    [hyperlith.impl.crypto :as crypto]
    [hyperlith.impl.css]
@@ -16,19 +17,19 @@
    [hyperlith.impl.params :refer [wrap-query-params]]
    [hyperlith.impl.router :as router]
    [hyperlith.impl.session :refer [wrap-session]]
+   [hyperlith.impl.sqlite :as sqlite]
    [hyperlith.impl.trace]
    [hyperlith.impl.util :as u]
-   [hyperlith.impl.sqlite :as sqlite]
    [ol.clave.ext.aleph :as clave-aleph])
   (:import
    (java.net ServerSocket)
    (java.util ArrayList)
    (java.util.concurrent
-     TimeUnit
      ConcurrentHashMap
+     ExecutorService
      Executors
-     LinkedBlockingQueue
-     ThreadPoolExecutor)))
+     Callable
+     LinkedBlockingQueue)))
 
 (import-vars
   ;; ENV
@@ -41,12 +42,8 @@
    modulo-pick]
   ;; HTML
   [hyperlith.impl.html
-   html
-   html->str
    html->bytes
-   html-raw-str
-   html-raw-bytes
-   html-resolve-alias]
+   escape]
   ;; CRYPTO
   [hyperlith.impl.crypto
    new-uid
@@ -112,79 +109,90 @@
         (repl-caught t)
         {:status 500}))))
 
+(defn- init-render-lanes [render-lanes dbs]
+  (->> (range render-lanes)
+    (mapv
+      (fn [_]
+        (Executors/newSingleThreadExecutor
+          (let [base (Executors/defaultThreadFactory)]
+            (reify java.util.concurrent.ThreadFactory
+              (newThread [_ r]
+                (.newThread base
+                  #(binding [sqlite/*dbs* (sqlite/create-read-connections! dbs)
+                             h/*cache*    (cache/init 2000)]
+                     (.run ^Runnable r)))))))))))
+
+(defn- submit-values-to-lanes! [lanes v]
+  (let [lanes-count (count lanes)]
+    (->> (range lanes-count)
+      (mapv
+        (fn lane [i]
+          (.submit ^ExecutorService (get lanes i)
+            ^Callable
+            (fn lane-submit []
+              (run! sqlite/start-read-tx
+                (vals sqlite/*dbs*))
+              (loop [k 0]
+                (let [idx (+ i (* lanes-count k))]
+                  (when (< idx (count v))
+                    ((nth v idx))
+                    (recur (inc k)))))
+              (run! sqlite/end-read-tx
+                (vals sqlite/*dbs*))))))
+      (run! deref))))
+
 (defn start-batch-loop!
-  [{:keys [::conns ::render-pool] :as ctx}
+  [{:keys [::conns] :as ctx}
    {:keys [batch-fn batch-tick-ms dbs]}]
-  (let [q   (LinkedBlockingQueue/new)
-        ctx (merge ctx dbs)
-        n   (ThreadPoolExecutor/.getCorePoolSize render-pool)
-        t   (Thread/startVirtualThread
-              (bound-fn* ;; binding conveyance
-                (fn batch-thread []
-                  (while (not (Thread/interrupted))
-                    (let [next-tick (+ (System/currentTimeMillis) batch-tick-ms)
-                          batch     (ArrayList/new)]
-                      (.drainTo q batch)
-                      (try
-                        (batch-fn ctx (seq batch))
-                        ;; Refresh connections
-                        (let [v (->> (ConcurrentHashMap/.entrySet conns)
-                                  (sort-by java.util.Map$Entry/.getKey)
-                                  (mapv java.util.Map$Entry/.getValue))]
-                          (->> (range n)
-                            (mapv (fn [i]
-                                    ^java.util.concurrent.Callable
-                                    (fn []
-                                      (run! sqlite/start-read-tx
-                                        (vals sqlite/*dbs*))
-                                      (loop [k 0]
-                                        (let [idx (+ i (* n k))]
-                                          (when (< idx (count v))
-                                            ((nth v idx))
-                                            (recur (inc k)))))
-                                      (run! sqlite/end-read-tx
-                                        (vals sqlite/*dbs*)))))
-                            (ThreadPoolExecutor/.invokeAll render-pool)))
-                        (catch Throwable t
-                          (repl-caught t)
-                          (flush)))
-                      (Thread/sleep ;; sleep 0 to let other tasks run
-                        (int (max 0 (- next-tick
-                                      (System/currentTimeMillis))))))))))]
+  (let [q     (LinkedBlockingQueue/new)
+        ctx   (merge ctx (sqlite/create-write-connections! dbs))
+        lanes (init-render-lanes
+                (Runtime/.availableProcessors (Runtime/getRuntime))
+                dbs)
+        t     (Thread/startVirtualThread
+                (bound-fn* ;; binding conveyance
+                  (fn batch-thread []
+                    (while (not (Thread/interrupted))
+                      (let [next-tick (+ (System/currentTimeMillis)
+                                        batch-tick-ms)
+                            batch     (ArrayList/new)]
+                        (.drainTo q batch)
+                        (try
+                          (batch-fn ctx (seq batch))
+                          ;; Refresh connections
+                          (->> (ConcurrentHashMap/.entrySet conns)
+                            ;; We sort to reduce tail latency and
+                            ;; make batches stable. This means connections
+                            ;; almost always run on the same thread.
+                            ;; This prevents various local caches from
+                            ;; thrashing.
+                            (sort-by java.util.Map$Entry/.getKey)
+                            (mapv java.util.Map$Entry/.getValue)
+                            (submit-values-to-lanes! lanes))
+                          (catch Throwable t
+                            (repl-caught t)
+                            (flush)))
+                        (Thread/sleep ;; sleep 0 to let other tasks run
+                          (int (max 0 (- next-tick
+                                        (System/currentTimeMillis))))))))))]
     (-> (assoc ctx
           ::tx!
           (fn tx! [thunk] (LinkedBlockingQueue/.offer q thunk)) )
       (update ::stop!
         conj (fn [] (Thread/.interrupt t))))))
 
-(defn- render-thread-factory [dbs]
-  (let [base (Executors/defaultThreadFactory)]
-    (reify java.util.concurrent.ThreadFactory
-      (newThread [_ r]
-        (.newThread base
-          ;; TODO: Make sqlite connections closable?
-          #(binding [sqlite/*dbs* (sqlite/create-read-connections! dbs)]
-             (.run ^Runnable r)))))))
-
 (defn start-app
   [{:keys [port ctx-start batch-fn batch-tick-ms
-           domain email dev? dbs pool-size]
-    :or   {port      8080 batch-tick-ms 50 ctx-start (fn [] {})
-           pool-size (Runtime/.availableProcessors (Runtime/getRuntime))}}]
+           domain email dev? dbs]
+    :or   {port      8080 batch-tick-ms 50 ctx-start (fn [] {})}}]
   (assert (not (nil? batch-fn)))
   (let [port        (if dev? port 443)
         _           (throw-if-port-in-use! port)
-        vt-executor (Executors/newVirtualThreadPerTaskExecutor)
         ctx         (-> (ctx-start)
                       (assoc
-                        ::vt-executor vt-executor
-                        ::conns (ConcurrentHashMap.)
-                        ::render-pool
-                        (ThreadPoolExecutor. pool-size pool-size
-                          0 TimeUnit/MILLISECONDS
-                          (LinkedBlockingQueue.) (render-thread-factory dbs)))
+                        ::conns (ConcurrentHashMap.))
                       (start-batch-loop!
-                        {:dbs           (sqlite/create-write-connections! dbs)
+                        {:dbs           dbs
                          :batch-fn      batch-fn
                          :batch-tick-ms batch-tick-ms}))
         wrap-ctx    (fn [handler]
@@ -202,8 +210,10 @@
                       wrap-session
                       wrap-parse-json-body
                       wrap-blocker)
-        config      {;; virtual thread executor
-                     :executor              vt-executor
+        config      {;; We run on the netty event loop directly
+                     ;; as all handlers either put on a queue
+                     ;; or add to a concurrentHashmap.
+                     :executor              :none
                      :port                  port
                      ;; Actions payloads are small
                      :max-request-body-size 4096

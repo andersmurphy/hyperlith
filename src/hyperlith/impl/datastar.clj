@@ -49,28 +49,28 @@
   "self.crypto.randomUUID().substring(0,8)")
 
 (defn build-shim-page-resp [head-hiccup]
-  (let [body (-> (h/html
-                   [h/doctype-html5
-                    [:html  {:lang "en"}
-                     [:head
-                      [:meta {:charset "UTF-8"}]
-                      (when head-hiccup head-hiccup)
-                      ;; Scripts
-                      [:script#js {:defer true :type "module"
-                                   :src   datastar}]
-                      ;; Enables responsiveness on mobile devices
-                      [:meta {:name    "viewport"
-                              :content "width=device-width, initial-scale=1.0"}]]
-                     [:body
-                      [:div {:data-signals:tabid tabid-js}]
-                      [:div {:data-init              on-load-js
-                             ;; Reconnect when the user comes online after
-                             ;; being offline. Closes any existing connection
-                             ;; from this div.
-                             :data-on:online__window on-load-js}]
-                      [:noscript "Your browser does not support JavaScript!"]
-                      [:main {:id "morph"}]]]])
-               h/html->str)]
+  (let [body (-> [h/doctype-html5
+                  [:html  {:lang "en"}
+                   [:head
+                    [:meta {:charset "UTF-8"}]
+                    (when head-hiccup head-hiccup)
+                    ;; Scripts
+                    [:script {:id "js"
+                              :defer true :type "module"
+                              :src   datastar}]
+                    ;; Enables responsiveness on mobile devices
+                    [:meta {:name    "viewport"
+                            :content "width=device-width, initial-scale=1.0"}]]
+                   [:body
+                    [:div {:data-signals:tabid tabid-js}]
+                    [:div {:data-init              on-load-js
+                           ;; Reconnect when the user comes online after
+                           ;; being offline. Closes any existing connection
+                           ;; from this div.
+                           :data-on:online__window on-load-js}]
+                    [:noscript "Your browser does not support JavaScript!"]
+                    [:main {:id "morph"}]]]]
+               (h/html->bytes true))]
     (-> {:status  200
          :headers (assoc default-headers "Content-Encoding" "zstd")
          :body    (-> body (zstd/compress 19))}
@@ -123,8 +123,7 @@
                             zstd-window)
                           16384)
             conns       (req :hyperlith.core/conns)
-            vt-executor (req :hyperlith.core/executor)
-            stream      (s/stream 0 nil vt-executor)
+            stream      (s/stream 0 nil)
             last-put_   (atom nil)
             render
             (fn render []
@@ -160,9 +159,9 @@
          :body    stream}))))
 
 (defn patch-signals [signals]
-  (h/html [:div {:data-signals (json/edn->json signals)
-                 :data-init    "el.remove()"}]))
+  [:div {:data-signals (json/edn->json signals)
+         :data-init    "el.remove()"}])
 
 (defn execute-expr [id expr]
-  (h/html [:div {:id id :data-ignore-morph true}
-           [:div {:data-init (str expr ";el.remove()")}]]))
+  [:div {:id id :data-ignore-morph true :style {:display "none"}}
+   [:div {:data-init (str expr ";el.remove()")}]])

@@ -8,6 +8,12 @@
                        (apply str))
         :else        (str s)))
 
+(defn style-map->style [v]
+  (reduce (fn [acc [k v]]
+            (str acc (to-str k) ":" (to-str v)";"))
+    ""
+    (sort-by (comp to-str key) v)))
+
 (defn format-rule [[k v]]
   (str
     (to-str k)

@@ -323,33 +323,33 @@
     (let [on-load  (str "$cellvalue = '" (or value "") "';el.focus();")
           on-input (str "@post('" handler-save-cell "')")
           id       (str "focus-" local-id)]
-      (h/html
-        [:div.focus-cell
-         [:input.focus-user
-          (array-map
-            :id                            id
-            :data-id                       local-id
-            :maxlength                     20
-            :size                          10
-            :type                          "text"
-            :data-preserve-attr            "data-init"
-            :data-init                     on-load
-            :data-bind                     "cellvalue"
-            :data-on:input__debounce.200ms on-input)]]))
+      [:div {:class "focus-cell"}
+       [:input
+        (array-map
+          :class "focus-user"
+          :id                            id
+          :data-id                       local-id
+          :maxlength                     20
+          :size                          10
+          :type                          "text"
+          :data-preserve-attr            "data-init"
+          :data-init                     on-load
+          :data-bind                     "cellvalue"
+          :data-on:input__debounce.200ms on-input)]])
 
     focus
-    (h/html
-      [:div.focus-cell
-       [:p.focus-other
-        {:data-id     local-id
-         :data-action handler-focused}
-        value]])
+    [:div {:class "focus-cell"}
+     [:p {:class       "focus-other"
+          :data-id     local-id
+          :data-action handler-focused}
+      value]]
 
-    :else (h/html [:p.cell
-                   {:data-id     local-id
-                    :data-value  value
-                    :data-action handler-focused}
-                   value])))
+    :else [:p
+           {:class "cell"
+            :data-id     local-id
+            :data-value  value
+            :data-action handler-focused}
+           value]))
 
 (defn xy->chunk-id [x y]
   (+ x (* y board-size)))
@@ -362,79 +362,75 @@
     vec))
 
 (defn Chunk [chunk-id chunk-cells sid]
-  (h/html
-    [:div.chunk {:id      (str "chunk-" chunk-id)
-                 :data-id chunk-id}
-     (into []
-       (map-indexed (fn [local-id box] (Cell local-id box sid)))
-       chunk-cells)]))
+  [:div {:class "chunk"
+         :id      (str "chunk-" chunk-id)
+         :data-id chunk-id}
+   (into []
+     (map-indexed (fn [local-id box] (Cell local-id box sid)))
+     chunk-cells)])
 
 (def empty-cells
-  (h/html
-    (into []
-      (map-indexed (fn [local-id box] (Cell local-id box nil)))
-      blank-chunk)))
+  (-> (into []
+        (map-indexed (fn [local-id box] (Cell local-id box nil)))
+        blank-chunk)
+    (h/html->bytes true)))
 
 (defn EmptyChunk [chunk-id]
-  (h/html
-    [:div.chunk {:id                (str "chunk-" chunk-id)
-                 :data-ignore-morph true
-                 :data-ignore       true
-                 :data-id           chunk-id}
-     empty-cells]))
+  [:div {:class             "chunk"
+         :id                (str "chunk-" chunk-id)
+         :data-ignore-morph true
+         :data-ignore       true
+         :data-id           chunk-id}
+   empty-cells])
 
 (defn UserView
   [db sid
    {:keys [x-offset-items y-offset-items
            x-rendered-items y-rendered-items]
     :as   offset-data}]
-  {:corner  (h/html [:div {:style {:background white}}])
-   :header  (mapv (fn [x] (h/html
-                            [:div {:style {:background  black
-                                           :color       white
-                                           :height      :40px
-                                           :display     :grid
-                                           :border-inline
-                                           (str "1px solid " white)
-                                           :place-items :center}}
-                             [:h2 nil x]]))
+  {:corner  [:div {:style {:background white}}]
+   :header  (mapv (fn [x] [:div {:style {:background  black
+                                         :color       white
+                                         :height      :40px
+                                         :display     :grid
+                                         :border-inline
+                                         (str "1px solid " white)
+                                         :place-items :center}}
+                           [:h2 x]])
               (range (* x-offset-items chunk-size)
                 (* (+ x-offset-items x-rendered-items) chunk-size)))
-   :sidebar (mapv (fn [x] (h/html
-                            [:div {:style {:background  black
-                                           :color       white
-                                           :width       :100px
-                                           :display     :grid
-                                           :border-block
-                                           (str "1px solid " white)
-                                           :place-items :center}}
-                             [:h2 nil x]]))
+   :sidebar (mapv (fn [x] [:div {:style {:background  black
+                                         :color       white
+                                         :width       :100px
+                                         :display     :grid
+                                         :border-block
+                                         (str "1px solid " white)
+                                         :place-items :center}}
+                           [:h2 x]])
               (range (* y-offset-items chunk-size)
                 (* (+ y-offset-items y-rendered-items) chunk-size)))
    :content
-   (h/html
-     [:div {:style {:display       :grid
-                    :grid-template "subgrid/subgrid"
-                    :grid-area     "1/1/-1/-1"}}
-      (->> (xy->chunk-ids offset-data)
-        (mapv (fn [chunk-id]
-                (or (-> (d/q db '{select [id data]
-                                  from   chunk
-                                  where  [= id ?chunk-id]}
-                          {:chunk-id chunk-id}
-                          (fn [stmt]
-                            (Chunk (d/int stmt 0) (h/json->edn (d/text stmt 1))
-                              sid)))
-                      first)
-                  (EmptyChunk chunk-id)))))])})
+   [:div {:style {:display       :grid
+                  :grid-template "subgrid/subgrid"
+                  :grid-area     "1/1/-1/-1"}}
+    (->> (xy->chunk-ids offset-data)
+      (mapv (fn [chunk-id]
+              (or (-> (d/q db '{select [id data]
+                                from   chunk
+                                where  [= id ?chunk-id]}
+                        {:chunk-id chunk-id}
+                        (fn [stmt]
+                          (Chunk (d/int stmt 0) (h/json->edn (d/text stmt 1))
+                            sid)))
+                    first)
+                (EmptyChunk chunk-id)))))]})
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://cells.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
 (def shim-headers
-  (h/html
-    [:link#css {:rel "stylesheet" :type "text/css" :href css}]
-    [:title nil "One billion cells"]
-    [:meta {:content "So many cells" :name "description"}]))
+  [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
+   [:title "One billion cells"]
+   [:meta {:content "So many cells" :name "description"}]])
 
 (defview handler-root
   {:path              "/" :shim-headers shim-headers :br-window-size 24
@@ -449,78 +445,85 @@
         tab-data         (get-tab-data db sid tabid)
         {:keys [x y height width share-id share-x share-y jump-id jump-x
                 jump-y]} tab-data]
-    [(h/html [:link#css {:rel "stylesheet" :type "text/css" :href css}])
-     (h/html
-       [:main#morph.main
-        {:data-on:mousedown
-         (str
-           "if (evt.target.dataset.action) {"
-           "evt.target.classList.add('pop');"
-           "$targetid = evt.target.dataset.id;"
-           "$parentid = evt.target.parentElement.dataset.id;"
-           "$gparentid = evt.target.parentElement.parentElement.dataset.id;"
-           "@post(`${evt.target.dataset.action}`);"
-           "setTimeout(() => evt.target.classList.remove('pop'), 300)"
-           "}")}
-        [:div.view-wrapper
-         [::vs/virtual-table#view
-          {:data-ref              "_view"
-           :v/x                   {:item-size          chunk-width-px
-                                   :buffer-items       1
-                                   :max-rendered-items 5
-                                   :scroll-pos         x
-                                   :view-size          width
-                                   :item-count-fn      (fn [] board-size)
-                                   :chunk-size         chunk-size}
-           :v/y                   {:item-size          chunk-height-px
-                                   :buffer-items       2
-                                   :max-rendered-items 7
-                                   :scroll-pos         y
-                                   :view-size          height
-                                   :item-count-fn      (fn [] board-size)
-                                   :chunk-size         chunk-size}
-           :v/item-fn             (partial UserView db sid)
-           :v/scroll-handler-path handler-scroll
-           :v/resize-handler-path handler-resize}]]
-        [:div.controls-wrapper
-         {;; firefox sometimes preserves scroll on refresh and we don't want that
-          :data-init (scroll-to-xy-js init-jump-x init-jump-y)}
-         [:div.jump
-          [:h2 "X:"]
-          [:input.jump-input
-           {:type "number" :data-bind "jumpx"
-            :data-effect
-            (str  "$view-x;@peek(() => {$jumpx = Math.round(($view-x/"
-              board-width-px")*"size")})")}]
-          [:h2 "Y:"]
-          [:input.jump-input
-           {:type "number" :data-bind "jumpy"
-            :data-effect
-            (str  "$view-y;@peek(() => {$jumpy = Math.round(($view-y/"
-              board-height-px")*"size")})")}]
-          [:div.button {:data-action handler-jump}
-           [:strong.pe-none "GO"]]
-          [:div.button
-           {:data-action       handler-share
-            :data-on:mousedown copy-xy-to-clipboard-js}
-           [:strong.pe-none "SHARE"]]]
-         [:h1 "One Billion Cells"]
-         [:p "Built using "
-          [:a {:href "https://clojure.org/"} "Clojure"]
-          " and "
-          [:a {:href "https://data-star.dev"} "Datastar"]
-          " - "
-          [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_cells/src/app/main.clj" } "source"]
-          " - "
-          [:a {:href "https://andersmurphy.com/about"} "blog"]]]
-        (when share-id
-          [:div {:id share-id :data-ignore-morph true}
-           [:div.toast {:data-init__delay.3s "el.remove()"}
-            [:div.button
-             [:p [:strong nil (str "X: " share-x " Y: " share-y)]]
-             [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]]]])
-        (when jump-id
-          (h/execute-expr jump-id (scroll-to-xy-js jump-x jump-y)))])]))
+    [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
+     [:main
+      {:class "main" :id "morph"
+       :data-on:mousedown
+       (str
+         "if (evt.target?.dataset.action) {"
+         "evt.target.classList.add('pop');"
+         "$targetid = evt.target?.dataset.id;"
+         "$parentid = evt.target.parentElement?.dataset.id;"
+         "$gparentid = evt.target.parentElement.parentElement?.dataset.id;"
+         "@post(`${evt.target?.dataset.action}`);"
+         "setTimeout(() => evt.target.classList.remove('pop'), 300)"
+         "}")}
+      [:div {:class "view-wrapper"}
+       (vs/virtual-table
+         {:id                    "view"
+          :data-ref              "_view"
+          :v/x                   {:item-size          chunk-width-px
+                                  :buffer-items       1
+                                  :max-rendered-items 5
+                                  :scroll-pos         x
+                                  :view-size          width
+                                  :item-count-fn      (fn [] board-size)
+                                  :chunk-size         chunk-size}
+          :v/y                   {:item-size          chunk-height-px
+                                  :buffer-items       2
+                                  :max-rendered-items 7
+                                  :scroll-pos         y
+                                  :view-size          height
+                                  :item-count-fn      (fn [] board-size)
+                                  :chunk-size         chunk-size}
+          :v/item-fn             (partial UserView db sid)
+          :v/scroll-handler-path handler-scroll
+          :v/resize-handler-path handler-resize})]
+      [:div
+       {:class     "controls-wrapper"
+        ;; firefox sometimes preserves scroll on refresh and we don't want that
+        :data-init (scroll-to-xy-js init-jump-x init-jump-y)}
+       [:div {:class "jump"}
+        [:h2 "X:"]
+        [:input
+         {:class "jump-input"
+          :type "number" :data-bind "jumpx"
+          :data-effect
+          (str  "$view-x;@peek(() => {$jumpx = Math.round(($view-x/"
+            board-width-px")*"size")})")}]
+        [:h2 "Y:"]
+        [:input
+         {:class "jump-input"
+          :type "number" :data-bind "jumpy"
+          :data-effect
+          (str  "$view-y;@peek(() => {$jumpy = Math.round(($view-y/"
+            board-height-px")*"size")})")}]
+        [:div {:class       "button"
+               :data-action handler-jump}
+         [:strong {:class "pe-none"} "GO"]]
+        [:div
+         {:class             "button"
+          :data-action       handler-share
+          :data-on:mousedown copy-xy-to-clipboard-js}
+         [:strong {:class "pe-none"} "SHARE"]]]
+       [:h1 "One Billion Cells"]
+       [:p "Built using "
+        [:a {:href "https://clojure.org/"} "Clojure"]
+        " and "
+        [:a {:href "https://data-star.dev"} "Datastar"]
+        " - "
+        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_cells/src/app/main.clj" } "source"]
+        " - "
+        [:a {:href "https://andersmurphy.com/about"} "blog"]]]
+      (when share-id
+        [:div {:id share-id :data-ignore-morph true}
+         [:div {:class               "toast"
+                :data-init__delay.3s "el.remove()"}
+          [:div {:class "button"}
+           [:p [:strong (str "X: " share-x " Y: " share-y)]]
+           [:p [:strong "SHARE URL COPIED TO CLIPBOARD"]]]]])
+      (when jump-id
+        (h/execute-expr jump-id (scroll-to-xy-js jump-x jump-y)))]]))
 
 (defn prep-chunk-fts [chunk]
   (->> (flatten chunk)
