@@ -244,8 +244,6 @@
        (html->stream out node)
        (.toByteArray out)))))
 
-;; Cache attributes (most expensive part)
-;; Attribute cache could be thread local if contention is an issue.
 ;; Escape string nodes
 ;; Escape for SSE? (mostly code blocks)?
 ;; Escape attributes? (fine if we are caching attributes)
