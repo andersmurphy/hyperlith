@@ -1,7 +1,6 @@
 (ns hyperlith.impl.cache
   (:import [com.github.benmanes.caffeine.cache Caffeine Cache]
-           [java.util Arrays]
-           [java.util HashMap]))
+           [java.util Arrays]))
 
 (defn init ^Cache
   [{:keys [max-weight max-entries weigher]}]
