@@ -1,7 +1,7 @@
 (ns hyperlith.impl.sqlite
-  (:require [hyperlith.impl.cache :as cache]
-            [hyperlith.impl.sqlite.api :as api]
-            [honey.sql :as hsql]))
+  (:require [hyperlith.impl.sqlite.api :as api]
+            [honey.sql :as hsql])
+  (:import [java.util HashMap]))
 
 (defn- bind [stmt params]
   (reduce
@@ -16,9 +16,9 @@
     1 ;; starts at 1
     params))
 
-(defn- prepare-cached [{:keys [pdb stmt-cache]} sql params]
-  (let [stmt   (cache/lookup-or-miss stmt-cache sql
-               (fn [_] (api/prepare-v3 pdb sql)))]
+(defn- prepare-cached [{:keys [pdb ^HashMap stmt-cache]} sql params]
+  (let [stmt (or (HashMap/.get stmt-cache sql)
+               (HashMap/.put stmt-cache (api/prepare-v3 pdb sql)))]
     (bind stmt params)
     stmt))
 
@@ -107,7 +107,7 @@
                           ;; SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
                           (bit-or 0x00000002 0x00000004))
         *pdb       (api/open-v2 db-name flags nil)
-        stmt-cache (cache/init {:max-entries 500})
+        stmt-cache (HashMap.)
         conn       {:pdb        *pdb
                     :stmt-cache stmt-cache}]
     (->> (pragma->set-pragma-query pragma)

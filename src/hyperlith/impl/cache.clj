@@ -24,3 +24,10 @@
 
 (defn blob->key [^bytes x]
   (->BlobKey x (int (Arrays/hashCode x))))
+
+(defn get [^Cache cache k]
+  (.getIfPresent cache k))
+
+(defn put [^Cache cache k v]
+  (.put cache k v)
+  v)

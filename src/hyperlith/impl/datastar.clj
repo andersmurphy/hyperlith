@@ -9,14 +9,14 @@
    [hyperlith.impl.html :as h]
    [hyperlith.impl.json :as json]
    [hyperlith.impl.router :as router]
-   [hyperlith.impl.sqlite :as sqlite]
    [hyperlith.impl.util :as u]
    [hyperlith.impl.zstd :as zstd]
    [manifold.deferred :as d]
    [manifold.stream :as s])
   (:import
    (java.io BufferedOutputStream ByteArrayOutputStream OutputStream)
-   (java.util.concurrent ConcurrentHashMap)))
+   (java.util.concurrent ConcurrentHashMap)
+   (hyperlith.impl.lane_context LaneCtx)))
 
 (def datastar-source-map
   (static-asset
@@ -70,7 +70,7 @@
                            :data-on:online__window on-load-js}]
                     [:noscript "Your browser does not support JavaScript!"]
                     [:main {:id "morph"}]]]]
-               (h/html->bytes true))]
+               h/html->bytes)]
     (-> {:status  200
          :headers (assoc default-headers "Content-Encoding" "zstd")
          :body    (-> body (zstd/compress 19))}
@@ -101,12 +101,12 @@
   (String/.getBytes "\n\n"))
 
 (defn html->stream!
-  [^OutputStream out root]
+  [lane-ctx ^OutputStream out root]
   (assert (vector? root))
   (run!
     (fn [node]
       (OutputStream/.write out ^bytes event-prefix)
-      (h/html->stream out node)
+      (h/html->stream lane-ctx out node)
       (OutputStream/.write out ^bytes event-sufix))
     root))
 
@@ -126,15 +126,17 @@
             stream      (s/stream 0 nil)
             last-put_   (atom nil)
             render
-            (fn render []
+            (fn render [^LaneCtx lane-ctx]
               (try
                 (if-not (s/closed? stream)
                   ;; Only render again if previous event was sent
                   ;; this gives you back pressure and frame dropping.
                   (when (or (nil? @last-put_) (d/realized? @last-put_))
                     (when-some [new-view (render-fn
-                                           (u/fast-merge req sqlite/*dbs*))]
-                      (html->stream! buf-out new-view)
+                                           (-> (u/fast-merge req
+                                                 (.dbs lane-ctx))
+                                             (assoc :lane-ctx lane-ctx)))]
+                      (html->stream! lane-ctx buf-out new-view)
                       (OutputStream/.flush buf-out)
                       (let [result (.toByteArray out)]
                         (.reset out)

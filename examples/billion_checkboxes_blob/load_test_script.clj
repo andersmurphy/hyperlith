@@ -79,7 +79,7 @@
         (Thread/sleep 5)))))
 
 (let [url   "http://localhost:8080"
-      users (gen-users 2000)]
+      users (gen-users 3000)]
   (println "Running against..." url)
   (views users (str url "/?u="))
   ;; (actions users

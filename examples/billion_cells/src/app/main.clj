@@ -373,7 +373,7 @@
   (-> (into []
         (map-indexed (fn [local-id box] (Cell local-id box nil)))
         blank-chunk)
-    (h/html->bytes true)))
+    h/html->bytes))
 
 (defn EmptyChunk [chunk-id]
   [:div {:class             "chunk"

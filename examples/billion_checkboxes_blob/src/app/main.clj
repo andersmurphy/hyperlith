@@ -372,7 +372,7 @@
   (-> (into []
         (map-indexed (fn [local-id box] (Checkbox local-id box)))
         blank-chunk)
-    (h/html->bytes true)))
+    h/html->bytes))
 
 (defn EmptyChunk [chunk-id]
   (-> [:div
@@ -384,7 +384,7 @@
        empty-checks]))
 
 (defn UserView
-  [html-cache db offset-data]
+  [exec-ctx html-cache db offset-data]
   {:content
    (->> (xy->chunk-ids offset-data)
      (mapv (fn [chunk-id]
@@ -399,8 +399,8 @@
                          (-> (cache/lookup-or-miss html-cache
                                [id (cache/blob->key data)]
                                (fn [_]
-                                 (-> (Chunk id data)
-                                   h/html->bytes))))))))
+                                 (->> (Chunk id data)
+                                   (h/html->bytes exec-ctx)))))))))
                (EmptyChunk chunk-id)))))})
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
@@ -428,7 +428,7 @@
 
 (defview handler-root
   {:path "/" :shim-headers shim-headers :br-window-size 24}
-  [{:keys         [db sid tabid html-cache]
+  [{:keys         [db sid tabid html-cache lane-ctx]
     {:strs [x y]} :query-params
     :as           _req}]
   (let [init-jump-x                                     (h/parse-long x 0)
@@ -468,7 +468,7 @@
                                   :view-size          height
                                   :item-count-fn      (fn [] board-size)
                                   :chunk-size         chunk-size}
-          :v/item-fn             (partial UserView html-cache db)
+          :v/item-fn             (partial UserView lane-ctx html-cache db)
           :v/scroll-handler-path handler-scroll
           :v/resize-handler-path handler-resize})]
       [:div

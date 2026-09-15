@@ -102,7 +102,7 @@
     (-> [:div {:data-on:pointerdown
                (str "@post(`" handler-tap-cell "?id=${evt.target.dataset.id}`)")}
          [:div {:class "board"} view]]
-      (h/html->bytes true))))
+      h/html->bytes)))
 
 (defview render-home {:path        "/" :shim-headers shim-headers
                       :zstd-window 20}

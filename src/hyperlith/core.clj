@@ -13,6 +13,7 @@
    [hyperlith.impl.env]
    [hyperlith.impl.html :as h]
    [hyperlith.impl.json :refer [wrap-parse-json-body]]
+   [hyperlith.impl.lane-context :as lc]
    [hyperlith.impl.namespaces :refer [import-vars]]
    [hyperlith.impl.params :refer [wrap-query-params]]
    [hyperlith.impl.router :as router]
@@ -22,14 +23,16 @@
    [hyperlith.impl.util :as u]
    [ol.clave.ext.aleph :as clave-aleph])
   (:import
+   (hyperlith.impl.lane_context LaneCtx)
+   [java.io ByteArrayOutputStream]
    (java.net ServerSocket)
-   (java.util ArrayList)
+   (java.util ArrayList HashMap)
    (java.util.concurrent
-     ConcurrentHashMap
-     ExecutorService
-     Executors
-     Callable
-     LinkedBlockingQueue)))
+    Callable
+    ConcurrentHashMap
+    ExecutorService
+    Executors
+    LinkedBlockingQueue)))
 
 (import-vars
   ;; ENV
@@ -111,34 +114,32 @@
 
 (defn- init-render-lanes [render-lanes dbs]
   (->> (range render-lanes)
-    (mapv
-      (fn [_]
-        (Executors/newSingleThreadExecutor
-          (let [base (Executors/defaultThreadFactory)]
-            (reify java.util.concurrent.ThreadFactory
-              (newThread [_ r]
-                (.newThread base
-                  #(binding [sqlite/*dbs* (sqlite/create-read-connections! dbs)
-                             h/*cache*    (cache/init 2000)]
-                     (.run ^Runnable r)))))))))))
+    (mapv (fn [_]
+            (lc/->LaneCtx
+              (Executors/newSingleThreadExecutor)
+              (sqlite/create-read-connections! dbs)
+              (cache/init 2000)
+              (HashMap.)
+              (ByteArrayOutputStream/new 64))))))
 
 (defn- submit-values-to-lanes! [lanes v]
   (let [lanes-count (count lanes)]
     (->> (range lanes-count)
       (mapv
         (fn lane [i]
-          (.submit ^ExecutorService (get lanes i)
-            ^Callable
-            (fn lane-submit []
-              (run! sqlite/start-read-tx
-                (vals sqlite/*dbs*))
-              (loop [k 0]
-                (let [idx (+ i (* lanes-count k))]
-                  (when (< idx (count v))
-                    ((nth v idx))
-                    (recur (inc k)))))
-              (run! sqlite/end-read-tx
-                (vals sqlite/*dbs*))))))
+          (let [^LaneCtx lane-ctx (get lanes i)]
+            (.submit ^ExecutorService (.exec lane-ctx)
+              ^Callable
+              (fn lane-submit []
+                (run! sqlite/start-read-tx
+                  (vals (.dbs lane-ctx)))
+                (loop [k 0]
+                  (let [idx (+ i (* lanes-count k))]
+                    (when (< idx (count v))
+                      ((nth v idx) lane-ctx)
+                      (recur (inc k)))))
+                (run! sqlite/end-read-tx
+                  (vals (.dbs lane-ctx))))))))
       (run! deref))))
 
 (defn start-batch-loop!
