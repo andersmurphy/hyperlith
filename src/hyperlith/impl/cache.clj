@@ -1,4 +1,5 @@
 (ns hyperlith.impl.cache
+  (:refer-clojure :exclude [get])
   (:import [com.github.benmanes.caffeine.cache Caffeine Cache]
            [java.util Arrays]))
 

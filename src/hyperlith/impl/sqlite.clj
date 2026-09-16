@@ -18,7 +18,9 @@
 
 (defn- prepare-cached [{:keys [pdb ^HashMap stmt-cache]} sql params]
   (let [stmt (or (HashMap/.get stmt-cache sql)
-               (HashMap/.put stmt-cache (api/prepare-v3 pdb sql)))]
+               (let [stmt (api/prepare-v3 pdb sql)]
+                 (HashMap/.put stmt-cache sql stmt)
+                 stmt))]
     (bind stmt params)
     stmt))
 
