@@ -115,12 +115,12 @@
 (defn- init-render-lanes [render-lanes dbs]
   (->> (range render-lanes)
     (mapv (fn [_]
-            (lc/->LaneCtx
-              (Executors/newSingleThreadExecutor)
-              (sqlite/create-read-connections! dbs)
-              (cache/init 2000)
-              (HashMap.)
-              (ByteArrayOutputStream/new 64))))))
+            (lc/map->LaneCtx
+              {:exec              (Executors/newSingleThreadExecutor)
+               :dbs               (sqlite/create-read-connections! dbs)
+               :attr-cache        (cache/init 2000)
+               :attr-name-cache   (HashMap.)
+               :attr-byte-scratch (ByteArrayOutputStream/new 64)})))))
 
 (defn- submit-values-to-lanes! [lanes v]
   (let [lanes-count (count lanes)]
@@ -166,7 +166,8 @@
                             ;; make batches stable. This means connections
                             ;; almost always run on the same thread.
                             ;; This prevents various local caches from
-                            ;; thrashing.
+                            ;; thrashing. It also re-balances connections
+                            ;; across render threads automatically.
                             (sort-by java.util.Map$Entry/.getKey)
                             (mapv java.util.Map$Entry/.getValue)
                             (submit-values-to-lanes! lanes))

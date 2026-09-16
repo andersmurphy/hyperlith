@@ -20,13 +20,6 @@
 
 (set! *warn-on-reflection* true)
 
-(defn write-bytes [^bytes node ^OutputStream out]
-  (.write out node))
-
-(defn write-string [^String node ^OutputStream out]
-  (.write out
-    (String/.getBytes node StandardCharsets/UTF_8)))
-
 (declare write-node)
 (declare write-attribute)
 
@@ -54,7 +47,14 @@
       ^bytes attribute-declaration-separator (str->bytes ":")
       ^bytes attribute-declaration-end       (str->bytes ";")
       ^HashSet unclosed-tags
-      (HashSet. #{"area" "base" "br" "col" "embed" "hr" "img" "input" "link" "meta" "param" "source" "track" "wbr"})]
+      (HashSet. #{"area" "base" "br" "col" "embed" "hr" "img" "input" "link" "meta" "param" "source" "track" "wbr"})
+      write-bytes
+      (fn write-bytes [^bytes node ^OutputStream out]
+        (.write out node))
+      write-string
+      (fn write-string [^String node ^OutputStream out]
+        (.write out
+          (String/.getBytes node StandardCharsets/UTF_8)))]
 
   (defn write-attribute-string
     [^OutputStream out ^String attribute-value ^String additional]
