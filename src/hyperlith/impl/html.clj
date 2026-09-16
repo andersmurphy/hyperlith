@@ -248,12 +248,10 @@
      (html->stream lane-ctx out node)
      (.toByteArray out)))
   ([node]
-   (let [lane-ctx (lc/->LaneCtx
-                    nil
-                    nil
-                    (cache/init 2000)
-                    (HashMap.)
-                    (ByteArrayOutputStream/new 64))]
+   (let [lane-ctx (lc/map->LaneCtx
+                    {:attr-cache        (cache/init 2000)
+                     :attr-name-cache   (HashMap.)
+                     :attr-byte-scratch (ByteArrayOutputStream/new 64)})]
      (with-open [out (ByteArrayOutputStream/new 16384)]
        (html->stream lane-ctx out node)
        (.toByteArray out)))))
