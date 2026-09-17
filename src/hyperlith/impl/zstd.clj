@@ -1,7 +1,7 @@
 (ns hyperlith.impl.zstd
-  (:import (com.github.luben.zstd Zstd ZstdOutputStreamNoFinalizer
-             ZstdCompressCtx)
-           (java.io ByteArrayOutputStream OutputStream)))
+  (:import
+   (com.github.luben.zstd Zstd ZstdCompressCtx EndDirective)
+   [java.nio ByteBuffer]))
 
 (defn compress ^byte/1 [data level]
   ;; Browser spec only support up to 8MB window which means
@@ -15,12 +15,17 @@
 (defn decompress ^byte/1 [^byte/1 data]
   (Zstd/decompress data (int (Zstd/decompressedSize data))))
 
-(defn compress-out-stream ^OutputStream
-  [^ByteArrayOutputStream out level window]
-  (-> (ZstdOutputStreamNoFinalizer/new out)
+(defn ctx ^ZstdCompressCtx [level window]
+  (-> (ZstdCompressCtx.)
     (.setLevel (int level))
-    (.setWindowLog window)
-    ;; skip frame checksum (TLS covers integrity)
-    (.setChecksum false)
-    ;; keep block open across flushes (better ratio)
-    (.setCloseFrameOnFlush false)))
+    (.setWindowLog (int window))
+    (.setChecksum false)))
+
+(defn close-ctx [^ZstdCompressCtx ctx]
+  (.close ctx))
+
+(defn compress-chunk!
+  [^ZstdCompressCtx ctx ^ByteBuffer dst ^ByteBuffer src]
+  (.clear dst)
+  (.flip src)
+  (.compressDirectByteBufferStream ctx dst src EndDirective/CONTINUE))

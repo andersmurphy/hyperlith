@@ -5,7 +5,7 @@
    [hyperlith.impl.assets :refer [static-asset]]
    [hyperlith.impl.crypto :as crypto]
    [hyperlith.impl.headers
-             :refer [default-headers strict-transport]]
+    :refer [default-headers strict-transport]]
    [hyperlith.impl.html :as h]
    [hyperlith.impl.json :as json]
    [hyperlith.impl.router :as router]
@@ -14,9 +14,9 @@
    [manifold.deferred :as d]
    [manifold.stream :as s])
   (:import
-   (java.io BufferedOutputStream ByteArrayOutputStream OutputStream)
-   (java.util.concurrent ConcurrentHashMap)
-   (hyperlith.impl.lane_context LaneCtx)))
+   (hyperlith.impl.lane_context LaneCtx)
+   (java.nio ByteBuffer)
+   (java.util.concurrent ConcurrentHashMap)))
 
 (def datastar-source-map
   (static-asset
@@ -55,7 +55,7 @@
                     [:meta {:charset "UTF-8"}]
                     (when head-hiccup head-hiccup)
                     ;; Scripts
-                    [:script {:id "js"
+                    [:script {:id    "js"
                               :defer true :type "module"
                               :src   datastar}]
                     ;; Enables responsiveness on mobile devices
@@ -101,14 +101,16 @@
   (String/.getBytes "\n\n"))
 
 (defn html->stream!
-  [lane-ctx ^OutputStream out root]
+  [^LaneCtx lane-ctx root]
   (assert (vector? root))
-  (run!
-    (fn [node]
-      (OutputStream/.write out ^bytes event-prefix)
-      (h/html->stream lane-ctx out node)
-      (OutputStream/.write out ^bytes event-sufix))
-    root))
+  (let [buf ^ByteBuffer (.zstd-src-buf lane-ctx)]
+    (ByteBuffer/.clear buf)
+    (run!
+      (fn [node]
+        (ByteBuffer/.put buf ^bytes event-prefix)
+        (h/html->stream lane-ctx buf node)
+        (ByteBuffer/.put buf ^bytes event-sufix))
+      root)))
 
 (defn render-handler
   [path render-fn & {:keys [on-close on-open zstd-level zstd-window] :as _opts
@@ -116,15 +118,10 @@
                             zstd-window 19}}]
   (router/add-route! [:post path]
     (fn handler [req]
-      (let [out         (ByteArrayOutputStream/new 4096)
-            buf-out     (BufferedOutputStream/new
-                          (zstd/compress-out-stream out
-                            zstd-level
-                            zstd-window)
-                          16384)
-            conns       (req :hyperlith.core/conns)
-            stream      (s/stream 0 nil)
-            last-put_   (atom nil)
+      (let [zstd-ctx  (zstd/ctx zstd-level zstd-window)
+            conns     (req :hyperlith.core/conns)
+            stream    (s/stream 0 nil)
+            last-put_ (atom nil)
             render
             (fn render [^LaneCtx lane-ctx]
               (try
@@ -136,17 +133,17 @@
                                            (-> (u/fast-merge req
                                                  (.dbs lane-ctx))
                                              (assoc :lane-ctx lane-ctx)))]
-                      (html->stream! lane-ctx buf-out new-view)
-                      (OutputStream/.flush buf-out)
-                      (let [result (.toByteArray out)]
-                        (.reset out)
-                        (let [r (s/put! stream result)]
-                          (reset! last-put_ r)))))
+                      (html->stream! lane-ctx new-view)
+                      (let [dst (.zstd-dst-buf lane-ctx)
+                            _ (zstd/compress-chunk! zstd-ctx
+                                (.zstd-dst-buf lane-ctx)
+                                (.zstd-src-buf lane-ctx))
+                            r (s/put! stream (.flip ^ByteBuffer dst))]
+                        (reset! last-put_ r))))
                   (do
                     (ConcurrentHashMap/.remove conns
                       (System/identityHashCode render))
-                    (.close out)
-                    (.close buf-out)
+                    (zstd/close-ctx zstd-ctx)
                     (when on-close (on-close req))))
                 (catch Throwable t
                   (repl-caught t))))]

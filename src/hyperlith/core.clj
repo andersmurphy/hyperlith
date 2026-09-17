@@ -24,8 +24,8 @@
    [ol.clave.ext.aleph :as clave-aleph])
   (:import
    (hyperlith.impl.lane_context LaneCtx)
-   [java.io ByteArrayOutputStream]
    (java.net ServerSocket)
+   [java.nio ByteBuffer]
    (java.util ArrayList HashMap)
    (java.util.concurrent
     Callable
@@ -120,7 +120,9 @@
                :dbs               (sqlite/create-read-connections! dbs)
                :attr-cache        (cache/init 2000)
                :attr-name-cache   (HashMap.)
-               :attr-byte-scratch (ByteArrayOutputStream/new 64)})))))
+               :attr-byte-scratch (ByteBuffer/allocateDirect 16384)
+               :zstd-src-buf      (ByteBuffer/allocateDirect (* 20 16384))
+               :zstd-dst-buf      (ByteBuffer/allocateDirect (* 2 16384))})))))
 
 (defn- submit-values-to-lanes! [lanes v]
   (let [lanes-count (count lanes)]
