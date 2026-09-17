@@ -28,4 +28,5 @@
   [^ZstdCompressCtx ctx ^ByteBuffer dst ^ByteBuffer src]
   (.clear dst)
   (.flip src)
-  (.compressDirectByteBufferStream ctx dst src EndDirective/CONTINUE))
+  (.compressDirectByteBufferStream ctx dst src EndDirective/CONTINUE)
+  (.clear src))
