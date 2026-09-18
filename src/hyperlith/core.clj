@@ -219,10 +219,7 @@
                       wrap-session
                       wrap-parse-json-body
                       wrap-blocker)
-        config      {;; We run on the netty event loop directly
-                     ;; as all handlers either put on a queue
-                     ;; or add to a concurrentHashmap.
-                     :executor              :none
+        config      {:executor (Executors/newVirtualThreadPerTaskExecutor)
                      :port                  port
                      ;; Actions payloads are small
                      :max-request-body-size 4096
