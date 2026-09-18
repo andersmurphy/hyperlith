@@ -2,4 +2,4 @@
 
 (defrecord LaneCtx
     [exec dbs attr-cache attr-name-cache attr-byte-scratch
-     zstd-src-buf zstd-dst-buf])
+     html-dst-buf zstd-src-buf])

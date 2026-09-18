@@ -1,6 +1,6 @@
 (ns hyperlith.impl.zstd
   (:import
-   (com.github.luben.zstd EndDirective Zstd ZstdCompressCtx)
+   [com.github.luben.zstd EndDirective Zstd ZstdCompressCtx]
    [io.netty.buffer ByteBuf PooledByteBufAllocator]
    [java.nio ByteBuffer]))
 

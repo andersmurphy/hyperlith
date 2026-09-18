@@ -122,6 +122,7 @@
                :attr-name-cache   (HashMap.)
                ;; Goes back onto the heap when converted to byte array
                :attr-byte-scratch (ByteBuffer/allocate 16384)
+               :html-dst-buf      (ByteBuffer/allocate (* 20 16384))
                ;; zstd is in native lang
                :zstd-src-buf      (ByteBuffer/allocateDirect (* 20 16384))})))))
 

@@ -102,14 +102,14 @@
 
 (defn html->stream!
   [^LaneCtx lane-ctx root]
-  (assert (vector? root))
-  (let [buf ^ByteBuffer (.zstd-src-buf lane-ctx)]
+  (let [buf ^ByteBuffer (.html-dst-buf lane-ctx)]
     (run!
       (fn [node]
         (ByteBuffer/.put buf ^bytes event-prefix)
         (h/html->stream lane-ctx buf node)
         (ByteBuffer/.put buf ^bytes event-sufix))
-      root)))
+      root)
+    (.flip buf)))
 
 (defn render-handler
   [path render-fn & {:keys [on-close on-open zstd-level zstd-window] :as _opts
@@ -132,11 +132,14 @@
                                            (-> (u/fast-merge req
                                                  (.dbs lane-ctx))
                                              (assoc :lane-ctx lane-ctx)))]
-                      (html->stream! lane-ctx new-view)
-                      (->> (.zstd-src-buf lane-ctx)
-                        (zstd/compress-chunk! zstd-ctx)
-                        (s/put! stream)
-                        (reset! last-put_))))
+                      (let [zstd-src ^ByteBuffer (.zstd-src-buf lane-ctx)
+                            html-dst ^ByteBuffer (.html-dst-buf lane-ctx)
+                            _        (html->stream! lane-ctx new-view)
+                            _        (ByteBuffer/.put zstd-src html-dst)
+                            _        (ByteBuffer/.clear html-dst)]
+                        (->> (zstd/compress-chunk! zstd-ctx zstd-src)
+                          (s/put! stream)
+                          (reset! last-put_)))))
                   (do
                     (ConcurrentHashMap/.remove conns
                       (System/identityHashCode render))
