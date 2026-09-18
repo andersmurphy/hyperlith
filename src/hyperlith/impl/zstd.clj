@@ -1,6 +1,7 @@
 (ns hyperlith.impl.zstd
   (:import
-   (com.github.luben.zstd Zstd ZstdCompressCtx EndDirective)
+   (com.github.luben.zstd EndDirective Zstd ZstdCompressCtx)
+   [io.netty.buffer ByteBuf PooledByteBufAllocator]
    [java.nio ByteBuffer]))
 
 (defn compress ^byte/1 [data level]
@@ -24,9 +25,16 @@
 (defn close-ctx [^ZstdCompressCtx ctx]
   (.close ctx))
 
-(defn compress-chunk!
-  [^ZstdCompressCtx ctx ^ByteBuffer dst ^ByteBuffer src]
-  (.clear dst)
-  (.flip src)
-  (.compressDirectByteBufferStream ctx dst src EndDirective/CONTINUE)
-  (.clear src))
+(defn buf->nio ^ByteBuffer [^ByteBuf buf]
+  (doto (.nioBuffer buf 0 (.capacity buf))
+    (.limit (.capacity buf)) (.position 0)))
+
+(defn compress-chunk! ^ByteBuffer
+  [^ZstdCompressCtx ctx ^ByteBuffer src]
+  (let [dst     ^ByteBuf (.directBuffer PooledByteBufAllocator/DEFAULT 32768 32768)
+        dst-nio (buf->nio dst)]
+    (.flip src)
+    (.compressDirectByteBufferStream ctx dst-nio src EndDirective/CONTINUE)
+    (.writerIndex dst (.position dst-nio))
+    (.clear src)
+    dst))

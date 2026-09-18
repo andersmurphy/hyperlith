@@ -15,7 +15,6 @@
    [manifold.stream :as s])
   (:import
    (hyperlith.impl.lane_context LaneCtx)
-   [io.netty.buffer PooledByteBufAllocator]
    (java.nio ByteBuffer)
    (java.util.concurrent ConcurrentHashMap)))
 
@@ -134,16 +133,10 @@
                                                  (.dbs lane-ctx))
                                              (assoc :lane-ctx lane-ctx)))]
                       (html->stream! lane-ctx new-view)
-                      (let [buf
-                            (.directBuffer
-                              PooledByteBufAllocator/DEFAULT 32768 32768)
-                            dst (doto (.nioBuffer buf 0 (.capacity buf))
-                                  (.limit (.capacity buf)) (.position 0))
-                            _   (zstd/compress-chunk! zstd-ctx dst
-                                  (.zstd-src-buf lane-ctx))
-                            _   (.writerIndex buf (.position dst))
-                            r   (s/put! stream buf)]
-                        (reset! last-put_ r))))
+                      (->> (.zstd-src-buf lane-ctx)
+                        (zstd/compress-chunk! zstd-ctx)
+                        (s/put! stream)
+                        (reset! last-put_))))
                   (do
                     (ConcurrentHashMap/.remove conns
                       (System/identityHashCode render))
