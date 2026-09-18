@@ -136,11 +136,12 @@
               (fn lane-submit []
                 (run! sqlite/start-read-tx
                   (vals (.dbs lane-ctx)))
-                (loop [k 0]
-                  (let [idx (+ i (* lanes-count k))]
-                    (when (< idx (count v))
-                      ((nth v idx) lane-ctx)
-                      (recur (inc k)))))
+                (let [v-count (count v)]
+                  (loop [k 0]
+                    (let [idx (+ i (* lanes-count k))]
+                      (when (< idx v-count)
+                        ((nth v idx) lane-ctx)
+                        (recur (inc k))))))
                 (run! sqlite/end-read-tx
                   (vals (.dbs lane-ctx))))))))
       (run! deref))))
