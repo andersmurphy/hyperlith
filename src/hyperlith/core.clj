@@ -153,7 +153,7 @@
         lanes (init-render-lanes
                 (Runtime/.availableProcessors (Runtime/getRuntime))
                 dbs)
-        t     (Thread/startVirtualThread
+        t     (Thread.
                 (bound-fn* ;; binding conveyance
                   (fn batch-thread []
                     (while (not (Thread/interrupted))
@@ -177,9 +177,11 @@
                           (catch Throwable t
                             (repl-caught t)
                             (flush)))
-                        (Thread/sleep ;; sleep 0 to let other tasks run
-                          (int (max 0 (- next-tick
-                                        (System/currentTimeMillis))))))))))]
+                        (let [sleep-time-ms (- next-tick
+                                              (System/currentTimeMillis))]
+                          (when (> sleep-time-ms 0)
+                            (Thread/sleep ^long sleep-time-ms))))))))
+        _ (Thread/.start t)]
     (-> (assoc ctx
           ::tx!
           (fn tx! [thunk] (LinkedBlockingQueue/.offer q thunk)) )
