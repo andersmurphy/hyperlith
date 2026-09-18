@@ -1,5 +1,5 @@
 (ns hyperlith.impl.util
-  (:refer-clojure :exclude [merge])
+  (:refer-clojure :exclude [merge parse-long])
   (:require [clojure.java.io :as io])
   (:import (java.io InputStream)))
 
