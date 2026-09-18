@@ -118,6 +118,7 @@
   (router/add-route! [:post path]
     (fn handler [req]
       (let [zstd-ctx  (zstd/ctx zstd-level zstd-window)
+            zstd-dst  (ByteBuffer/allocateDirect 16384)
             conns     (req :hyperlith.core/conns)
             stream    (s/stream 0 nil)
             last-put_ (atom nil)
@@ -136,9 +137,10 @@
                             html-dst ^ByteBuffer (.html-dst-buf lane-ctx)
                             _        (html->stream! lane-ctx new-view)
                             _        (ByteBuffer/.put zstd-src html-dst)
-                            _        (ByteBuffer/.clear html-dst)]
-                        (->> (zstd/compress-chunk! zstd-ctx zstd-src)
-                          (s/put! stream)
+                            _        (ByteBuffer/.clear html-dst)
+                            _        (zstd/compress-chunk! zstd-ctx
+                                       zstd-dst zstd-src)]
+                        (->> (s/put! stream zstd-dst)
                           (reset! last-put_)))))
                   (do
                     (ConcurrentHashMap/.remove conns
