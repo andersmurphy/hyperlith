@@ -30,9 +30,9 @@
    (java.util.concurrent
     Callable
     ConcurrentHashMap
-    ExecutorService
     Executors
-    LinkedBlockingQueue)))
+    LinkedBlockingQueue
+    ThreadPoolExecutor)))
 
 (import-vars
   ;; ENV
@@ -112,12 +112,11 @@
         (repl-caught t)
         {:status 500}))))
 
-(defn- init-render-lanes [render-lanes dbs]
-  (->> (range render-lanes)
+(defn- init-render-lanes [n-lanes dbs]
+  (->> (range n-lanes)
     (mapv (fn [_]
             (lc/map->LaneCtx
-              {:exec              (Executors/newSingleThreadExecutor)
-               :dbs               (sqlite/create-read-connections! dbs)
+              {:dbs               (sqlite/create-read-connections! dbs)
                :attr-cache        (cache/init 2000)
                :attr-name-cache   (HashMap.)
                ;; Goes back onto the heap when converted to byte array
@@ -126,64 +125,52 @@
                ;; zstd is in native lang
                :zstd-src-buf      (ByteBuffer/allocateDirect (* 32 16384))})))))
 
-(defn- submit-values-to-lanes! [lanes v]
-  (let [lanes-count (count lanes)]
-    (->> (range lanes-count)
-      (mapv
-        (fn lane [i]
-          (let [^LaneCtx lane-ctx (get lanes i)]
-            (.submit ^ExecutorService (.exec lane-ctx)
-              ^Callable
-              (fn lane-submit []
-                (run! sqlite/start-read-tx
-                  (vals (.dbs lane-ctx)))
-                (let [v-count (count v)]
-                  (loop [k 0]
-                    (let [idx (+ i (* lanes-count k))]
-                      (when (< idx v-count)
-                        ((nth v idx) lane-ctx)
-                        (recur (inc k))))))
-                (run! sqlite/end-read-tx
-                  (vals (.dbs lane-ctx))))))))
-      (run! deref))))
-
 (defn start-batch-loop!
   [{:keys [::conns] :as ctx}
    {:keys [batch-fn batch-tick-ms dbs]}]
-  (let [q     (LinkedBlockingQueue/new)
-        ctx   (merge ctx (sqlite/create-write-connections! dbs))
-        lanes (init-render-lanes
-                (Runtime/.availableProcessors (Runtime/getRuntime))
-                dbs)
-        t     (Thread.
-                (bound-fn* ;; binding conveyance
-                  (fn batch-thread []
-                    (while (not (Thread/interrupted))
-                      (let [next-tick (+ (System/currentTimeMillis)
-                                        batch-tick-ms)
-                            batch     (ArrayList/new)]
-                        (.drainTo q batch)
-                        (try
-                          (batch-fn ctx (seq batch))
-                          ;; Refresh connections
-                          (->> (ConcurrentHashMap/.entrySet conns)
-                            ;; We sort to reduce tail latency and
-                            ;; make batches stable. This means connections
-                            ;; almost always run on the same thread.
-                            ;; This prevents various local caches from
-                            ;; thrashing. It also re-balances connections
-                            ;; across render threads automatically.
-                            (sort-by java.util.Map$Entry/.getKey)
-                            (mapv java.util.Map$Entry/.getValue)
-                            (submit-values-to-lanes! lanes))
-                          (catch Throwable t
-                            (repl-caught t)
-                            (flush)))
-                        (let [sleep-time-ms (- next-tick
-                                              (System/currentTimeMillis))]
-                          (when (> sleep-time-ms 0)
-                            (Thread/sleep ^long sleep-time-ms))))))))
-        _ (Thread/.start t)]
+  (let [q       (LinkedBlockingQueue/new)
+        ctx     (merge ctx (sqlite/create-write-connections! dbs))
+        n-lanes (Runtime/.availableProcessors (Runtime/getRuntime))
+        lanes   (init-render-lanes n-lanes dbs)
+        pool    (Executors/newFixedThreadPool n-lanes)
+        t       (Thread.
+                  ^Runnable
+                  (bound-fn* ;; binding conveyance
+                    (fn batch-thread []
+                      (while (not (Thread/interrupted))
+                        (let [next-tick (+ (System/currentTimeMillis)
+                                          batch-tick-ms)
+                              batch     (ArrayList/new)]
+                          (.drainTo q batch)
+                          (try
+                            (batch-fn ctx (seq batch))
+                            ;; Refresh connections
+                            (let [vs   (->> (ConcurrentHashMap/.entrySet conns)
+                                         (mapv java.util.Map$Entry/.getValue))
+                                  n-vs (count vs)]
+                              (->> (range n-lanes)
+                                (mapv (fn [i]
+                                        ^Callable
+                                        (fn []
+                                          (let [lane-ctx ^LaneCtx (get lanes i)]
+                                            (run! sqlite/start-read-tx
+                                              (vals (.dbs lane-ctx)))
+                                            (loop [k 0]
+                                              (let [idx (+ i (* n-lanes k))]
+                                                (when (< idx n-vs)
+                                                  ((nth vs idx) lane-ctx)
+                                                  (recur (inc k)))))
+                                            (run! sqlite/end-read-tx
+                                              (vals (.dbs lane-ctx)))))))
+                                (ThreadPoolExecutor/.invokeAll pool)))
+                            (catch Throwable t
+                              (repl-caught t)
+                              (flush)))
+                          (let [sleep-time-ms (- next-tick
+                                                (System/currentTimeMillis))]
+                            (when (> sleep-time-ms 0)
+                              (Thread/sleep ^long sleep-time-ms))))))))
+        _       (Thread/.start t)]
     (-> (assoc ctx
           ::tx!
           (fn tx! [thunk] (LinkedBlockingQueue/.offer q thunk)) )
