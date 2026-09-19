@@ -119,9 +119,7 @@
     (fn handler [req]
       (let [zstd-ctx  (zstd/ctx zstd-level zstd-window)
             zstd-dst  (ByteBuffer/allocateDirect 16384)
-            lanes     (req :hyperlith.core/lanes)
-            ;; Select random lane for this connection to live on
-            lane-ctx  ^LaneCtx (lanes (rand-int (count lanes)))
+            lane-ctx  ((req :hyperlith.core/select-lane))
             stream    (s/stream 0 nil)
             last-put_ (atom nil)
             conns     (.lane-conns lane-ctx)

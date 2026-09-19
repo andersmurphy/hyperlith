@@ -32,7 +32,8 @@
     ConcurrentHashMap
     Executors
     LinkedBlockingQueue
-    ThreadPoolExecutor)))
+    ThreadPoolExecutor)
+   [java.util.concurrent.atomic AtomicInteger]))
 
 (import-vars
   ;; ENV
@@ -96,7 +97,7 @@
 
 (defn throw-if-port-in-use! [port]
   (try
-    (with-open [_ (ServerSocket. 8080)])
+    (with-open [_ (ServerSocket. port)])
     (catch Throwable _
       (throw
         (ex-info
@@ -178,37 +179,42 @@
            domain email dev? dbs]
     :or   {port 8080 batch-tick-ms 50 ctx-start (fn [] {})}}]
   (assert (not (nil? batch-fn)))
-  (let [port     (if dev? port 443)
-        n-lanes  (Runtime/.availableProcessors (Runtime/getRuntime))
-        lanes    (init-render-lanes n-lanes dbs)
-        _        (throw-if-port-in-use! port)
-        ctx      (-> (ctx-start)
-                      (assoc ::lanes lanes)
-                      (start-batch-loop!
-                        {:lanes         lanes
-                         :dbs           dbs
-                         :batch-fn      batch-fn
-                         :batch-tick-ms batch-tick-ms}))
-        wrap-ctx (fn [handler]
-                      (fn [req]
-                        (handler (u/fast-merge req ctx))))
+  (let [port        (if dev? port 443)
+        n-lanes     (Runtime/.availableProcessors (Runtime/getRuntime))
+        lanes       (init-render-lanes n-lanes dbs)
+        select-lane (let [lane-idx ^AtomicInteger (AtomicInteger. 0)]
+                      ;; Round robin lane select
+                      (fn ^LaneCtx []
+                        (get lanes
+                          (Math/floorMod (.getAndIncrement lane-idx) n-lanes))))
+        _           (throw-if-port-in-use! port)
+        ctx         (-> (ctx-start)
+                   (assoc ::select-lane select-lane)
+                   (start-batch-loop!
+                     {:lanes         lanes
+                      :dbs           dbs
+                      :batch-fn      batch-fn
+                      :batch-tick-ms batch-tick-ms}))
+        wrap-ctx    (fn [handler]
+                   (fn [req]
+                     (handler (u/fast-merge req ctx))))
         ;; Middleware make for messy error stacks.
-        router   (-> router/router
-                      wrap-ctx
-                      ;; Wrap error here because req params/body/session
-                      ;; have been handled (and provide useful context).
-                      wrap-error
-                      ;; The handlers after this point do not throw errors
-                      ;; are robust/lenient.
-                      wrap-query-params
-                      wrap-session
-                      wrap-parse-json-body
-                      wrap-blocker)
-        config   {:executor              (Executors/newVirtualThreadPerTaskExecutor)
-                  :port                  port
-                  ;; Actions payloads are small
-                  :max-request-body-size 4096
-                  :request-buffer-size   4096}
+        router      (-> router/router
+                   wrap-ctx
+                   ;; Wrap error here because req params/body/session
+                   ;; have been handled (and provide useful context).
+                   wrap-error
+                   ;; The handlers after this point do not throw errors
+                   ;; are robust/lenient.
+                   wrap-query-params
+                   wrap-session
+                   wrap-parse-json-body
+                   wrap-blocker)
+        config      {:executor              (Executors/newVirtualThreadPerTaskExecutor)
+                     :port                  port
+                     ;; Actions payloads are small
+                     :max-request-body-size 4096
+                     :request-buffer-size   4096}
         server
         (if dev?
           (http/start-server router config)
