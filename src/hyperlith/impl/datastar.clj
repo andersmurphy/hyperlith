@@ -14,9 +14,9 @@
    [manifold.deferred :as d]
    [manifold.stream :as s])
   (:import
+   (java.util.concurrent ConcurrentHashMap)
    (hyperlith.impl.lane_context LaneCtx)
-   (java.nio ByteBuffer)
-   (java.util.concurrent ConcurrentHashMap)))
+   (java.nio ByteBuffer)))
 
 (def datastar-source-map
   (static-asset
@@ -119,20 +119,23 @@
     (fn handler [req]
       (let [zstd-ctx  (zstd/ctx zstd-level zstd-window)
             zstd-dst  (ByteBuffer/allocateDirect 16384)
-            conns     (req :hyperlith.core/conns)
+            lanes     (req :hyperlith.core/lanes)
+            ;; Select random lane for this connection to live on
+            lane-ctx  ^LaneCtx (lanes (rand-int (count lanes)))
             stream    (s/stream 0 nil)
             last-put_ (atom nil)
+            conns     (.lane-conns lane-ctx)
+            ;; Only merge ctx at the start of a connection (so cheap)
+            req       (-> (u/fast-merge req (.dbs lane-ctx))
+                        (assoc :hyperlith.core/lane-ctx lane-ctx))
             render
-            (fn render [^LaneCtx lane-ctx]
+            (fn render []
               (try
                 (if-not (s/closed? stream)
                   ;; Only render again if previous event was sent
                   ;; this gives you back pressure and frame dropping.
                   (when (or (nil? @last-put_) (d/realized? @last-put_))
-                    (when-some [new-view (render-fn
-                                           (-> (u/fast-merge req
-                                                 (.dbs lane-ctx))
-                                             (assoc :lane-ctx lane-ctx)))]
+                    (when-some [new-view (render-fn req)]
                       (let [zstd-src ^ByteBuffer (.zstd-src-buf lane-ctx)
                             html-dst ^ByteBuffer (.html-dst-buf lane-ctx)
                             _        (html->stream! lane-ctx new-view)

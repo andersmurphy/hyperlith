@@ -79,6 +79,7 @@
         (Thread/sleep 5)))))
 
 (let [url   "http://localhost:8080"
+      url2  "https://checkboxes.andersmurphy.com"
       users (gen-users 3000)]
   (println "Running against..." url)
   (views users (str url "/?u="))

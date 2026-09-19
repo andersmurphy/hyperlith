@@ -26,7 +26,7 @@
    (hyperlith.impl.lane_context LaneCtx)
    (java.net ServerSocket)
    [java.nio ByteBuffer]
-   (java.util ArrayList HashMap)
+   (java.util ArrayList HashMap Map$Entry)
    (java.util.concurrent
     Callable
     ConcurrentHashMap
@@ -112,26 +112,11 @@
         (repl-caught t)
         {:status 500}))))
 
-(defn- init-render-lanes [n-lanes dbs]
-  (->> (range n-lanes)
-    (mapv (fn [_]
-            (lc/map->LaneCtx
-              {:dbs               (sqlite/create-read-connections! dbs)
-               :attr-cache        (cache/init 2000)
-               :attr-name-cache   (HashMap.)
-               ;; Goes back onto the heap when converted to byte array
-               :attr-byte-scratch (ByteBuffer/allocate 16384)
-               :html-dst-buf      (ByteBuffer/allocate (* 32 16384))
-               ;; zstd is in native lang
-               :zstd-src-buf      (ByteBuffer/allocateDirect (* 32 16384))})))))
-
 (defn start-batch-loop!
-  [{:keys [::conns] :as ctx}
-   {:keys [batch-fn batch-tick-ms dbs]}]
+  [ctx {:keys [batch-fn batch-tick-ms dbs lanes]}]
   (let [q       (LinkedBlockingQueue/new)
         ctx     (merge ctx (sqlite/create-write-connections! dbs))
-        n-lanes (Runtime/.availableProcessors (Runtime/getRuntime))
-        lanes   (init-render-lanes n-lanes dbs)
+        n-lanes (count lanes)
         pool    (Executors/newFixedThreadPool n-lanes)
         t       (Thread.
                   ^Runnable
@@ -145,24 +130,21 @@
                           (try
                             (batch-fn ctx (seq batch))
                             ;; Refresh connections
-                            (let [vs   (->> (ConcurrentHashMap/.entrySet conns)
-                                         (mapv java.util.Map$Entry/.getValue))
-                                  n-vs (count vs)]
-                              (->> (range n-lanes)
-                                (mapv (fn [i]
-                                        ^Callable
-                                        (fn []
-                                          (let [lane-ctx ^LaneCtx (get lanes i)]
-                                            (run! sqlite/start-read-tx
-                                              (vals (.dbs lane-ctx)))
-                                            (loop [k 0]
-                                              (let [idx (+ i (* n-lanes k))]
-                                                (when (< idx n-vs)
-                                                  ((nth vs idx) lane-ctx)
-                                                  (recur (inc k)))))
-                                            (run! sqlite/end-read-tx
-                                              (vals (.dbs lane-ctx)))))))
-                                (ThreadPoolExecutor/.invokeAll pool)))
+                            (->> lanes
+                              (mapv
+                                (fn [^LaneCtx lane-ctx]
+                                  ^Callable
+                                  (fn []
+                                    (let [conns ^ConcurrentHashMap
+                                          (.lane-conns lane-ctx)]
+                                      (run! sqlite/start-read-tx
+                                        (vals (.dbs lane-ctx)))
+                                      (run! (fn [conn]
+                                              ((Map$Entry/.getValue conn)))
+                                        (.entrySet conns))
+                                      (run! sqlite/end-read-tx
+                                        (vals (.dbs lane-ctx)))))))
+                              (ThreadPoolExecutor/.invokeAll pool))
                             (catch Throwable t
                               (repl-caught t)
                               (flush)))
@@ -177,25 +159,41 @@
       (update ::stop!
         conj (fn [] (Thread/.interrupt t))))))
 
+(defn- init-render-lanes [n-lanes dbs]
+  (->> (range n-lanes)
+    (mapv (fn [_]
+            (lc/map->LaneCtx
+              {:dbs               (sqlite/create-read-connections! dbs)
+               :lane-conns        (ConcurrentHashMap.)
+               :attr-cache        (cache/init 2000)
+               :attr-name-cache   (HashMap.)
+               ;; Goes back onto the heap when converted to byte array
+               :attr-byte-scratch (ByteBuffer/allocate 16384)
+               :html-dst-buf      (ByteBuffer/allocate (* 32 16384))
+               ;; zstd is in native lang
+               :zstd-src-buf      (ByteBuffer/allocateDirect (* 32 16384))})))))
+
 (defn start-app
   [{:keys [port ctx-start batch-fn batch-tick-ms
            domain email dev? dbs]
-    :or   {port      8080 batch-tick-ms 50 ctx-start (fn [] {})}}]
+    :or   {port 8080 batch-tick-ms 50 ctx-start (fn [] {})}}]
   (assert (not (nil? batch-fn)))
-  (let [port        (if dev? port 443)
-        _           (throw-if-port-in-use! port)
-        ctx         (-> (ctx-start)
-                      (assoc
-                        ::conns (ConcurrentHashMap.))
+  (let [port     (if dev? port 443)
+        n-lanes  (Runtime/.availableProcessors (Runtime/getRuntime))
+        lanes    (init-render-lanes n-lanes dbs)
+        _        (throw-if-port-in-use! port)
+        ctx      (-> (ctx-start)
+                      (assoc ::lanes lanes)
                       (start-batch-loop!
-                        {:dbs           dbs
+                        {:lanes         lanes
+                         :dbs           dbs
                          :batch-fn      batch-fn
                          :batch-tick-ms batch-tick-ms}))
-        wrap-ctx    (fn [handler]
+        wrap-ctx (fn [handler]
                       (fn [req]
                         (handler (u/fast-merge req ctx))))
         ;; Middleware make for messy error stacks.
-        router      (-> router/router
+        router   (-> router/router
                       wrap-ctx
                       ;; Wrap error here because req params/body/session
                       ;; have been handled (and provide useful context).
@@ -206,11 +204,11 @@
                       wrap-session
                       wrap-parse-json-body
                       wrap-blocker)
-        config      {:executor (Executors/newVirtualThreadPerTaskExecutor)
-                     :port                  port
-                     ;; Actions payloads are small
-                     :max-request-body-size 4096
-                     :request-buffer-size   4096}
+        config   {:executor              (Executors/newVirtualThreadPerTaskExecutor)
+                  :port                  port
+                  ;; Actions payloads are small
+                  :max-request-body-size 4096
+                  :request-buffer-size   4096}
         server
         (if dev?
           (http/start-server router config)

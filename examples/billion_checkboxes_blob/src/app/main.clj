@@ -428,7 +428,7 @@
 
 (defview handler-root
   {:path "/" :shim-headers shim-headers :br-window-size 24}
-  [{:keys         [db sid tabid html-cache lane-ctx]
+  [{:keys         [db sid tabid html-cache ::h/lane-ctx]
     {:strs [x y]} :query-params
     :as           _req}]
   (let [init-jump-x                                     (h/parse-long x 0)
