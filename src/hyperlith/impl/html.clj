@@ -44,52 +44,65 @@
       ^bytes attribute-class-separator       (str->bytes " ")
       ^bytes attribute-declaration-separator (str->bytes ":")
       ^bytes attribute-declaration-end       (str->bytes ";")
+      ^bytes esc-amp                         (str->bytes "&amp;")
+      ^bytes esc-lt                          (str->bytes "&lt;")
+      ^bytes esc-gt                          (str->bytes "&gt;")
+      ^bytes esc-quot                        (str->bytes "&quot;")
+      ^bytes esc-apos                        (str->bytes "&#39;")
       ^HashSet unclosed-tags
       (HashSet. #{"area" "base" "br" "col" "embed" "hr" "img" "input" "link" "meta" "param" "source" "track" "wbr"})
       write-bytes
       (fn write-bytes [^bytes node ^ByteBuffer out]
         (.put out node))
       write-string
-      (fn write-string [lane-ctx ^String node ^ByteBuffer out]
+      (fn write-string [^String node ^ByteBuffer out]
         (.put out
           (String/.getBytes node StandardCharsets/UTF_8)))
-      escape
-      (fn escape ^String [^String value]
-        (when value
-          (-> value
-            (.replace "&" "&amp;")
-            (.replace "<" "&lt;")
-            (.replace ">" "&gt;")
-            (.replace "\"" "&quot;")
-            (.replace "'" "&#39;"))))]
+      write-escaped-string
+      (fn write-escaped-string [^String value ^ByteBuffer out]
+        (loop [i 0 start 0 n (.length value)]
+          (if (== i n)
+            (when (> i start)
+              (.put out (String/.getBytes
+                          ^String (.substring value start i)
+                          StandardCharsets/UTF_8)))
+            (if-let [^bytes esc (case (.charAt value i)
+                                  \& esc-amp  \< esc-lt   \> esc-gt
+                                  \" esc-quot \' esc-apos nil)]
+              (do
+                (when (> i start)
+                  (.put out (String/.getBytes
+                              ^String (.substring value start i)
+                              StandardCharsets/UTF_8)))
+                (.put out esc)
+                (recur (inc i) (inc i) n))
+              (recur (inc i) start n)))))]
 
   (defn write-attribute-string
-    [lane-ctx ^ByteBuffer out ^String attribute-value]
+    [^ByteBuffer out ^String attribute-value]
     (when (Numbers/isPos (.length attribute-value))
       (write-bytes attribute-value-open out)
-      (write-string lane-ctx (escape attribute-value) out)
+      (write-escaped-string attribute-value out)
       (write-bytes attribute-value-close out)))
 
   (defn write-attribute-map
-    [lane-ctx ^ByteBuffer out ^APersistentMap attribute-value]
+    [^ByteBuffer out ^APersistentMap attribute-value]
     (when-not (.isEmpty attribute-value)
       (let [^Iterator iterator (.iterator attribute-value)]
         (write-bytes attribute-value-open out)
         (while (.hasNext iterator)
           (let [^MapEntry entry (.next iterator)]
-            (write-string lane-ctx (.getName ^Keyword (.key entry)) out)
+            (write-string (.getName ^Keyword (.key entry)) out)
             (write-bytes attribute-declaration-separator out)
-            (write-string lane-ctx (escape (str (.val entry))) out)
+            (write-escaped-string (str (.val entry)) out)
             (when (.hasNext iterator)
               (write-bytes attribute-declaration-end out))))
         (write-bytes attribute-value-close out))))
 
   (defn write-attribute-style
-    [lane-ctx ^ByteBuffer out ^APersistentMap attribute-value]
+    [^ByteBuffer out ^APersistentMap attribute-value]
     (write-bytes attribute-value-open out)
-    (write-string lane-ctx ^String
-      (escape
-        (css/style-map->style attribute-value)) out)
+    (write-escaped-string ^String (css/style-map->style attribute-value) out)
     (write-bytes attribute-value-close out))
 
   (defn write-attribute-collection
@@ -99,7 +112,7 @@
         (write-node lane-ctx attribute-value-open out)
         (while (.hasNext iterator)
           (when-let [item (.next iterator)]
-            (write-string lane-ctx (escape (str item)) out)
+            (write-escaped-string (str item) out)
             (when (.hasNext iterator)
               (write-bytes attribute-class-separator out))))
         (write-bytes attribute-value-close out))))
@@ -112,7 +125,7 @@
         (or (.get cache attribute-name)
           (let [attribute-string-name (name attribute-name)]
             (write-bytes attribute-separator scratch-out)
-            (write-string lane-ctx attribute-string-name scratch-out)
+            (write-string attribute-string-name scratch-out)
             (let [b (buf->array! scratch-out)]
               (.put cache attribute-name b)
               b)))
@@ -152,7 +165,7 @@
   (defn write-element-start-tag
     [lane-ctx ^ByteBuffer out ^Iterator element-iterator ^String tag-name]
     (write-bytes element-open-start-tag out)
-    (write-string lane-ctx tag-name out)
+    (write-string tag-name out)
     (if (.hasNext element-iterator)
       (let [item (.next element-iterator)]
         (if (instance? IPersistentMap item)
@@ -165,9 +178,9 @@
       (write-bytes element-close-start-tag out)))
 
   (defn write-element-end-tag
-    [lane-ctx ^ByteBuffer out ^String element-tag-name]
+    [^ByteBuffer out ^String element-tag-name]
     (write-bytes element-open-end-tag out)
-    (write-string lane-ctx element-tag-name out)
+    (write-string element-tag-name out)
     (write-bytes element-close-end-tag out))
 
   (defn write-element
@@ -177,7 +190,7 @@
       (when-not (.contains unclosed-tags tag-name)
         (while (.hasNext element-iterator)
           (write-node lane-ctx (.next element-iterator) out))
-        (write-element-end-tag lane-ctx out tag-name))))
+        (write-element-end-tag out tag-name))))
 
   (defn write-collection
     [lane-ctx ^ByteBuffer out ^Iterable collection]
@@ -198,17 +211,17 @@
       (bytes? node) (.put out ^bytes node)
 
       (string? node)
-      (write-string lane-ctx (escape node) out)
+      (write-escaped-string node out)
 
       (instance? Sequential node)
       (write-collection lane-ctx out node)
 
-      :else (write-string lane-ctx (escape (str node)) out))))
+      :else (write-escaped-string (str node) out))))
 
 (defn write-attribute [lane-ctx attribute-value attribute-name builder]
   (cond
     (instance? String attribute-value)
-    (write-attribute-string lane-ctx builder attribute-value)
+    (write-attribute-string builder attribute-value)
 
     (instance? Boolean attribute-value) nil
 
@@ -220,11 +233,11 @@
 
     (instance? IPersistentMap attribute-value)
     (if (= attribute-name :style)
-      (write-attribute-style lane-ctx builder attribute-value)
-      (write-attribute-map lane-ctx builder attribute-value))
+      (write-attribute-style builder attribute-value)
+      (write-attribute-map builder attribute-value))
 
     :else
-    (write-attribute-string lane-ctx builder (str attribute-value))))
+    (write-attribute-string builder (str attribute-value))))
 
 (defn html->stream [lane-ctx ^ByteBuffer out node]
   (write-node lane-ctx node out))
