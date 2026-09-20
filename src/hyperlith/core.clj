@@ -46,8 +46,7 @@
    modulo-pick]
   ;; HTML
   [hyperlith.impl.html
-   html->bytes
-   escape]
+   html->bytes]
   ;; CRYPTO
   [hyperlith.impl.crypto
    new-uid
