@@ -91,7 +91,9 @@
   (defn write-attribute-style
     [lane-ctx ^ByteBuffer out ^APersistentMap attribute-value]
     (write-bytes attribute-value-open out)
-    (write-string lane-ctx ^String (css/style-map->style attribute-value) out)
+    (write-string lane-ctx ^String
+      (escape
+        (css/style-map->style attribute-value)) out)
     (write-bytes attribute-value-close out))
 
   (defn write-attribute-collection
