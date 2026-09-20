@@ -118,14 +118,14 @@
   (router/add-route! [:post path]
     (fn handler [req]
       (let [zstd-ctx  (zstd/ctx zstd-level zstd-window)
-            zstd-dst  (ByteBuffer/allocateDirect 16384)
+            zstd-dst  (ByteBuffer/allocateDirect  (* 2 16384))
             lane-ctx  ((req :hyperlith.core/select-lane))
             stream    (s/stream 0 nil)
             last-put_ (atom nil)
             conns     (.lane-conns ^LaneCtx lane-ctx)
             ;; Only merge ctx at the start of a connection (so cheap)
             req       (-> (u/fast-merge req (.dbs ^LaneCtx  lane-ctx))
-                                (assoc :hyperlith.core/lane-ctx lane-ctx))
+                        (assoc :hyperlith.core/lane-ctx lane-ctx))
             render
             (fn render []
               (try

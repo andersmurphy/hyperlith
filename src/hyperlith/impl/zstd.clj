@@ -29,5 +29,11 @@
   (.clear dst)
   (.flip src)
   (.compressDirectByteBufferStream ctx dst src EndDirective/CONTINUE)
-  (.clear src)
-  (.flip dst))
+  (try
+    (when (.hasRemaining src)
+      (throw (ex-info "zstd dst overflow"
+               {:src-remaining (.remaining src)
+                :dst-capacity  (.capacity dst)})))
+    (finally
+      (.clear src)
+      (.flip dst))))
