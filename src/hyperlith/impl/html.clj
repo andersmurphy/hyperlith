@@ -83,7 +83,7 @@
           (let [^MapEntry entry (.next iterator)]
             (write-string lane-ctx (.getName ^Keyword (.key entry)) out)
             (write-bytes attribute-declaration-separator out)
-            (write-string lane-ctx (str (.val entry)) out)
+            (write-string lane-ctx (escape (str (.val entry))) out)
             (when (.hasNext iterator)
               (write-bytes attribute-declaration-end out))))
         (write-bytes attribute-value-close out))))
