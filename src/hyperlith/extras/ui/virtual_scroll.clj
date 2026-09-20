@@ -108,7 +108,7 @@
         x-item-grid      (str "min-content min-content "x-item-grid" auto")
         y-item-grid      (str "min-content min-content "y-item-grid" auto")]
     [:div {:data-signals__ifmissing
-           (h/escape (h/edn->json {x-signal 0 y-signal 0}))
+           (h/edn->json {x-signal 0 y-signal 0})
              :style                   {:width      :100%
                                        :height     :100%
                                        :max-width  x-max-size
@@ -205,11 +205,11 @@
                   :y-offset-items   y-offset-items
                   :y-rendered-items y-rendered-items})]
     [:div {:data-signals__ifmissing
-           (h/escape (h/edn->json {x-signal 0 y-signal 0}))
-           :style                   {:width      :100%
-                                     :height     :100%
-                                     :max-width  x-max-size
-                                     :max-height y-max-size}}
+           (h/edn->json {x-signal 0 y-signal 0})
+           :style {:width      :100%
+                   :height     :100%
+                   :max-width  x-max-size
+                   :max-height y-max-size}}
      [:div
       (assoc {:id id :data-ref data-ref}
         ;; send up initial size on load
