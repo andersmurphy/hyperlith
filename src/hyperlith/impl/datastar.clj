@@ -122,10 +122,10 @@
             lane-ctx  ((req :hyperlith.core/select-lane))
             stream    (s/stream 0 nil)
             last-put_ (atom nil)
-            conns     (.lane-conns lane-ctx)
+            conns     (.lane-conns ^LaneCtx lane-ctx)
             ;; Only merge ctx at the start of a connection (so cheap)
-            req       (-> (u/fast-merge req (.dbs lane-ctx))
-                        (assoc :hyperlith.core/lane-ctx lane-ctx))
+            req       (-> (u/fast-merge req (.dbs ^LaneCtx  lane-ctx))
+                                (assoc :hyperlith.core/lane-ctx lane-ctx))
             render
             (fn render []
               (try
@@ -134,8 +134,10 @@
                   ;; this gives you back pressure and frame dropping.
                   (when (or (nil? @last-put_) (d/realized? @last-put_))
                     (when-some [new-view (render-fn req)]
-                      (let [zstd-src ^ByteBuffer (.zstd-src-buf lane-ctx)
-                            html-dst ^ByteBuffer (.html-dst-buf lane-ctx)
+                      (let [zstd-src ^ByteBuffer (.zstd-src-buf
+                                                   ^LaneCtx lane-ctx)
+                            html-dst ^ByteBuffer (.html-dst-buf
+                                                   ^LaneCtx lane-ctx)
                             _        (html->stream! lane-ctx new-view)
                             _        (ByteBuffer/.put zstd-src html-dst)
                             _        (ByteBuffer/.clear html-dst)

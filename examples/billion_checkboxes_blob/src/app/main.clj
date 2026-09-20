@@ -412,9 +412,8 @@
             {:data-id     state
              :data-action handler-palette
              :data-color  state
-             :class       (str "palette-item "
-                            (when (= current-selected state)
-                              "palette-selected"))}])
+             :class ["palette-item" (when (= current-selected state)
+                                      "palette-selected")]}])
      (subvec states 1))])
 
 (def shim-headers
