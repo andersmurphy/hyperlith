@@ -1,5 +1,5 @@
 (ns hyperlith.impl.lane-context)
 
 (defrecord LaneCtx
-    [dbs lane-conns attr-cache attr-name-cache attr-byte-scratch
+    [dbs lane-conns attr-value-cache attr-name-cache attr-byte-scratch
      html-dst-buf zstd-src-buf])

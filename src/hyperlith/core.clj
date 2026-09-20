@@ -165,7 +165,7 @@
             (lc/map->LaneCtx
               {:dbs               (sqlite/create-read-connections! dbs)
                :lane-conns        (ConcurrentHashMap.)
-               :attr-cache        (cache/init 2000)
+               :attr-value-cache        (cache/init 2000)
                :attr-name-cache   (HashMap.)
                ;; Goes back onto the heap when converted to byte array
                :attr-byte-scratch (ByteBuffer/allocate 16384)
