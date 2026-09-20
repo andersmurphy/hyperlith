@@ -14,9 +14,8 @@
     Sequential]
    [hyperlith.impl.lane_context LaneCtx]
    [java.lang Iterable]
-   [java.nio ByteBuffer CharBuffer]
+   [java.nio ByteBuffer]
    [java.nio.charset StandardCharsets]
-   [java.nio.charset CharsetEncoder]
    [java.util HashMap HashSet Iterator]))
 
 (set! *warn-on-reflection* true)
@@ -51,12 +50,9 @@
       (fn write-bytes [^bytes node ^ByteBuffer out]
         (.put out node))
       write-string
-      (fn write-string
-        [^LaneCtx lane-ctx ^String s ^ByteBuffer out]
-        (let [^CharsetEncoder e (.encoder lane-ctx)]
-          (.reset ^CharsetEncoder e)
-          (let [^CharBuffer in (CharBuffer/wrap s)]
-            (.encode ^CharsetEncoder e in out true))))
+      (fn write-string [lane-ctx ^String node ^ByteBuffer out]
+        (.put out
+          (String/.getBytes node StandardCharsets/UTF_8)))
       escape
       (fn escape ^String [^String value]
         (when value
@@ -244,8 +240,7 @@
    (let [lane-ctx (lc/map->LaneCtx
                     {:attr-cache        (cache/init 2000)
                      :attr-name-cache   (HashMap.)
-                     :attr-byte-scratch (ByteBuffer/allocate 16384)
-                     :encoder           (.newEncoder StandardCharsets/UTF_8)})
+                     :attr-byte-scratch (ByteBuffer/allocate 16384)})
          out      (ByteBuffer/allocate 16384)]
      (html->stream lane-ctx out node)
      (buf->array! out))))

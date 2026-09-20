@@ -26,7 +26,6 @@
    (hyperlith.impl.lane_context LaneCtx)
    (java.net ServerSocket)
    [java.nio ByteBuffer]
-   [java.nio.charset StandardCharsets]
    (java.util ArrayList HashMap Map$Entry)
    (java.util.concurrent
     Callable
@@ -166,7 +165,6 @@
             (lc/map->LaneCtx
               {:dbs               (sqlite/create-read-connections! dbs)
                :lane-conns        (ConcurrentHashMap.)
-               :encoder           (.newEncoder StandardCharsets/UTF_8)
                :attr-cache        (cache/init 2000)
                :attr-name-cache   (HashMap.)
                ;; Goes back onto the heap when converted to byte array
