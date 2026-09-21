@@ -372,7 +372,7 @@
   (-> (into []
         (map-indexed (fn [local-id box] (Checkbox local-id box)))
         blank-chunk)
-    h/html->bytes))
+    h/html->bytes-oneshot))
 
 (defn EmptyChunk [chunk-id]
   (-> [:div
@@ -380,7 +380,8 @@
         :id                (str "chunk-" chunk-id)
         :data-ignore-morph true
         :data-ignore       true
-        :data-id           chunk-id}
+        :data-id           chunk-id
+        :data-action handler-check}
        empty-checks]))
 
 (defn UserView
@@ -399,7 +400,7 @@
                          (-> (cache/lookup-or-miss html-cache
                                [id (cache/blob->key data)]
                                (fn [_]
-                                 (->> (Chunk id data)
+                                 (-> (Chunk id data)
                                    (h/html->bytes exec-ctx)))))))))
                (EmptyChunk chunk-id)))))})
 

@@ -233,32 +233,34 @@
     :else
     (write-attribute-string builder (str attribute-value))))
 
-(defn html->stream [lane-ctx ^ByteBuffer out node]
+(defn html->stream [node lane-ctx ^ByteBuffer out]
   (write-node lane-ctx node out))
 
 (def doctype-html5 (String/.getBytes "<!DOCTYPE html>"))
 
 (defn html->bytes
-  ([lane-ctx node]
-   (let [out (ByteBuffer/allocate 16384)]
-     (html->stream lane-ctx out node)
-     (buf->array! out)))
+  ([node lane-ctx]
+   (html->bytes node lane-ctx (ByteBuffer/allocate 16384)))
+  ([node lane-ctx out]
+   (html->stream node lane-ctx out)
+   (buf->array! out)))
+
+(defn html->bytes-oneshot
   ([node]
-   (let [lane-ctx (lc/map->LaneCtx
-                    {:attr-value-cache        (cache/init 2000)
-                     :attr-name-cache   (HashMap.)
-                     :attr-byte-scratch (ByteBuffer/allocate 16384)})
-         out      (ByteBuffer/allocate 16384)]
-     (html->stream lane-ctx out node)
+   (html->bytes-oneshot node 16384))
+  ([node out-size]
+   (let [lane-ctx (lc/new-lane-ctx)
+         out (ByteBuffer/allocate out-size)]
+     (html->stream node lane-ctx out)
      (buf->array! out))))
 
 (comment
-  (html->bytes
+  (html->bytes-oneshot
     [:div  "hello"
      [:div  "hello"]
      [:div  "hello"]])
   
-  (-> (html->bytes
+  (-> (html->bytes-oneshot
         [:link {:id "css" :rel "stylesheet" :type "text/css" :href
                 "/a8jqbDm8qU3PYHTz9IJ9N4k8pKIRzSRSo"}])
     (String.)))

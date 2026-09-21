@@ -1,7 +1,11 @@
 (ns app.main
   (:gen-class)
-  (:require [hyperlith.core :as h :refer [defaction defview]]
-            [app.game :as game]))
+  (:require
+   [app.game :as game]
+   [hyperlith.core :as h :refer [defaction defview]]
+   [hyperlith.impl.lane-context :as lc]) 
+  (:import
+   [java.nio ByteBuffer]))
 
 (def board-size 50)
 
@@ -97,12 +101,12 @@
    [:title "Game of Life"]
    [:meta {:content "Conway's Game of Life" :name "description"}]])
 
-(defn board [snapshot]
+(defn board [snapshot html-ctx]
   (let [view (board-state snapshot)]
     (-> [:div {:data-on:pointerdown
                (str "@post(`" handler-tap-cell "?id=${evt.target.dataset.id}`)")}
          [:div {:class "board"} view]]
-      h/html->bytes)))
+      (h/html->bytes html-ctx (.html-dst-buf html-ctx)))))
 
 (defview render-home {:path        "/" :shim-headers shim-headers
                       :zstd-window 20}
@@ -137,17 +141,19 @@
 (defn next-generation! [db]
   (swap! db update :board next-gen-board))
 
-(defn batch-fn [{:keys [db board-cache]} thunks]
+(defn batch-fn [{:keys [db board-cache html-ctx]} thunks]
   (run! (fn [thunk] (thunk db)) thunks)
   (next-generation! db)
-  (reset! board-cache (board @db)))
+  (reset! board-cache (board @db html-ctx)))
 
 (defn ctx-start []
   (let [db_         (atom {:board (game/empty-board board-size board-size)
                            :users {}})
         board-cache (atom nil)]
     {:board-cache board-cache
-     :db          db_}))
+     :db          db_
+     :html-ctx    (lc/new-lane-ctx
+                    {:html-dst-buf (ByteBuffer/allocate (* 10 16384))})}))
 
 (defonce app_ (atom nil))
 
@@ -181,3 +187,13 @@
   (->> @db :board (remove false?))
 
   ,)
+
+(comment
+  (require '[clj-async-profiler.core :as prof])
+
+  (prof/start {:event :alloc})
+  (prof/start)
+  (prof/stop)
+  (prof/serve-ui 7777)
+  ;; (clojure.java.browse/browse-url "http://localhost:7777/")
+  )

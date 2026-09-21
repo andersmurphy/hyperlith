@@ -70,7 +70,7 @@
                            :data-on:online__window on-load-js}]
                     [:noscript "Your browser does not support JavaScript!"]
                     [:main {:id "morph"}]]]]
-               h/html->bytes)]
+               h/html->bytes-oneshot)]
     (-> {:status  200
          :headers (assoc default-headers "Content-Encoding" "zstd")
          :body    (-> body (zstd/compress 19))}
@@ -101,12 +101,12 @@
   (String/.getBytes "\n\n"))
 
 (defn html->stream!
-  [^LaneCtx lane-ctx root]
+  [root ^LaneCtx lane-ctx ]
   (let [buf ^ByteBuffer (.html-dst-buf lane-ctx)]
     (run!
       (fn [node]
         (ByteBuffer/.put buf ^bytes event-prefix)
-        (h/html->stream lane-ctx buf node)
+        (h/html->stream node lane-ctx buf)
         (ByteBuffer/.put buf ^bytes event-sufix))
       root)
     (.flip buf)))
@@ -138,7 +138,7 @@
                                                    ^LaneCtx lane-ctx)
                             html-dst ^ByteBuffer (.html-dst-buf
                                                    ^LaneCtx lane-ctx)
-                            _        (html->stream! lane-ctx new-view)
+                            _        (html->stream! new-view lane-ctx)
                             _        (ByteBuffer/.put zstd-src html-dst)
                             _        (ByteBuffer/.clear html-dst)
                             _        (zstd/compress-chunk! zstd-ctx

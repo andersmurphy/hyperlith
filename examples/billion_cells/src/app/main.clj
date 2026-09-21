@@ -373,7 +373,7 @@
   (-> (into []
         (map-indexed (fn [local-id box] (Cell local-id box nil)))
         blank-chunk)
-    h/html->bytes))
+    (h/html->bytes-oneshot (* 2 16384))))
 
 (defn EmptyChunk [chunk-id]
   [:div {:class             "chunk"
@@ -557,17 +557,18 @@
 (defn start-app! [& {:keys [dev?]}]
   (reset! app_
     (h/start-app
-      {:dbs           {:db {:name          "cells.db"
-                            :pragma-writer {:cache_size 8000}
-                            :pragma
-                            {:cache_size   2000
-                             :page_size    (* 4096 4)
-                             :mmap_size    268435456}}}
-       :batch-fn      #'batch-fn
-       :batch-tick-ms 100
-       :email         (h/env :email)
-       :domain        (h/env :domain)
-       :dev?          dev?}))
+      {:dbs                {:db {:name          "cells.db"
+                                 :pragma-writer {:cache_size 8000}
+                                 :pragma
+                                 {:cache_size 2000
+                                  :page_size  (* 4096 4)
+                                  :mmap_size  268435456}}}
+       :batch-fn           #'batch-fn
+       :batch-tick-ms      100
+       :render-buffer-size (* 64 16384)
+       :email              (h/env :email)
+       :domain             (h/env :domain)
+       :dev?               dev?}))
   (let [{{:keys [::h/tx!]} :ctx} @app_]
     (tx! (fn [db _] (migrations db)
            (d/escape-write-tx [db db]

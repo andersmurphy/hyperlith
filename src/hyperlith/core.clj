@@ -5,7 +5,6 @@
    [clojure.main :refer [repl-caught]]
    [hyperlith.impl.assets]
    [hyperlith.impl.blocker :refer [wrap-blocker]]
-   [hyperlith.impl.cache :as cache]
    [hyperlith.impl.codec :as codec]
    [hyperlith.impl.crypto :as crypto]
    [hyperlith.impl.css]
@@ -26,7 +25,7 @@
    (hyperlith.impl.lane_context LaneCtx)
    (java.net ServerSocket)
    [java.nio ByteBuffer]
-   (java.util ArrayList HashMap Map$Entry)
+   (java.util ArrayList Map$Entry)
    (java.util.concurrent
     Callable
     ConcurrentHashMap
@@ -46,7 +45,8 @@
    modulo-pick]
   ;; HTML
   [hyperlith.impl.html
-   html->bytes]
+   html->bytes
+   html->bytes-oneshot]
   ;; CRYPTO
   [hyperlith.impl.crypto
    new-uid
@@ -159,56 +159,60 @@
       (update ::stop!
         conj (fn [] (Thread/.interrupt t))))))
 
-(defn- init-render-lanes [n-lanes dbs]
-  (->> (range n-lanes)
+(defn- init-render-lanes [{:keys [render-pool-size dbs render-buffer-size]}]
+  (->> (range render-pool-size)
     (mapv (fn [_]
-            (lc/map->LaneCtx
-              {:dbs               (sqlite/create-read-connections! dbs)
-               :lane-conns        (ConcurrentHashMap.)
-               :attr-value-cache        (cache/init 2000)
-               :attr-name-cache   (HashMap.)
-               ;; Goes back onto the heap when converted to byte array
-               :attr-byte-scratch (ByteBuffer/allocate 16384)
-               :html-dst-buf      (ByteBuffer/allocate (* 32 16384))
+            (lc/new-lane-ctx
+              {:dbs          (sqlite/create-read-connections! dbs)
+               :lane-conns   (ConcurrentHashMap.)
+               :html-dst-buf (ByteBuffer/allocate render-buffer-size)
                ;; zstd is in native lang
-               :zstd-src-buf      (ByteBuffer/allocateDirect (* 32 16384))})))))
+               :zstd-src-buf (ByteBuffer/allocateDirect
+                                    render-buffer-size)})))))
 
 (defn start-app
   [{:keys [port ctx-start batch-fn batch-tick-ms
-           domain email dev? dbs]
-    :or   {port 8080 batch-tick-ms 50 ctx-start (fn [] {})}}]
+           domain email dev? dbs render-pool-size render-buffer-size]
+    :or   {port               8080
+           batch-tick-ms      50
+           ctx-start          (fn [] {})
+           render-pool-size   (Runtime/.availableProcessors
+                                (Runtime/getRuntime))
+           render-buffer-size (* 32 16384)}}]
   (assert (not (nil? batch-fn)))
   (let [port        (if dev? port 443)
-        n-lanes     (Runtime/.availableProcessors (Runtime/getRuntime))
-        lanes       (init-render-lanes n-lanes dbs)
+        lanes       (init-render-lanes
+                      {:render-pool-size   render-pool-size
+                       :render-buffer-size render-buffer-size})
         select-lane (let [lane-idx ^AtomicInteger (AtomicInteger. 0)]
                       ;; Round robin lane select
                       (fn ^LaneCtx []
                         (get lanes
-                          (Math/floorMod (.getAndIncrement lane-idx) n-lanes))))
+                          (Math/floorMod (.getAndIncrement lane-idx)
+                            render-pool-size))))
         _           (throw-if-port-in-use! port)
         ctx         (-> (ctx-start)
-                   (assoc ::select-lane select-lane)
-                   (start-batch-loop!
-                     {:lanes         lanes
-                      :dbs           dbs
-                      :batch-fn      batch-fn
-                      :batch-tick-ms batch-tick-ms}))
+                      (assoc ::select-lane select-lane)
+                      (start-batch-loop!
+                        {:lanes         lanes
+                         :dbs           dbs
+                         :batch-fn      batch-fn
+                         :batch-tick-ms batch-tick-ms}))
         wrap-ctx    (fn [handler]
-                   (fn [req]
-                     (handler (u/fast-merge req ctx))))
+                      (fn [req]
+                        (handler (u/fast-merge req ctx))))
         ;; Middleware make for messy error stacks.
         router      (-> router/router
-                   wrap-ctx
-                   ;; Wrap error here because req params/body/session
-                   ;; have been handled (and provide useful context).
-                   wrap-error
-                   ;; The handlers after this point do not throw errors
-                   ;; are robust/lenient.
-                   wrap-query-params
-                   wrap-session
-                   wrap-parse-json-body
-                   wrap-blocker)
+                      wrap-ctx
+                      ;; Wrap error here because req params/body/session
+                      ;; have been handled (and provide useful context).
+                      wrap-error
+                      ;; The handlers after this point do not throw errors
+                      ;; are robust/lenient.
+                      wrap-query-params
+                      wrap-session
+                      wrap-parse-json-body
+                      wrap-blocker)
         config      {:executor              (Executors/newVirtualThreadPerTaskExecutor)
                      :port                  port
                      ;; Actions payloads are small
