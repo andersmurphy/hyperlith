@@ -114,6 +114,10 @@
 
 (defn start-batch-loop!
   [ctx {:keys [batch-fn batch-tick-ms dbs lanes]}]
+  (assert (not (nil? batch-tick-ms)))
+  (assert (not (nil? batch-fn)))
+  (assert (not (nil? dbs)))
+  (assert (not (nil? lanes)))
   (let [q       (LinkedBlockingQueue/new)
         ctx     (merge ctx (sqlite/create-write-connections! dbs))
         n-lanes (count lanes)
@@ -160,6 +164,9 @@
         conj (fn [] (Thread/.interrupt t))))))
 
 (defn- init-render-lanes [{:keys [render-pool-size dbs render-buffer-size]}]
+  (assert (not (nil? render-pool-size)))
+  (assert (not (nil? render-buffer-size)))
+  (assert (not (nil? dbs)))
   (->> (range render-pool-size)
     (mapv (fn [_]
             (lc/new-lane-ctx
@@ -168,7 +175,7 @@
                :html-dst-buf (ByteBuffer/allocate render-buffer-size)
                ;; zstd is in native lang
                :zstd-src-buf (ByteBuffer/allocateDirect
-                                    render-buffer-size)})))))
+                               render-buffer-size)})))))
 
 (defn start-app
   [{:keys [port ctx-start batch-fn batch-tick-ms
@@ -179,11 +186,11 @@
            render-pool-size   (Runtime/.availableProcessors
                                 (Runtime/getRuntime))
            render-buffer-size (* 32 16384)}}]
-  (assert (not (nil? batch-fn)))
   (let [port        (if dev? port 443)
         lanes       (init-render-lanes
                       {:render-pool-size   render-pool-size
-                       :render-buffer-size render-buffer-size})
+                       :render-buffer-size render-buffer-size
+                       :dbs                dbs})
         select-lane (let [lane-idx ^AtomicInteger (AtomicInteger. 0)]
                       ;; Round robin lane select
                       (fn ^LaneCtx []
