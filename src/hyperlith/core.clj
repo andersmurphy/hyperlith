@@ -27,11 +27,10 @@
    [java.nio ByteBuffer]
    (java.util ArrayList Map$Entry)
    (java.util.concurrent
-    Callable
     ConcurrentHashMap
     Executors
     LinkedBlockingQueue
-    ThreadPoolExecutor)
+    Semaphore)
    [java.util.concurrent.atomic AtomicInteger]))
 
 (import-vars
@@ -113,15 +112,16 @@
         {:status 500}))))
 
 (defn start-batch-loop!
-  [ctx {:keys [batch-fn batch-tick-ms dbs lanes]}]
+  [ctx {:keys [batch-fn batch-tick-ms dbs lanes start-sem done-sem]}]
   (assert (not (nil? batch-tick-ms)))
   (assert (not (nil? batch-fn)))
   (assert (not (nil? dbs)))
   (assert (not (nil? lanes)))
+  (assert (not (nil? start-sem)))
+  (assert (not (nil? done-sem)))
   (let [q       (LinkedBlockingQueue/new)
         ctx     (merge ctx (sqlite/create-write-connections! dbs))
         n-lanes (count lanes)
-        pool    (Executors/newFixedThreadPool n-lanes)
         t       (Thread.
                   ^Runnable
                   (bound-fn* ;; binding conveyance
@@ -134,21 +134,8 @@
                           (try
                             (batch-fn ctx (seq batch))
                             ;; Refresh connections
-                            (->> lanes
-                              (mapv
-                                (fn [^LaneCtx lane-ctx]
-                                  ^Callable
-                                  (fn []
-                                    (let [conns ^ConcurrentHashMap
-                                          (.lane-conns lane-ctx)]
-                                      (run! sqlite/start-read-tx
-                                        (vals (.dbs lane-ctx)))
-                                      (run! (fn [conn]
-                                              ((Map$Entry/.getValue conn)))
-                                        (.entrySet conns))
-                                      (run! sqlite/end-read-tx
-                                        (vals (.dbs lane-ctx)))))))
-                              (ThreadPoolExecutor/.invokeAll pool))
+                            (Semaphore/.release start-sem n-lanes)
+                            (Semaphore/.acquire done-sem n-lanes)
                             (catch Throwable t
                               (repl-caught t)
                               (flush)))
@@ -163,19 +150,41 @@
       (update ::stop!
         conj (fn [] (Thread/.interrupt t))))))
 
-(defn- init-render-lanes [{:keys [render-pool-size dbs render-buffer-size]}]
+(defn- init-render-lanes
+  [{:keys [render-pool-size dbs render-buffer-size start-sem done-sem]}]
   (assert (not (nil? render-pool-size)))
   (assert (not (nil? render-buffer-size)))
   (assert (not (nil? dbs)))
+  (assert (not (nil? start-sem)))
+  (assert (not (nil? done-sem)))
   (->> (range render-pool-size)
     (mapv (fn [_]
-            (lc/new-lane-ctx
-              {:dbs          (sqlite/create-read-connections! dbs)
-               :lane-conns   (ConcurrentHashMap.)
-               :html-dst-buf (ByteBuffer/allocate render-buffer-size)
-               ;; zstd is in native lang
-               :zstd-src-buf (ByteBuffer/allocateDirect
-                               render-buffer-size)})))))
+            (let [lane-ctx ^LaneCtx
+                  (lc/new-lane-ctx
+                    {:dbs          (sqlite/create-read-connections! dbs)
+                     :lane-conns   (ConcurrentHashMap.)
+                     :html-dst-buf (ByteBuffer/allocate render-buffer-size)
+                     ;; zstd is in native lang
+                     :zstd-src-buf (ByteBuffer/allocateDirect
+                                     render-buffer-size)})]
+              (-> (Thread.
+                    ^Runnable
+                    (bound-fn* ;; binding conveyance
+                      (fn render-thread []
+                        (while (not (Thread/interrupted))
+                          (Semaphore/.acquire start-sem)
+                          (let [conns ^ConcurrentHashMap
+                                (.lane-conns lane-ctx)]
+                            (run! sqlite/start-read-tx
+                              (vals (.dbs lane-ctx)))
+                            (run! (fn [conn]
+                                    ((Map$Entry/.getValue conn)))
+                              (.entrySet conns))
+                            (run! sqlite/end-read-tx
+                              (vals (.dbs lane-ctx))))
+                          (Semaphore/.release done-sem)))))
+                Thread/.start)
+              lane-ctx)))))
 
 (defn start-app
   [{:keys [port ctx-start batch-fn batch-tick-ms
@@ -187,10 +196,14 @@
                                 (Runtime/getRuntime))
            render-buffer-size (* 32 16384)}}]
   (let [port        (if dev? port 443)
+        start-sem   (Semaphore/new render-pool-size true)
+        done-sem    (Semaphore/new render-pool-size true)
         lanes       (init-render-lanes
                       {:render-pool-size   render-pool-size
                        :render-buffer-size render-buffer-size
-                       :dbs                dbs})
+                       :dbs                dbs
+                       :start-sem          start-sem
+                       :done-sem           done-sem})
         select-lane (let [lane-idx ^AtomicInteger (AtomicInteger. 0)]
                       ;; Round robin lane select
                       (fn ^LaneCtx []
@@ -204,7 +217,9 @@
                         {:lanes         lanes
                          :dbs           dbs
                          :batch-fn      batch-fn
-                         :batch-tick-ms batch-tick-ms}))
+                         :batch-tick-ms batch-tick-ms
+                         :start-sem     start-sem
+                         :done-sem      done-sem}))
         wrap-ctx    (fn [handler]
                       (fn [req]
                         (handler (u/fast-merge req ctx))))

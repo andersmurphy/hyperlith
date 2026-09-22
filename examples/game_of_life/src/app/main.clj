@@ -165,7 +165,8 @@
        :batch-tick-ms 200
        :email         (h/env :email)
        :domain        (h/env :domain)
-       :dev?          dev?})))
+       :dev?          dev?
+       :dbs {}})))
 
 (defn -main [& _]
   (start-app!))
