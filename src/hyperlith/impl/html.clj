@@ -50,7 +50,7 @@
       ^bytes esc-quot                        (str->bytes "&quot;")
       ^bytes esc-apos                        (str->bytes "&#39;")
       ^HashSet unclosed-tags
-      (HashSet. #{"area" "base" "br" "col" "embed" "hr" "img" "input" "link" "meta" "param" "source" "track" "wbr"})
+      (HashSet. #{:area :base :br :col :embed :hr :img :input :link :meta :param :source :track :wbr})
       write-bytes
       (fn write-bytes [^bytes node ^ByteBuffer out]
         (.put out node))
@@ -119,7 +119,7 @@
 
   (defn write-attribute-name [^LaneCtx lane-ctx attribute-name out]
     (let [cache       ^HashMap (.attr-name-cache lane-ctx)
-          scratch-out ^ByteBuffer (.attr-byte-scratch lane-ctx)]
+          scratch-out ^ByteBuffer (.byte-scratch lane-ctx)]
       (write-bytes
         ;; Attributes names are finite so we cache them in an unbounded cache
         (or (.get cache attribute-name)
@@ -146,8 +146,8 @@
               ;; Because caffeine cache is being used in a single
               ;; threaded context this is safe and avoids a lot
               ;; of allocations (compared to computeIfAbsent)
-              (let [^ByteBuffer scratch-out (.attr-byte-scratch lane-ctx)
-                    attr-value-cache              (.attr-value-cache lane-ctx)]
+              (let [^ByteBuffer scratch-out (.byte-scratch lane-ctx)
+                    attr-value-cache        (.attr-value-cache lane-ctx)]
                 (-> (or (cache/get attr-value-cache attribute-value)
                       (cache/put attr-value-cache attribute-value
                         (do (write-attribute lane-ctx
@@ -157,9 +157,19 @@
                   (write-bytes out)))))))))
 
   (defn write-element-start-tag
-    [lane-ctx ^ByteBuffer out ^Iterator element-iterator ^String tag-name]
-    (write-bytes element-open-start-tag out)
-    (write-string tag-name out)
+    [^LaneCtx lane-ctx ^ByteBuffer out ^Iterator element-iterator ^Keyword tag]
+    (let [cache       ^HashMap (.tag-cache lane-ctx)
+          scratch-out ^ByteBuffer (.byte-scratch lane-ctx)]
+      (write-bytes
+        ;; Tag names are finite so we cache them in an unbounded cache
+        (or (.get cache tag)
+          (let [tag-name (name tag)]
+            (write-bytes element-open-start-tag out)
+            (write-string tag-name out)
+            (let [b (buf->array! scratch-out)]
+              (.put cache tag b)
+              b)))
+        out))
     (if (.hasNext element-iterator)
       (let [item (.next element-iterator)]
         (if (instance? IPersistentMap item)
@@ -172,19 +182,28 @@
       (write-bytes element-close-start-tag out)))
 
   (defn write-element-end-tag
-    [^ByteBuffer out ^String element-tag-name]
-    (write-bytes element-open-end-tag out)
-    (write-string element-tag-name out)
-    (write-bytes element-close-end-tag out))
+    [^LaneCtx lane-ctx ^ByteBuffer out ^Keyword tag]
+    (let [cache       ^HashMap (.tag-cache lane-ctx)
+          scratch-out ^ByteBuffer (.byte-scratch lane-ctx)]
+      (write-bytes
+        ;; Tag names are finite so we cache them in an unbounded cache
+        (or (.get cache tag)
+          (let [tag-name (name tag)]
+            (write-bytes element-open-end-tag out)
+            (write-string tag-name out)
+            (write-bytes element-close-end-tag out)
+            (let [b (buf->array! scratch-out)]
+              (.put cache tag b)
+              b)))
+        out)))
 
   (defn write-element
     [lane-ctx ^ByteBuffer out ^Iterator element-iterator ^Keyword tag]
-    (let [tag-name (.getName tag)]
-      (write-element-start-tag lane-ctx out element-iterator tag-name)
-      (when-not (.contains unclosed-tags tag-name)
-        (while (.hasNext element-iterator)
-          (write-node lane-ctx (.next element-iterator) out))
-        (write-element-end-tag out tag-name))))
+    (write-element-start-tag lane-ctx out element-iterator tag)
+    (when-not (.contains unclosed-tags tag)
+      (while (.hasNext element-iterator)
+        (write-node lane-ctx (.next element-iterator) out))
+      (write-element-end-tag lane-ctx out tag)))
 
   (defn write-collection
     [lane-ctx ^ByteBuffer out ^Iterable collection]

@@ -192,8 +192,8 @@
     :or   {port               8080
            batch-tick-ms      50
            ctx-start          (fn [] {})
-           render-pool-size   (Runtime/.availableProcessors
-                                (Runtime/getRuntime))
+           render-pool-size    (Runtime/.availableProcessors
+                                 (Runtime/getRuntime))
            render-buffer-size (* 32 16384)}}]
   (let [port        (if dev? port 443)
         start-sem   (Semaphore/new render-pool-size true)
@@ -209,7 +209,7 @@
                       (fn ^LaneCtx []
                         (get lanes
                           (Math/floorMod (.getAndIncrement lane-idx)
-                            render-pool-size))))
+                            ^int render-pool-size))))
         _           (throw-if-port-in-use! port)
         ctx         (-> (ctx-start)
                       (assoc ::select-lane select-lane)
