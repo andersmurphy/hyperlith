@@ -133,39 +133,39 @@
 
   (defn write-element-attributes
     [^LaneCtx lane-ctx ^ByteBuffer out ^APersistentMap attributes]
-    (let [^Iterator iterator (.iterator attributes)]
-      (while (.hasNext iterator)
-        (let [^MapEntry attribute (.next iterator)]
-          (when-let [attribute-value (.val attribute)]
-            (let [^Keyword attribute-name (.key attribute)]
-              (write-attribute-name lane-ctx attribute-name out)
-              ;; We use caffeine here because we WTinyLRU is much
-              ;; better suited to bursts of cache thrashing data
-              ;; than a regular LRU.
-              ;;
-              ;; Because caffeine cache is being used in a single
-              ;; threaded context this is safe and avoids a lot
-              ;; of allocations (compared to computeIfAbsent)
-              (let [^ByteBuffer scratch-out (.byte-scratch lane-ctx)
-                    attr-value-cache        (.attr-value-cache lane-ctx)]
-                (-> (or (cache/get attr-value-cache attribute-value)
-                      (cache/put attr-value-cache attribute-value
-                        (do (write-attribute lane-ctx
-                              attribute-value
-                              attribute-name scratch-out)
-                            (buf->array! scratch-out))))
-                  (write-bytes out)))))))))
+    (reduce-kv
+      (fn [_ attr-name attr-value]
+        (when attr-value
+          (write-attribute-name lane-ctx attr-name out)
+          ;; We use caffeine here because we WTinyLRU is much
+          ;; better suited to bursts of cache thrashing data
+          ;; than a regular LRU.
+          ;;
+          ;; Because caffeine cache is being used in a single
+          ;; threaded context this is safe and avoids a lot
+          ;; of allocations (compared to computeIfAbsent)
+          (let [^ByteBuffer scratch-out (.byte-scratch lane-ctx)
+                attr-value-cache        (.attr-value-cache lane-ctx)]
+            (-> (or (cache/get attr-value-cache attr-value)
+                  (cache/put attr-value-cache attr-value
+                    (do (write-attribute lane-ctx
+                          attr-value
+                          attr-name scratch-out)
+                        (buf->array! scratch-out))))
+              (write-bytes out)))))
+      nil
+      attributes))
 
   (defn write-element-start-tag
     [^LaneCtx lane-ctx ^ByteBuffer out ^Iterator element-iterator ^Keyword tag]
-    (let [cache       ^HashMap (.tag-cache lane-ctx)
+    (let [cache       ^HashMap (.tag-open-cache lane-ctx)
           scratch-out ^ByteBuffer (.byte-scratch lane-ctx)]
       (write-bytes
         ;; Tag names are finite so we cache them in an unbounded cache
         (or (.get cache tag)
           (let [tag-name (name tag)]
-            (write-bytes element-open-start-tag out)
-            (write-string tag-name out)
+            (write-bytes element-open-start-tag scratch-out)
+            (write-string tag-name scratch-out)
             (let [b (buf->array! scratch-out)]
               (.put cache tag b)
               b)))
@@ -183,15 +183,15 @@
 
   (defn write-element-end-tag
     [^LaneCtx lane-ctx ^ByteBuffer out ^Keyword tag]
-    (let [cache       ^HashMap (.tag-cache lane-ctx)
+    (let [cache       ^HashMap (.tag-close-cache lane-ctx)
           scratch-out ^ByteBuffer (.byte-scratch lane-ctx)]
       (write-bytes
         ;; Tag names are finite so we cache them in an unbounded cache
         (or (.get cache tag)
           (let [tag-name (name tag)]
-            (write-bytes element-open-end-tag out)
-            (write-string tag-name out)
-            (write-bytes element-close-end-tag out)
+            (write-bytes element-open-end-tag scratch-out)
+            (write-string tag-name scratch-out)
+            (write-bytes element-close-end-tag scratch-out)
             (let [b (buf->array! scratch-out)]
               (.put cache tag b)
               b)))

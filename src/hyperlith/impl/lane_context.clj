@@ -7,7 +7,7 @@
 
 (defrecord LaneCtx
     [dbs lane-conns attr-value-cache attr-name-cache byte-scratch
-     html-dst-buf zstd-src-buf tag-cache])
+     html-dst-buf zstd-src-buf tag-open-cache tag-close-cache])
 
 (defn new-lane-ctx ^LaneCtx
   ([] (new-lane-ctx nil))
@@ -15,7 +15,8 @@
    (map->LaneCtx
      {:dbs              dbs
       :lane-conns       lane-conns
-      :tag-cache        (HashMap.)
+      :tag-open-cache        (HashMap.)
+      :tag-close-cache        (HashMap.)
       :attr-value-cache (cache/init 2000)
       :attr-name-cache  (HashMap.)
       ;; Goes back onto the heap when converted to byte array
