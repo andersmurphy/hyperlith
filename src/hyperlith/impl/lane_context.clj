@@ -2,8 +2,7 @@
   (:require
    [hyperlith.impl.cache :as cache]) 
   (:import
-   [java.nio ByteBuffer]
-   [java.util HashMap]))
+   [java.nio ByteBuffer]))
 
 (defrecord LaneCtx
     [dbs lane-conns attr-value-cache attr-name-cache byte-scratch
@@ -15,10 +14,10 @@
    (map->LaneCtx
      {:dbs              dbs
       :lane-conns       lane-conns
-      :tag-open-cache        (HashMap.)
-      :tag-close-cache        (HashMap.)
+      :tag-open-cache   (atom {})
+      :tag-close-cache  (atom {})      
+      :attr-name-cache  (atom {})
       :attr-value-cache (cache/init 2000)
-      :attr-name-cache  (HashMap.)
       ;; Goes back onto the heap when converted to byte array
       :byte-scratch     (ByteBuffer/allocate 16384)
       :html-dst-buf     html-dst-buf})))
