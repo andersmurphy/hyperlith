@@ -11,7 +11,7 @@
 
 (defn new-lane-ctx ^LaneCtx
   ([] (new-lane-ctx nil))
-  ([{:keys [dbs lane-conns html-dst-buf zstd-src-buf]}]
+  ([{:keys [dbs lane-conns html-dst-buf]}]
    (map->LaneCtx
      {:dbs              dbs
       :lane-conns       lane-conns
@@ -21,6 +21,4 @@
       :attr-name-cache  (HashMap.)
       ;; Goes back onto the heap when converted to byte array
       :byte-scratch     (ByteBuffer/allocate 16384)
-      :html-dst-buf     html-dst-buf
-      ;; zstd is in native lang
-      :zstd-src-buf     zstd-src-buf})))
+      :html-dst-buf     html-dst-buf})))

@@ -163,9 +163,7 @@
                   (lc/new-lane-ctx
                     {:dbs          (sqlite/create-read-connections! dbs)
                      :lane-conns   (ConcurrentHashMap.)
-                     :html-dst-buf (ByteBuffer/allocate render-buffer-size)
-                     ;; zstd is in native lang
-                     :zstd-src-buf (ByteBuffer/allocateDirect
+                     :html-dst-buf (ByteBuffer/allocateDirect
                                      render-buffer-size)})]
               (-> (Thread.
                     ^Runnable

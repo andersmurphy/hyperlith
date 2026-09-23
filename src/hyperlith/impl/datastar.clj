@@ -101,8 +101,9 @@
   (String/.getBytes "\n\n"))
 
 (defn html->stream!
-  [root ^LaneCtx lane-ctx ]
+  [root ^LaneCtx lane-ctx]
   (let [buf ^ByteBuffer (.html-dst-buf lane-ctx)]
+    (ByteBuffer/.clear buf)
     (run!
       (fn [node]
         (ByteBuffer/.put buf ^bytes event-prefix)
@@ -134,15 +135,11 @@
                   ;; this gives you back pressure and frame dropping.
                   (when (or (nil? @last-put_) (d/realized? @last-put_))
                     (when-some [new-view (render-fn req)]
-                      (let [zstd-src ^ByteBuffer (.zstd-src-buf
-                                                   ^LaneCtx lane-ctx)
-                            html-dst ^ByteBuffer (.html-dst-buf
+                      (let [html-dst ^ByteBuffer (.html-dst-buf
                                                    ^LaneCtx lane-ctx)
                             _        (html->stream! new-view lane-ctx)
-                            _        (ByteBuffer/.put zstd-src html-dst)
-                            _        (ByteBuffer/.clear html-dst)
                             _        (zstd/compress-chunk! zstd-ctx
-                                       zstd-dst zstd-src)]
+                                       zstd-dst html-dst)]
                         (->> (s/put! stream zstd-dst)
                           (reset! last-put_)))))
                   (do

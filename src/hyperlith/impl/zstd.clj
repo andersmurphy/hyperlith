@@ -27,7 +27,6 @@
 (defn compress-chunk! ^ByteBuffer
   [^ZstdCompressCtx ctx ^ByteBuffer dst ^ByteBuffer src]
   (.clear dst)
-  (.flip src)
   (.compressDirectByteBufferStream ctx dst src EndDirective/CONTINUE)
   (try
     (when (.hasRemaining src)
@@ -35,5 +34,4 @@
                {:src-remaining (.remaining src)
                 :dst-capacity  (.capacity dst)})))
     (finally
-      (.clear src)
       (.flip dst))))
