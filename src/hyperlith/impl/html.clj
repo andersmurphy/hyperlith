@@ -148,6 +148,14 @@
             (or (when-let [v (cache/get attr-value-cache attr-value)]
                   (write-bytes v out) true)
               (cache/put attr-value-cache attr-value
+                ;; Technically a style attribute map with the same
+                ;; value as another attribute map could shadow each
+                ;; other. eg:
+                ;; 
+                ;; {:data-bg {:background :red}} would shadow
+                ;; {:style   {:background :red}}
+                ;; 
+                ;; Probably worth fixing at some point.
                 (do (write-attribute lane-ctx
                       attr-value
                       attr-name out)
