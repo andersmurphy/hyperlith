@@ -16,7 +16,7 @@
    [java.lang Iterable]
    [java.nio ByteBuffer]
    [java.nio.charset StandardCharsets]
-   [java.util HashMap HashSet Iterator]))
+   [java.util HashSet Iterator]))
 
 (set! *warn-on-reflection* true)
 
@@ -26,12 +26,13 @@
 (defn str->bytes [s]
   (String/.getBytes s StandardCharsets/UTF_8))
 
-(defn buf->array! [^ByteBuffer buf]
-  (let [out-array (byte-array (.position buf))]
-    (.flip buf)
-    (.get buf out-array)
-    (.clear buf)
-    out-array))
+(defn region->byte-array! [^ByteBuffer out ^long start]
+  (let [end (.position out)
+        arr (byte-array (- end start))]
+    (.position out start)
+    (.get out arr)
+    (.position out end)
+    arr))
 
 (let [;; Avoid var lookup overhead (can't have const bytes)
       ^bytes element-open-start-tag          (str->bytes "<")
@@ -117,20 +118,17 @@
               (write-bytes attribute-class-separator out))))
         (write-bytes attribute-value-close out))))
 
-  (defn write-attribute-name [^LaneCtx lane-ctx attribute-name out]
-    (let [cache       (.attr-name-cache lane-ctx)
-          scratch-out ^ByteBuffer (.byte-scratch lane-ctx)]
-      (write-bytes
-        ;; Attributes names are finite so we cache them in an unbounded cache
-        ;; Each thread has it's own atom so we can read and then write
-        (or (@cache attribute-name)
-          (let [attribute-string-name (name attribute-name)]
-            (write-bytes attribute-separator scratch-out)
-            (write-string attribute-string-name scratch-out)
-            (let [b (buf->array! scratch-out)]
-              (swap! cache assoc attribute-name b)
-              b)))
-        out)))
+  (defn write-attribute-name [^LaneCtx lane-ctx attribute-name ^ByteBuffer out]
+    (let [cache (.attr-name-cache lane-ctx)]
+      ;; Attributes names are finite so we cache them in an unbounded cache
+      ;; Each thread has it's own atom so we can read and then write
+      (or (when-let [v (@cache attribute-name)] (write-bytes v out) true)
+        (let [start                 (.position out)
+              attribute-string-name (name attribute-name)]
+          (write-bytes attribute-separator out)
+          (write-string attribute-string-name out)
+          (swap! cache assoc attribute-name (region->byte-array! out start))
+          nil))))
 
   (defn write-element-attributes
     [^LaneCtx lane-ctx ^ByteBuffer out ^APersistentMap attributes]
@@ -145,33 +143,30 @@
           ;; Because caffeine cache is being used in a single
           ;; threaded context this is safe and avoids a lot
           ;; of allocations (compared to computeIfAbsent)
-          (let [^ByteBuffer scratch-out (.byte-scratch lane-ctx)
-                attr-value-cache        (.attr-value-cache lane-ctx)]
-            (-> (or (cache/get attr-value-cache attr-value)
-                  (cache/put attr-value-cache attr-value
-                    (do (write-attribute lane-ctx
-                          attr-value
-                          attr-name scratch-out)
-                        (buf->array! scratch-out))))
-              (write-bytes out)))))
+          (let [start            (.position out)
+                attr-value-cache (.attr-value-cache lane-ctx)]
+            (or (when-let [v (cache/get attr-value-cache attr-value)]
+                  (write-bytes v out) true)
+              (cache/put attr-value-cache attr-value
+                (do (write-attribute lane-ctx
+                      attr-value
+                      attr-name out)
+                    (region->byte-array! out start)))))))
       nil
       attributes))
 
   (defn write-element-start-tag
     [^LaneCtx lane-ctx ^ByteBuffer out ^Iterator element-iterator ^Keyword tag]
-    (let [cache       (.tag-open-cache lane-ctx)
-          scratch-out ^ByteBuffer (.byte-scratch lane-ctx)]
-      (write-bytes
-        ;; Tag names are finite so we cache them in an unbounded cache
-        ;; Each thread has it's own atom so we can read and then write
-        (or (@cache tag)
-          (let [tag-name (name tag)]
-            (write-bytes element-open-start-tag scratch-out)
-            (write-string tag-name scratch-out)
-            (let [b (buf->array! scratch-out)]
-              (swap! cache assoc tag b)
-              b)))
-        out))
+    (let [start (.position out)
+          cache (.tag-open-cache lane-ctx)]
+      ;; Tag names are finite so we cache them in an unbounded cache
+      ;; Each thread has it's own atom so we can read and then write
+      (or (when-let [v (@cache tag)] (write-bytes v out) true)
+        (let [tag-name (name tag)]
+          (write-bytes element-open-start-tag out)
+          (write-string tag-name out)
+          (swap! cache assoc tag (region->byte-array! out start))
+          nil)))
     (if (.hasNext element-iterator)
       (let [item (.next element-iterator)]
         (if (instance? IPersistentMap item)
@@ -185,19 +180,17 @@
 
   (defn write-element-end-tag
     [^LaneCtx lane-ctx ^ByteBuffer out ^Keyword tag]
-    (let [cache       (.tag-close-cache lane-ctx)
-          scratch-out ^ByteBuffer (.byte-scratch lane-ctx)]
-      (write-bytes
-        ;; Tag names are finite so we cache them in an unbounded cache
-        (or (@cache tag)
-          (let [tag-name (name tag)]
-            (write-bytes element-open-end-tag scratch-out)
-            (write-string tag-name scratch-out)
-            (write-bytes element-close-end-tag scratch-out)
-            (let [b (buf->array! scratch-out)]
-              (swap! cache assoc tag b)
-              b)))
-        out)))
+    (let [start (.position out)
+          cache (.tag-close-cache lane-ctx)]
+      ;; Tag names are finite so we cache them in an unbounded cache
+      ;; Each thread has it's own atom so we can read and then write
+      (or (when-let [v (@cache tag)] (write-bytes v out) true)
+        (let [tag-name (name tag)]
+          (write-bytes element-open-end-tag out)
+          (write-string tag-name out)
+          (write-bytes element-close-end-tag out)
+          (swap! cache assoc tag (region->byte-array! out start))
+          nil))))
 
   (defn write-element
     [lane-ctx ^ByteBuffer out ^Iterator element-iterator ^Keyword tag]
@@ -262,24 +255,21 @@
 (defn html->bytes
   ([node lane-ctx]
    (html->bytes node lane-ctx (ByteBuffer/allocate 16384)))
-  ([node lane-ctx out]
-   (html->stream node lane-ctx out)
-   (buf->array! out)))
+  ([node lane-ctx ^ByteBuffer out]
+   (let [start (.position out)]
+     (html->stream node lane-ctx out)
+     (region->byte-array! out start))))
 
 (defn html->bytes-oneshot
   ([node]
    (html->bytes-oneshot node 16384))
   ([node out-size]
    (let [lane-ctx (lc/new-lane-ctx)
-         out (ByteBuffer/allocate out-size)]
+         out      (ByteBuffer/allocate out-size)]
      (html->stream node lane-ctx out)
-     (buf->array! out))))
+     (region->byte-array! out 0))))
 
 (comment
-  (html->bytes-oneshot
-    [:div  "hello"
-     [:div  "hello"]
-     [:div  "hello"]])
   
   (-> (html->bytes-oneshot
         [:link {:id "css" :rel "stylesheet" :type "text/css" :href
