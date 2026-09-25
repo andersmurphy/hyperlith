@@ -258,7 +258,9 @@
   ([node lane-ctx ^ByteBuffer out]
    (let [start (.position out)]
      (html->stream node lane-ctx out)
-     (region->byte-array! out start))))
+     (let [b (region->byte-array! out start)]
+       (.clear out)
+       b))))
 
 (defn html->bytes-oneshot
   ([node]
