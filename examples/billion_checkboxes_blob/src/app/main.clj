@@ -426,6 +426,16 @@
 (defn scroll->cell-xy-js [n]
   (str "Math.round((" n "/" board-size-px ")*" size ")"))
 
+(def on-mouse-down-js
+  (str
+    "if (evt.target?.dataset.action || evt.target.parentElement?.dataset.action) {"
+    "evt.target.classList.add('pop');"
+    "$targetid = evt.target?.dataset.id;"
+    "$parentid = evt.target.parentElement?.dataset.id;"
+    "@post(`${evt.target?.dataset.action || evt.target.parentElement?.dataset.action}`);"
+    "setTimeout(() => evt.target.classList.remove('pop'), 300)"
+    "}"))
+
 (defview handler-root
   {:path "/" :shim-headers shim-headers :br-window-size 24}
   [{:keys         [db sid tabid html-cache ::h/lane-ctx]
@@ -441,15 +451,7 @@
      [:main
       {:id    "morph"
        :class "main"
-       :data-on:mousedown
-       (str
-         "if (evt.target?.dataset.action || evt.target.parentElement?.dataset.action) {"
-         "evt.target.classList.add('pop');"
-         "$targetid = evt.target?.dataset.id;"
-         "$parentid = evt.target.parentElement?.dataset.id;"
-         "@post(`${evt.target?.dataset.action || evt.target.parentElement?.dataset.action}`);"
-         "setTimeout(() => evt.target.classList.remove('pop'), 300)"
-         "}")}
+       :data-on:mousedown on-mouse-down-js}
       [:div {:class "view-wrapper"}
        (vs/virtual
          {:id                    "view"

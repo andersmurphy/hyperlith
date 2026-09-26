@@ -1,6 +1,4 @@
-(ns hyperlith.impl.lane-context 
-  (:require
-   [hyperlith.impl.cache :as cache]))
+(ns hyperlith.impl.lane-context)
 
 (defrecord LaneCtx
     [dbs lane-conns attr-value-cache attr-name-cache 
@@ -10,10 +8,9 @@
   ([] (new-lane-ctx nil))
   ([{:keys [dbs lane-conns html-dst-buf]}]
    (map->LaneCtx
-     {:dbs              dbs
-      :lane-conns       lane-conns
-      :tag-open-cache   (atom {})
-      :tag-close-cache  (atom {})
-      :attr-name-cache  (atom {})
-      :attr-value-cache (cache/init 2000)
-      :html-dst-buf     html-dst-buf})))
+     {:dbs             dbs
+      :lane-conns      lane-conns
+      :tag-open-cache  (atom {})
+      :tag-close-cache (atom {})
+      :attr-name-cache (atom {})
+      :html-dst-buf    html-dst-buf})))

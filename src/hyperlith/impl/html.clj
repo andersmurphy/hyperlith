@@ -1,8 +1,7 @@
 (ns hyperlith.impl.html
   (:require
    [hyperlith.impl.css :as css]
-   [hyperlith.impl.lane-context :as lc]
-   [hyperlith.impl.cache :as cache])
+   [hyperlith.impl.lane-context :as lc])
   (:import
    [clojure.lang
     APersistentMap
