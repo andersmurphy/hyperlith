@@ -1,8 +1,8 @@
 (ns hyperlith.impl.lane-context)
 
 (defrecord LaneCtx
-    [dbs lane-conns attr-value-cache attr-name-cache 
-     html-dst-buf zstd-src-buf tag-open-cache tag-close-cache])
+    [dbs lane-conns attr-name-cache tag-open-cache tag-close-cache
+     html-dst-buf])
 
 (defn new-lane-ctx ^LaneCtx
   ([] (new-lane-ctx nil))
