@@ -7,8 +7,8 @@
    [clojure.pprint :as pprint]
    [hyperlith.core :as h :refer [defaction defview]]
    [hyperlith.extras.ui.virtual-scroll :as vs]
-   [hyperlith.impl.sqlite :as d]
-   [hyperlith.impl.cache :as cache]))
+   [hyperlith.impl.cache :as cache]
+   [hyperlith.impl.sqlite :as d]))
 
 (set! *warn-on-reflection* true)
 ;; (set! *unchecked-math* :warn-on-boxed)
@@ -375,47 +375,52 @@
     h/html->bytes-oneshot))
 
 (defn EmptyChunk [chunk-id]
-  (-> [:div
-       {:class             "chunk"
-        :id                (str "chunk-" chunk-id)
-        :data-ignore-morph true
-        :data-ignore       true
-        :data-id           chunk-id
-        :data-action handler-check}
-       empty-checks]))
+  [:div
+   {:class             "chunk"
+    :id                (str "chunk-" chunk-id)
+    :data-ignore-morph true
+    :data-ignore       true
+    :data-id           chunk-id
+    :data-action       handler-check}
+   empty-checks])
 
 (defn UserView
-  [exec-ctx html-cache db offset-data]
+  [html-cache db offset-data]
   {:content
-   (->> (xy->chunk-ids offset-data)
-     (mapv (fn [chunk-id]
-             (or (first
-                   (d/q db
-                     '{select [id data]
-                       from   chunk
-                       where  [= id ?chunk-id]}
-                     {:chunk-id chunk-id}
-                     (fn [stmt]
-                       (let [id (d/int stmt 0) data (d/blob stmt 1)]
-                         (-> (cache/lookup-or-miss html-cache
-                               [id (cache/blob->key data)]
-                               (fn [_]
-                                 (-> (Chunk id data)
-                                   (h/html->bytes exec-ctx)))))))))
-               (EmptyChunk chunk-id)))))})
+   (fn [lane-ctx out]
+     (->> (xy->chunk-ids offset-data)
+       (run! (fn [chunk-id]
+               (-> (or (first
+                         (d/q db
+                           '{select [id data]
+                             from   chunk
+                             where  [= id ?chunk-id]}
+                           {:chunk-id chunk-id}
+                           (fn [stmt]
+                             (let [id (d/int stmt 0) data (d/blob stmt 1)]
+                               (-> (cache/lookup-or-miss html-cache
+                                     [id (cache/blob->key data)]
+                                     (fn [_]
+                                       (-> (Chunk id data)
+                                         (h/html->bytes lane-ctx)))))))))
+                     (EmptyChunk chunk-id))
+                 (h/html->stream lane-ctx out))))))})
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
 (defn Palette [current-selected]
-  [:div {:class "palette"}
-   (mapv (fn [state]
-           [:div
-            {:data-id     state
-             :data-action handler-palette
-             :data-color  state
-             :class ["palette-item" (when (= current-selected state)
-                                      "palette-selected")]}])
-     (subvec states 1))])
+  (fn [lane-ctx out]
+    (h/html->stream
+      [:div {:class "palette"}
+       (mapv (fn [state]
+               [:div
+                {:data-id     state
+                 :data-action handler-palette
+                 :data-color  state
+                 :class       ["palette-item" (when (= current-selected state)
+                                                "palette-selected")]}])
+         (subvec states 1))]
+      lane-ctx out)))
 
 (def shim-headers
   [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
@@ -438,19 +443,18 @@
 
 (defview handler-root
   {:path "/" :shim-headers shim-headers :br-window-size 24}
-  [{:keys         [db sid tabid html-cache ::h/lane-ctx]
+  [{:keys         [db sid tabid html-cache]
     {:strs [x y]} :query-params
     :as           _req}]
   (let [init-jump-x                                     (h/parse-long x 0)
         init-jump-y                                     (h/parse-long y 0)
         tab-data                                        (get-tab-data db sid tabid)
         {:keys [x y height width share-id
-                share-x share-y jump-x jump-y jump-id]} tab-data
-        palette                                         (Palette (or (:color tab-data) 1))]
+                share-x share-y jump-x jump-y jump-id]} tab-data]
     [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
      [:main
-      {:id    "morph"
-       :class "main"
+      {:id                "morph"
+       :class             "main"
        :data-on:mousedown on-mouse-down-js}
       [:div {:class "view-wrapper"}
        (vs/virtual
@@ -470,7 +474,7 @@
                                   :view-size          height
                                   :item-count-fn      (fn [] board-size)
                                   :chunk-size         chunk-size}
-          :v/item-fn             (partial UserView lane-ctx html-cache db)
+          :v/item-fn             (partial UserView html-cache db)
           :v/scroll-handler-path handler-scroll
           :v/resize-handler-path handler-resize})]
       [:div
@@ -495,7 +499,7 @@
                :data-action       handler-share
                :data-on:mousedown copy-xy-to-clipboard-js}
          [:strong {:class "pe-none"} "SHARE"]]]
-       palette
+       (Palette (or (:color tab-data) 1))
        [:h1 "One Billion Checkboxes"]
        [:p "Built using "
         [:a {:href "https://clojure.org/"} "Clojure"]

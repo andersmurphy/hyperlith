@@ -125,8 +125,7 @@
             last-put_ (atom nil)
             conns     (.lane-conns ^LaneCtx lane-ctx)
             ;; Only merge ctx at the start of a connection (so cheap)
-            req       (-> (u/fast-merge req (.dbs ^LaneCtx  lane-ctx))
-                        (assoc :hyperlith.core/lane-ctx lane-ctx))
+            req       (u/fast-merge req (.dbs ^LaneCtx  lane-ctx))
             render
             (fn render []
               (try

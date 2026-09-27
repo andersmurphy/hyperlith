@@ -44,6 +44,7 @@
    modulo-pick]
   ;; HTML
   [hyperlith.impl.html
+   html->stream
    html->bytes
    html->bytes-oneshot]
   ;; CRYPTO

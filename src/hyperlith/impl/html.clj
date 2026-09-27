@@ -207,6 +207,9 @@
 
       (instance? Sequential node)
       (write-collection lane-ctx out node)
+      
+      (fn? node)
+      (node lane-ctx out)
 
       :else (write-escaped-string (str node) out)))
   
