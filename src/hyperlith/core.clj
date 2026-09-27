@@ -119,31 +119,41 @@
   (assert (not (nil? lanes)))
   (assert (not (nil? start-sem)))
   (assert (not (nil? done-sem)))
-  (let [q       (LinkedBlockingQueue/new)
-        ctx     (merge ctx (sqlite/create-write-connections! dbs))
-        n-lanes (count lanes)
-        t       (Thread.
-                  ^Runnable
-                  (bound-fn* ;; binding conveyance
-                    (fn batch-thread []
-                      (while (not (Thread/interrupted))
-                        (let [next-tick (+ (System/currentTimeMillis)
-                                          batch-tick-ms)
-                              batch     (ArrayList/new)]
-                          (.drainTo q batch)
-                          (try
-                            (batch-fn ctx (seq batch))
-                            ;; Refresh connections
-                            (Semaphore/.release start-sem n-lanes)
-                            (Semaphore/.acquire done-sem n-lanes)
-                            (catch Throwable t
-                              (repl-caught t)
-                              (flush)))
-                          (let [sleep-time-ms (- next-tick
-                                                (System/currentTimeMillis))]
-                            (when (> sleep-time-ms 0)
-                              (Thread/sleep ^long sleep-time-ms))))))))
-        _       (Thread/.start t)]
+  (let [overruns (atom [])
+        q        (LinkedBlockingQueue/new)
+        ctx      (merge ctx (sqlite/create-write-connections! dbs))
+        n-lanes  (count lanes)
+        t        (Thread.
+                   ^Runnable
+                   (bound-fn* ;; binding conveyance
+                     (fn batch-thread []
+                       (while (not (Thread/interrupted))
+                         (let [next-tick (+ (System/currentTimeMillis)
+                                           batch-tick-ms)
+                               batch     (ArrayList/new)]
+                           (.drainTo q batch)
+                           (try
+                             (batch-fn ctx (seq batch))
+                             ;; Refresh connections
+                             (Semaphore/.release start-sem n-lanes)
+                             (Semaphore/.acquire done-sem n-lanes)
+                             (catch Throwable t
+                               (repl-caught t)
+                               (flush)))
+                           (let [sleep-time-ms
+                                 (- next-tick (System/currentTimeMillis))]
+                             (when (< sleep-time-ms 0)
+                               ;; log overrun
+                               (when (= @overruns [])
+                                 (Thread/startVirtualThread
+                                   (fn [] (Thread/sleep 20000)
+                                     (println "WARNING: tick overrun")
+                                     (println (u/stats @overruns))
+                                     (reset! overruns []))))
+                               (swap! overruns conj (- sleep-time-ms)))
+                             (when (> sleep-time-ms 0)
+                               (Thread/sleep ^long sleep-time-ms))))))))
+        _        (Thread/.start t)]
     (-> (assoc ctx
           ::tx!
           (fn tx! [thunk] (LinkedBlockingQueue/.offer q thunk)) )

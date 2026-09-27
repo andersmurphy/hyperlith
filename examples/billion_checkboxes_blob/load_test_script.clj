@@ -25,18 +25,6 @@
   {"Accept-Encoding" "zstd"
    "sec-fetch-site"  "same-origin"})
 
-(def latency-threshold-ms 200)
-(def stats (atom {:count 0 :max 0 :threshold-breaches 0}))
-
-(defn record-latency! [ms]
-  (let [breach? (> ms latency-threshold-ms)]
-    (swap! stats
-      (fn [s]
-        (-> s
-          (update :count inc)
-          (update :max max ms)
-          (update :threshold-breaches #(if breach? (inc %) %)))))))
-
 (defn views [users url]
   (dotimes [i (count users)]
     (Thread/startVirtualThread
@@ -49,20 +37,16 @@
                       :body    (json/encode {"tabid" "7dc673ca"})
                       :as      :stream})]
           (with-open [in (:body resp)]
-            (loop [last-time (System/currentTimeMillis)
-                   buf       (byte-array 4096)]
+            (loop [buf       (byte-array 4096)]
               (let [avail (.available in)]
                 (if (zero? avail)
                   (do (Thread/sleep 10)
-                      (recur last-time buf))
+                      (recur buf))
                   (let [read (.read in buf 0 (min avail 4096))]
                     (if (neg? read)
                       (println "Stream closed")
-                      (let [now    (System/currentTimeMillis)
-                            gap-ms (- now last-time)]
-                        (record-latency! gap-ms)
-                        (Thread/sleep 10)
-                        (recur now buf)))))))))))))
+                      (do (Thread/sleep 10)
+                          (recur buf)))))))))))))
 
 (defn actions [users url data-generator]
   (Thread/startVirtualThread
@@ -79,8 +63,7 @@
         (Thread/sleep 5)))))
 
 (let [url   "http://localhost:8080"
-      url2  "https://checkboxes.andersmurphy.com"
-      users (gen-users 3000)]
+      users (gen-users 4000)]
   (println "Running against..." url)
   (views users (str url "/?u="))
   ;; (actions users
@@ -95,7 +78,5 @@
       (let [[x y] (next-xy)]
         {"tabid"  "7dc673ca"
          "view-x" x
-         "view-y" y
-         })))
-  (Thread/sleep 20000)
-  (println @stats))
+         "view-y" y})))
+  (Thread/sleep 20000))

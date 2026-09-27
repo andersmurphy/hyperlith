@@ -38,3 +38,15 @@
   Always returns the same value for a given coll and value."
   [coll x]
   (-> (hash x) (mod (count coll)) coll))
+
+(defn stats [xs]
+  (let [s (vec (sort xs))
+        p #(nth s (int (* % (dec (count s)) 0.01)))]
+    (array-map
+      :n   (count s)
+      :p50 (p 50)
+      :p95 (p 95)
+      :p99 (p 99)
+      :max (peek s))))
+
+
