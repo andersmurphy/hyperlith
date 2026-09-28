@@ -207,7 +207,7 @@
                                  (Runtime/getRuntime))
            render-buffer-size (* 32 16384)}}]
   (let [port        (if dev? port 443)
-        start-sem   (Semaphore/new render-pool-size true)
+        start-sem   (Semaphore/new 0 true)
         done-sem    (Semaphore/new render-pool-size true)
         lanes       (init-render-lanes
                       {:render-pool-size   render-pool-size
