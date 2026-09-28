@@ -153,6 +153,8 @@
                                      (reset! overruns []))))
                                (swap! overruns conj (- sleep-time-ms)))
                              (when (> sleep-time-ms 0)
+                               (when (not (= @overruns []))
+                                 (swap! overruns conj batch-tick-ms))
                                (Thread/sleep ^long sleep-time-ms))))))))
         _        (Thread/.start t)]
     (-> (assoc ctx
