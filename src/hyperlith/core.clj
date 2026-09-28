@@ -30,7 +30,7 @@
     ConcurrentHashMap
     Executors
     LinkedBlockingQueue
-    Semaphore)
+    CyclicBarrier)
    [java.util.concurrent.atomic AtomicInteger]))
 
 (import-vars
@@ -113,17 +113,16 @@
         {:status 500}))))
 
 (defn start-batch-loop!
-  [ctx {:keys [batch-fn batch-tick-ms dbs lanes start-sem done-sem]}]
+  [ctx {:keys [batch-fn batch-tick-ms dbs lanes start-barrier done-barrier]}]
   (assert (not (nil? batch-tick-ms)))
   (assert (not (nil? batch-fn)))
   (assert (not (nil? dbs)))
   (assert (not (nil? lanes)))
-  (assert (not (nil? start-sem)))
-  (assert (not (nil? done-sem)))
+  (assert (not (nil? start-barrier)))
+  (assert (not (nil? done-barrier)))
   (let [overruns (atom [])
         q        (LinkedBlockingQueue/new)
         ctx      (merge ctx (sqlite/create-write-connections! dbs))
-        n-lanes  (count lanes)
         t        (Thread.
                    ^Runnable
                    (bound-fn* ;; binding conveyance
@@ -135,9 +134,10 @@
                            (.drainTo q batch)
                            (try
                              (batch-fn ctx (seq batch))
-                             ;; Refresh connections
-                             (Semaphore/.release start-sem n-lanes)
-                             (Semaphore/.acquire done-sem n-lanes)
+                             ;; Start renders
+                             (.await ^CyclicBarrier start-barrier)
+                             ;; Wait until all renders complete
+                             (.await ^CyclicBarrier done-barrier)
                              (catch Throwable t
                                (repl-caught t)
                                (flush)))
@@ -151,7 +151,8 @@
                                      (println "WARNING: tick overrun")
                                      (println (u/stats @overruns))
                                      (reset! overruns []))))
-                               (swap! overruns conj (- sleep-time-ms)))
+                               (swap! overruns conj
+                                 (- batch-tick-ms sleep-time-ms)))
                              (when (> sleep-time-ms 0)
                                (when (not (= @overruns []))
                                  (swap! overruns conj batch-tick-ms))
@@ -164,12 +165,12 @@
         conj (fn [] (Thread/.interrupt t))))))
 
 (defn- init-render-lanes
-  [{:keys [render-pool-size dbs render-buffer-size start-sem done-sem]}]
+  [{:keys [render-pool-size dbs render-buffer-size start-barrier done-barrier]}]
   (assert (not (nil? render-pool-size)))
   (assert (not (nil? render-buffer-size)))
   (assert (not (nil? dbs)))
-  (assert (not (nil? start-sem)))
-  (assert (not (nil? done-sem)))
+  (assert (not (nil? start-barrier)))
+  (assert (not (nil? done-barrier)))
   (->> (range render-pool-size)
     (mapv (fn [_]
             (let [lane-ctx ^LaneCtx
@@ -183,7 +184,7 @@
                     (bound-fn* ;; binding conveyance
                       (fn render-thread []
                         (while (not (Thread/interrupted))
-                          (Semaphore/.acquire start-sem)
+                          (.await ^CyclicBarrier start-barrier)
                           (let [conns ^ConcurrentHashMap
                                 (.lane-conns lane-ctx)]
                             (run! sqlite/start-read-tx
@@ -193,7 +194,7 @@
                               (.entrySet conns))
                             (run! sqlite/end-read-tx
                               (vals (.dbs lane-ctx))))
-                          (Semaphore/.release done-sem)))))
+                          (.await ^CyclicBarrier done-barrier)))))
                 Thread/.start)
               lane-ctx)))))
 
@@ -206,36 +207,36 @@
            render-pool-size    (Runtime/.availableProcessors
                                  (Runtime/getRuntime))
            render-buffer-size (* 32 16384)}}]
-  (let [port        (if dev? port 443)
-        start-sem   (Semaphore/new 0 true)
-        done-sem    (Semaphore/new render-pool-size true)
-        lanes       (init-render-lanes
-                      {:render-pool-size   render-pool-size
-                       :render-buffer-size render-buffer-size
-                       :dbs                dbs
-                       :start-sem          start-sem
-                       :done-sem           done-sem})
-        select-lane (let [lane-idx ^AtomicInteger (AtomicInteger. 0)]
+  (let [port          (if dev? port 443)
+        start-barrier (CyclicBarrier/new (inc render-pool-size))
+        done-barrier  (CyclicBarrier/new (inc render-pool-size))
+        lanes         (init-render-lanes
+                        {:render-pool-size   render-pool-size
+                         :render-buffer-size render-buffer-size
+                         :dbs                dbs
+                         :start-barrier      start-barrier
+                         :done-barrier       done-barrier})
+        select-lane   (let [lane-idx ^AtomicInteger (AtomicInteger. 0)]
                       ;; Round robin lane select
                       (fn ^LaneCtx []
                         (get lanes
                           (Math/floorMod (.getAndIncrement lane-idx)
                             ^int render-pool-size))))
-        _           (throw-if-port-in-use! port)
-        ctx         (-> (ctx-start)
-                      (assoc ::select-lane select-lane)
-                      (start-batch-loop!
-                        {:lanes         lanes
-                         :dbs           dbs
-                         :batch-fn      batch-fn
-                         :batch-tick-ms batch-tick-ms
-                         :start-sem     start-sem
-                         :done-sem      done-sem}))
-        wrap-ctx    (fn [handler]
+        _             (throw-if-port-in-use! port)
+        ctx           (-> (ctx-start)
+                        (assoc ::select-lane select-lane)
+                        (start-batch-loop!
+                          {:lanes         lanes
+                           :dbs           dbs
+                           :batch-fn      batch-fn
+                           :batch-tick-ms batch-tick-ms
+                           :start-barrier start-barrier
+                           :done-barrier  done-barrier}))
+        wrap-ctx      (fn [handler]
                       (fn [req]
                         (handler (u/fast-merge req ctx))))
         ;; Middleware make for messy error stacks.
-        router      (-> router/router
+        router        (-> router/router
                       wrap-ctx
                       ;; Wrap error here because req params/body/session
                       ;; have been handled (and provide useful context).
@@ -246,11 +247,11 @@
                       wrap-session
                       wrap-parse-json-body
                       wrap-blocker)
-        config      {:executor              (Executors/newVirtualThreadPerTaskExecutor)
-                     :port                  port
-                     ;; Actions payloads are small
-                     :max-request-body-size 4096
-                     :request-buffer-size   4096}
+        config        {:executor              (Executors/newVirtualThreadPerTaskExecutor)
+                       :port                  port
+                       ;; Actions payloads are small
+                       :max-request-body-size 4096
+                       :request-buffer-size   4096}
         server
         (if dev?
           (http/start-server router config)
