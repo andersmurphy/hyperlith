@@ -174,36 +174,36 @@
   (assert (not (nil? start-barrier)))
   (assert (not (nil? done-barrier)))
   (assert (not (nil? fragment-cache-size)))
-  (->> (range render-pool-size)
-    (mapv (fn [_]
-            (let [lane-ctx ^LaneCtx
-                  (lc/new-lane-ctx
-                    {:dbs          (sqlite/create-read-connections! dbs)
-                     :lane-conns   (ConcurrentHashMap.)
-                     :html-dst-buf (ByteBuffer/allocateDirect
+  (let [cache (cache/init
+                {:max-weight fragment-cache-size
+                 :weigher    (fn [_k ^bytes v] (alength v))})]
+    (->> (range render-pool-size)
+      (mapv (fn [_]
+              (let [lane-ctx ^LaneCtx
+                    (lc/new-lane-ctx
+                      {:dbs            (sqlite/create-read-connections! dbs)
+                       :lane-conns     (ConcurrentHashMap.)
+                       :html-dst-buf   (ByteBuffer/allocateDirect
                                        render-buffer-size)
-                     :fragment-cache
-                     (cache/init
-                       {:max-weight fragment-cache-size
-                        :weigher    (fn [_k ^bytes v] (alength v))})})]
-              (-> (Thread.
-                    ^Runnable
-                    (bound-fn* ;; binding conveyance
-                      (fn render-thread []
-                        (while (not (Thread/interrupted))
-                          (.await ^CyclicBarrier start-barrier)
-                          (let [conns ^ConcurrentHashMap
-                                (.lane-conns lane-ctx)]
-                            (run! sqlite/start-read-tx
-                              (vals (.dbs lane-ctx)))
-                            (run! (fn [conn]
-                                    ((Map$Entry/.getValue conn)))
-                              (.entrySet conns))
-                            (run! sqlite/end-read-tx
-                              (vals (.dbs lane-ctx))))
-                          (.await ^CyclicBarrier done-barrier)))))
-                Thread/.start)
-              lane-ctx)))))
+                       :fragment-cache cache})]
+                (-> (Thread.
+                      ^Runnable
+                      (bound-fn* ;; binding conveyance
+                        (fn render-thread []
+                          (while (not (Thread/interrupted))
+                            (.await ^CyclicBarrier start-barrier)
+                            (let [conns ^ConcurrentHashMap
+                                  (.lane-conns lane-ctx)]
+                              (run! sqlite/start-read-tx
+                                (vals (.dbs lane-ctx)))
+                              (run! (fn [conn]
+                                      ((Map$Entry/.getValue conn)))
+                                (.entrySet conns))
+                              (run! sqlite/end-read-tx
+                                (vals (.dbs lane-ctx))))
+                            (.await ^CyclicBarrier done-barrier)))))
+                  Thread/.start)
+                lane-ctx))))))
 
 (defn start-app
   [{:keys [port ctx-start batch-fn batch-tick-ms
@@ -215,7 +215,7 @@
            render-pool-size    (Runtime/.availableProcessors
                                  (Runtime/getRuntime))
            render-buffer-size  (* 32 16384)
-           fragment-cache-size (* 128 1024 1024)}}]
+           fragment-cache-size (* 512 1024 1024)}}]
   (let [port          (if dev? port 443)
         start-barrier (CyclicBarrier/new (inc render-pool-size))
         done-barrier  (CyclicBarrier/new (inc render-pool-size))
