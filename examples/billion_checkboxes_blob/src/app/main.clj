@@ -8,7 +8,8 @@
    [hyperlith.core :as h :refer [defaction defview]]
    [hyperlith.extras.ui.virtual-scroll :as vs]
    [hyperlith.impl.cache :as cache]
-   [hyperlith.impl.sqlite :as d]))
+   [hyperlith.impl.sqlite :as d])
+  (:import (hyperlith.impl.cache BlobKey)))
 
 (set! *warn-on-reflection* true)
 ;; (set! *unchecked-math* :warn-on-boxed)
@@ -357,7 +358,7 @@
         (xy->chunk-id x y))
     vec))
 
-(defn Chunk [chunk-id chunk-cells]
+(defn Chunk [chunk-id ^BlobKey chunk-cells]
   [:div
    {:class       "chunk"
     :id          (str "chunk-" chunk-id)
@@ -366,13 +367,15 @@
     :data-action handler-check}
    (into []
      (map-indexed (fn [local-id box] (Checkbox local-id box)))
-     chunk-cells)])
+     (.-b chunk-cells))])
 
-(def empty-checks
-  (-> (into []
-        (map-indexed (fn [local-id box] (Checkbox local-id box)))
-        blank-chunk)
-    h/html->bytes-oneshot))
+(comment
+  (.getBytes (cache/blob->key (bytes [1 2 4 ]))))
+
+(defn EmptyChecks []
+  (into []
+    (map-indexed (fn [local-id box] (Checkbox local-id box)))
+    blank-chunk))
 
 (defn EmptyChunk [chunk-id]
   [:div
@@ -382,45 +385,38 @@
     :data-ignore       true
     :data-id           chunk-id
     :data-action       handler-check}
-   empty-checks])
+   [EmptyChecks]])
 
 (defn UserView
-  [html-cache db offset-data]
+  [db offset-data]
   {:content
-   (fn [lane-ctx out]
+   (fn []
      (->> (xy->chunk-ids offset-data)
-       (run! (fn [chunk-id]
-               (-> (or (first
-                         (d/q db
-                           '{select [id data]
-                             from   chunk
-                             where  [= id ?chunk-id]}
-                           {:chunk-id chunk-id}
-                           (fn [stmt]
-                             (let [id (d/int stmt 0) data (d/blob stmt 1)]
-                               (-> (cache/lookup-or-miss html-cache
-                                     [id (cache/blob->key data)]
-                                     (fn [_]
-                                       (-> (Chunk id data)
-                                         (h/html->bytes lane-ctx)))))))))
-                     (EmptyChunk chunk-id))
-                 (h/html->stream lane-ctx out))))))})
+       (mapv (fn [chunk-id]
+               (or (first
+                     (d/q db
+                       '{select [id data]
+                         from   chunk
+                         where  [= id ?chunk-id]}
+                       {:chunk-id chunk-id}
+                       (fn [stmt]
+                         [Chunk (d/int stmt 0)
+                          (cache/blob->key (d/blob stmt 1))])))
+                 [EmptyChunk chunk-id])))))})
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
 (defn Palette [current-selected]
-  (fn [lane-ctx out]
-    (h/html->stream
-      [:div {:class "palette"}
-       (mapv (fn [state]
-               [:div
-                {:data-id     state
-                 :data-action handler-palette
-                 :data-color  state
-                 :class       ["palette-item" (when (= current-selected state)
-                                                "palette-selected")]}])
-         (subvec states 1))]
-      lane-ctx out)))
+  [:div {:class "palette"}
+   (mapv (fn [state]
+           [:div
+            {:data-id     state
+             :data-action handler-palette
+             :data-color  state
+             :class
+             ["palette-item" (when (= current-selected state)
+                               "palette-selected")]}])
+     (subvec states 1))])
 
 (def shim-headers
   [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
@@ -441,9 +437,40 @@
     "setTimeout(() => evt.target.classList.remove('pop'), 300)"
     "}"))
 
+(defn Info []
+  [[:h1 "One Billion Checkboxes"]
+   [:p "Built using "
+    [:a {:href "https://clojure.org/"} "Clojure"]
+    " and "
+    [:a {:href "https://data-star.dev"} "Datastar"]
+    " - "
+    [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "source"]
+    " - "
+    [:a {:href "https://andersmurphy.com/about"} "blog"]]])
+
+(defn Jump []
+  [:div {:class "jump"}
+   [:h2 "X:"]
+   [:input {:class "jump-input"
+            :type  "number" :data-bind "jumpx"
+            :data-effect
+            (str  "$view-x;@peek(() => {$jumpx = "(scroll->cell-xy-js "$view-x")"})")}]
+   [:h2 "Y:"]
+   [:input
+    {:class "jump-input"
+     :type  "number" :data-bind "jumpy"
+     :data-effect
+     (str  "$view-y;@peek(() => {$jumpy = "(scroll->cell-xy-js "$view-y")"})")}]
+   [:div {:class "button" :data-action handler-jump}
+    [:strong {:class "pe-none"} "JUMP"]]
+   [:div {:class             "button"
+          :data-action       handler-share
+          :data-on:mousedown copy-xy-to-clipboard-js}
+    [:strong {:class "pe-none"} "SHARE"]]])
+
 (defview handler-root
   {:path "/" :shim-headers shim-headers :br-window-size 24}
-  [{:keys         [db sid tabid html-cache]
+  [{:keys         [db sid tabid]
     {:strs [x y]} :query-params
     :as           _req}]
   (let [init-jump-x                                     (h/parse-long x 0)
@@ -474,41 +501,16 @@
                                   :view-size          height
                                   :item-count-fn      (fn [] board-size)
                                   :chunk-size         chunk-size}
-          :v/item-fn             (partial UserView html-cache db)
+          :v/item-fn             (partial UserView db)
           :v/scroll-handler-path handler-scroll
           :v/resize-handler-path handler-resize})]
       [:div
        {:class     "controls-wrapper"
         ;; firefox sometimes preserves scroll on refresh and we don't want that
         :data-init (scroll-to-xy-js init-jump-x init-jump-y)}
-       [:div {:class "jump"}
-        [:h2 "X:"]
-        [:input {:class "jump-input"
-                 :type  "number" :data-bind "jumpx"
-                 :data-effect
-                 (str  "$view-x;@peek(() => {$jumpx = "(scroll->cell-xy-js "$view-x")"})")}]
-        [:h2 "Y:"]
-        [:input
-         {:class "jump-input"
-          :type  "number" :data-bind "jumpy"
-          :data-effect
-          (str  "$view-y;@peek(() => {$jumpy = "(scroll->cell-xy-js "$view-y")"})")}]
-        [:div {:class "button" :data-action handler-jump}
-         [:strong {:class "pe-none"} "JUMP"]]
-        [:div {:class             "button"
-               :data-action       handler-share
-               :data-on:mousedown copy-xy-to-clipboard-js}
-         [:strong {:class "pe-none"} "SHARE"]]]
-       (Palette (or (:color tab-data) 1))
-       [:h1 "One Billion Checkboxes"]
-       [:p "Built using "
-        [:a {:href "https://clojure.org/"} "Clojure"]
-        " and "
-        [:a {:href "https://data-star.dev"} "Datastar"]
-        " - "
-        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "source"]
-        " - "
-        [:a {:href "https://andersmurphy.com/about"} "blog"]]]
+       [Jump]
+       [Palette (or (:color tab-data) 1)]
+       [Info]]
       (when share-id
         [:div {:id share-id :data-ignore-morph true}
          [:div {:data-on:mousedown "el.remove()" :class "toast"}
@@ -552,11 +554,7 @@
   (reset! app_
     (h/start-app
       {:ctx-start
-       (fn []
-         {:html-cache
-          (cache/init
-            {:max-weight (* 512 1024 1024)
-             :weigher    (fn [_k ^bytes v] (alength v))})})
+       (fn [] {})
        :dbs
        {:db {:name          "database-new.db"
              :pragma-writer {:cache_size 15625}
@@ -690,4 +688,3 @@
           where       [= data ?blank-chunk]}
         {:blank-chunk blank-chunk})))
   ,)
-

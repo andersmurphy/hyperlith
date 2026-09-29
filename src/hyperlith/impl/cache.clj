@@ -22,7 +22,7 @@
       (== hash (.hash ^BlobKey o))
       (Arrays/equals ^bytes b ^bytes (.b ^BlobKey o)))))
 
-(defn blob->key [^bytes x]
+(defn blob->key ^BlobKey [^bytes x]
   (->BlobKey x (int (Arrays/hashCode x))))
 
 (defn get [^Cache cache k]
@@ -31,3 +31,7 @@
 (defn put [^Cache cache k v]
   (.put cache k v)
   v)
+
+(comment
+  (let [a (blob->key (byte-array [1 2 3]))]
+      (.-b  a)))

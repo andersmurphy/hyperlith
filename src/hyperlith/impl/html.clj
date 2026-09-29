@@ -1,5 +1,6 @@
 (ns hyperlith.impl.html
   (:require
+   [hyperlith.impl.cache :as cache]
    [hyperlith.impl.css :as css]
    [hyperlith.impl.lane-context :as lc])
   (:import
@@ -21,6 +22,7 @@
 
 (declare write-node)
 (declare write-attribute)
+(declare html->bytes)
 
 (defn str->bytes [s]
   (String/.getBytes s StandardCharsets/UTF_8))
@@ -185,15 +187,26 @@
 
       write-collection
       (fn write-collection
-        [lane-ctx ^ByteBuffer out ^Iterable collection]
+        [^LaneCtx lane-ctx ^ByteBuffer out ^Iterable collection]
         (let [^Iterator iterator (.iterator collection)]
           (when (.hasNext iterator)
             (let [item (.next iterator)]
-              (if (instance? Keyword item)
-                (write-element lane-ctx out iterator item)
-                (do (write-node lane-ctx item out)
-                    (while (.hasNext iterator)
-                      (write-node lane-ctx (.next iterator) out))))))))]
+              (cond  (keyword? item)
+                     (write-element lane-ctx out iterator item)
+
+                     (fn? item)
+                     (.put out ^bytes
+                       (cache/lookup-or-miss
+                         (.fragment-cache lane-ctx)
+                         collection
+                         (fn [_]
+                           (html->bytes (apply item (subvec collection 1))
+                             lane-ctx))))
+
+                     :else
+                     (do (write-node lane-ctx item out)
+                         (while (.hasNext iterator)
+                           (write-node lane-ctx (.next iterator) out))))))))]
 
   (defn write-node
     [lane-ctx node ^ByteBuffer out]
@@ -209,7 +222,7 @@
       (write-collection lane-ctx out node)
       
       (fn? node)
-      (node lane-ctx out)
+      (write-node lane-ctx (node) out)
 
       :else (write-escaped-string (str node) out)))
   
