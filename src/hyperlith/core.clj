@@ -167,21 +167,25 @@
 
 (defn- init-render-lanes
   [{:keys [render-pool-size dbs render-buffer-size start-barrier done-barrier
-           fragment-cache]}]
+           fragment-cache-size]}]
   (assert (not (nil? render-pool-size)))
   (assert (not (nil? render-buffer-size)))
   (assert (not (nil? dbs)))
   (assert (not (nil? start-barrier)))
   (assert (not (nil? done-barrier)))
+  (assert (not (nil? fragment-cache-size)))
   (->> (range render-pool-size)
     (mapv (fn [_]
             (let [lane-ctx ^LaneCtx
                   (lc/new-lane-ctx
                     {:dbs          (sqlite/create-read-connections! dbs)
-                     :fragment-cache fragment-cache
                      :lane-conns   (ConcurrentHashMap.)
                      :html-dst-buf (ByteBuffer/allocateDirect
-                                     render-buffer-size)})]
+                                       render-buffer-size)
+                     :fragment-cache
+                     (cache/init
+                       {:max-weight fragment-cache-size
+                        :weigher    (fn [_k ^bytes v] (alength v))})})]
               (-> (Thread.
                     ^Runnable
                     (bound-fn* ;; binding conveyance
@@ -209,9 +213,9 @@
            batch-tick-ms       50
            ctx-start           (fn [] {})
            render-pool-size    (Runtime/.availableProcessors
-                                (Runtime/getRuntime))
+                                 (Runtime/getRuntime))
            render-buffer-size  (* 32 16384)
-           fragment-cache-size (* 512 1024 1024)}}]
+           fragment-cache-size (* 128 1024 1024)}}]
   (let [port          (if dev? port 443)
         start-barrier (CyclicBarrier/new (inc render-pool-size))
         done-barrier  (CyclicBarrier/new (inc render-pool-size))
@@ -221,10 +225,7 @@
                          :dbs                dbs
                          :start-barrier      start-barrier
                          :done-barrier       done-barrier
-                         :fragment-cache
-                         (cache/init
-                           {:max-weight fragment-cache-size
-                            :weigher    (fn [_k ^bytes v] (alength v))})})
+                         :fragment-cache-size fragment-cache-size})
         select-lane   (let [lane-idx ^AtomicInteger (AtomicInteger. 0)]
                         ;; Round robin lane select
                         (fn ^LaneCtx []

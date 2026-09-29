@@ -195,13 +195,13 @@
                      (write-element lane-ctx out iterator item)
 
                      (fn? item)
-                     (.put out ^bytes
-                       (cache/lookup-or-miss
-                         (.fragment-cache lane-ctx)
-                         collection
-                         (fn [_]
-                           (html->bytes (apply item (subvec collection 1))
-                             lane-ctx))))
+                     (let [cache (.fragment-cache lane-ctx)
+                           b     (or (cache/get cache collection)
+                                   (cache/put cache collection
+                                     (html->bytes (apply item
+                                                    (subvec collection 1))
+                                       lane-ctx)))]
+                       (.put out ^bytes b))
 
                      :else
                      (do (write-node lane-ctx item out)
