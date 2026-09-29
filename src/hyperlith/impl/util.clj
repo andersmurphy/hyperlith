@@ -18,7 +18,7 @@
   ([x]
    (parse-long x nil))
   ([x default]
-   (if (string? x) (parse-long x) default)))
+   (if (string? x) (clojure.core/parse-long x) default)))
 
 (defn resource->bytes [resource]
   (-> resource io/input-stream InputStream/.readAllBytes))
