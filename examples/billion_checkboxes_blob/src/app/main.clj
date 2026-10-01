@@ -369,9 +369,6 @@
      (map-indexed (fn [local-id box] (Checkbox local-id box)))
      (.-b chunk-cells))])
 
-(comment
-  (.getBytes (cache/blob->key (bytes [1 2 4 ]))))
-
 (defn EmptyChecks []
   (into []
     (map-indexed (fn [local-id box] (Checkbox local-id box)))

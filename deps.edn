@@ -1,6 +1,7 @@
 {:paths ["src" "resources" "classes"]
  :deps
- {org.clojure/clojure   {:mvn/version "1.12.5"}
+ {org.clojure/clojure {:mvn/version "1.13.0-alpha8"}
+
   org.clojure/data.json {:mvn/version "2.5.1"}
 
   ;; HTTP

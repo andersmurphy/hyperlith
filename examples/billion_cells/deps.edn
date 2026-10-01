@@ -1,5 +1,6 @@
 {:paths   ["src" "resources"]
- :deps    {org.clojure/clojure                      {:mvn/version "1.12.5"}
+ :deps    {org.clojure/clojure
+           {:mvn/version "1.13.0-alpha8"}
            hyperlith/hyperlith                      {:local/root "../../../hyperlith"}
            com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.6.2"}}
  :aliases {:dev   {:jvm-opts

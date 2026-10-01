@@ -1,12 +1,12 @@
 {:paths   ["src" "resources"]
- :deps    {org.clojure/clojure {:mvn/version "1.12.5"}
+ :deps    {org.clojure/clojure {:mvn/version "1.13.0-alpha8"}
            hyperlith/hyperlith {:local/root "../../../hyperlith"}}
  :aliases {:dev   {:jvm-opts
                    ["--enable-native-access=ALL-UNNAMED"
                     "-Duser.timezone=UTC"
                     "-XX:+UseZGC"
                     "-XX:+ZGenerational"
-                    "-XX:+UseCompactObjectHeaders"                    
+                    "-XX:+UseCompactObjectHeaders"
                     "-XX:+UseCompressedOops"
                     "-Djdk.attach.allowAttachSelf"
                     "-XX:+EnableDynamicAgentLoading"]}
