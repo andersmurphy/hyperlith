@@ -2,7 +2,8 @@
   (:refer-clojure :exclude [parse-long])
   (:require
    [aleph.http :as http]
-   [clojure.main :refer [repl-caught]]
+   [clojure.main :refer [repl-caught]]   
+   [hyperlith.core :as-alias h]
    [hyperlith.impl.assets]
    [hyperlith.impl.blocker :refer [wrap-blocker]]
    [hyperlith.impl.cache :as cache]
@@ -11,7 +12,7 @@
    [hyperlith.impl.css]
    [hyperlith.impl.datastar :as ds]
    [hyperlith.impl.env]
-   [hyperlith.impl.html :as h]
+   [hyperlith.impl.html]
    [hyperlith.impl.json :refer [wrap-parse-json-body]]
    [hyperlith.impl.lane-context :as lc]
    [hyperlith.impl.namespaces :refer [import-vars]]
@@ -26,13 +27,13 @@
    (hyperlith.impl.lane_context LaneCtx)
    (java.net ServerSocket)
    [java.nio ByteBuffer]
-   (java.util ArrayList Map$Entry)
+   (java.util ArrayList Collection)
    (java.util.concurrent
     ConcurrentHashMap
+    ConcurrentLinkedQueue
     CyclicBarrier
     Executors
-    LinkedBlockingQueue)
-   [java.util.concurrent.atomic AtomicInteger]))
+    LinkedBlockingQueue)))
 
 (import-vars
   ;; ENV
@@ -114,13 +115,15 @@
         {:status 500}))))
 
 (defn start-batch-loop!
-  [ctx {:keys [batch-fn batch-tick-ms dbs lanes start-barrier done-barrier]}]
+  [ctx {:keys [batch-fn batch-tick-ms dbs lanes start-barrier done-barrier
+               render-queue conns]}]
   (assert (not (nil? batch-tick-ms)))
   (assert (not (nil? batch-fn)))
   (assert (not (nil? dbs)))
   (assert (not (nil? lanes)))
   (assert (not (nil? start-barrier)))
   (assert (not (nil? done-barrier)))
+  (assert (not (nil? render-queue)))
   (let [overruns (atom [])
         q        (LinkedBlockingQueue/new)
         ctx      (merge ctx (sqlite/create-write-connections! dbs))
@@ -135,6 +138,11 @@
                            (.drainTo q batch)
                            (try
                              (batch-fn ctx (seq batch))
+                             (.addAll
+                               ^ConcurrentLinkedQueue
+                               render-queue
+                               ^Collection
+                               (.values ^ConcurrentHashMap conns))
                              ;; Start renders
                              (.await ^CyclicBarrier start-barrier)
                              ;; Wait until all renders complete
@@ -167,12 +175,13 @@
 
 (defn- init-render-lanes
   [{:keys [render-pool-size dbs render-buffer-size start-barrier done-barrier
-           fragment-cache-size]}]
+           fragment-cache-size render-queue]}]
   (assert (not (nil? render-pool-size)))
   (assert (not (nil? render-buffer-size)))
   (assert (not (nil? dbs)))
   (assert (not (nil? start-barrier)))
   (assert (not (nil? done-barrier)))
+  (assert (not (nil? render-queue)))
   (assert (not (nil? fragment-cache-size)))
   (let [cache (cache/init
                 {:max-weight fragment-cache-size
@@ -182,7 +191,6 @@
               (let [lane-ctx ^LaneCtx
                     (lc/new-lane-ctx
                       {:dbs            (sqlite/create-read-connections! dbs)
-                       :lane-conns     (ConcurrentHashMap.)
                        :html-dst-buf   (ByteBuffer/allocateDirect
                                        render-buffer-size)
                        :fragment-cache cache})]
@@ -192,15 +200,15 @@
                         (fn render-thread []
                           (while (not (Thread/interrupted))
                             (.await ^CyclicBarrier start-barrier)
-                            (let [conns ^ConcurrentHashMap
-                                  (.lane-conns lane-ctx)]
                               (run! sqlite/start-read-tx
                                 (vals (.dbs lane-ctx)))
-                              (run! (fn [conn]
-                                      ((Map$Entry/.getValue conn)))
-                                (.entrySet conns))
+                              (u/while-some
+                                [render (.poll
+                                          ^ConcurrentLinkedQueue
+                                          render-queue)]
+                                (render lane-ctx))
                               (run! sqlite/end-read-tx
-                                (vals (.dbs lane-ctx))))
+                                (vals (.dbs lane-ctx)))
                             (.await ^CyclicBarrier done-barrier)))))
                   Thread/.start)
                 lane-ctx))))))
@@ -219,32 +227,33 @@
   (let [port          (if dev? port 443)
         start-barrier (CyclicBarrier/new (inc render-pool-size))
         done-barrier  (CyclicBarrier/new (inc render-pool-size))
+        render-queue  (ConcurrentLinkedQueue/new)
+        conns         (ConcurrentHashMap/new)
         lanes         (init-render-lanes
-                        {:render-pool-size   render-pool-size
-                         :render-buffer-size render-buffer-size
-                         :dbs                dbs
-                         :start-barrier      start-barrier
-                         :done-barrier       done-barrier
+                        {:render-pool-size    render-pool-size
+                         :render-buffer-size  render-buffer-size
+                         :dbs                 dbs
+                         :start-barrier       start-barrier
+                         :done-barrier        done-barrier
+                         :render-queue        render-queue
                          :fragment-cache-size fragment-cache-size})
-        select-lane   (let [lane-idx ^AtomicInteger (AtomicInteger. 0)]
-                        ;; Round robin lane select
-                        (fn ^LaneCtx []
-                          (get lanes
-                            (Math/floorMod (.getAndIncrement lane-idx)
-                              ^int render-pool-size))))
         _             (throw-if-port-in-use! port)
         ctx           (-> (ctx-start)
-                        (assoc ::select-lane select-lane)
                         (start-batch-loop!
                           {:lanes         lanes
                            :dbs           dbs
                            :batch-fn      batch-fn
                            :batch-tick-ms batch-tick-ms
                            :start-barrier start-barrier
-                           :done-barrier  done-barrier}))
+                           :done-barrier  done-barrier
+                           :render-queue  render-queue
+                           :conns         conns}))
         wrap-ctx      (fn [handler]
                         (fn [req]
-                          (handler (u/fast-merge req ctx))))
+                          (handler
+                            (-> req
+                              (u/fast-merge ctx)
+                              (assoc ::h/conns conns)))))
         ;; Middleware make for messy error stacks.
         router        (-> router/router
                         wrap-ctx

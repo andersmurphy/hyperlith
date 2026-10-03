@@ -110,7 +110,7 @@
 
 (defview render-home {:path        "/" :shim-headers shim-headers
                       :zstd-window 20}
-  [{:keys [board-cache _sid] :as _req}]
+  [_ {:keys [board-cache _sid] :as _req}]
   [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
    [:main {:class "main" :id "morph"}
     [:h1 "Game of Life (multiplayer)"]
@@ -125,7 +125,7 @@
     @board-cache]])
 
 (defview render-home-embed {:path "/embed" :shim-headers shim-headers}
-  [{:keys [board-cache _sid] :as _req}]
+  [_ {:keys [board-cache _sid] :as _req}]
   [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
    [:main {:class "main" :id "morph"}
     [:h1 "Game of Life (multiplayer)"]

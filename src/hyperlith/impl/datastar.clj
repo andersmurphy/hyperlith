@@ -3,10 +3,11 @@
    [clojure.main :refer [repl-caught]]
    [clojure.string :as str]
    [hyperlith.impl.assets :refer [static-asset]]
-   [hyperlith.impl.crypto :as crypto]
+   [hyperlith.impl.crypto :as crypto]   
+   [hyperlith.core :as-alias h]
    [hyperlith.impl.headers
     :refer [default-headers strict-transport]]
-   [hyperlith.impl.html :as h]
+   [hyperlith.impl.html :as html]
    [hyperlith.impl.json :as json]
    [hyperlith.impl.router :as router]
    [hyperlith.impl.util :as u]
@@ -49,7 +50,7 @@
   "self.crypto.randomUUID().substring(0,8)")
 
 (defn build-shim-page-resp [head-hiccup]
-  (let [body (-> [h/doctype-html5
+  (let [body (-> [html/doctype-html5
                   [:html  {:lang "en"}
                    [:head
                     [:meta {:charset "UTF-8"}]
@@ -70,7 +71,7 @@
                            :data-on:online__window on-load-js}]
                     [:noscript "Your browser does not support JavaScript!"]
                     [:main {:id "morph"}]]]]
-               h/html->bytes-oneshot)]
+               html/html->bytes-oneshot)]
     (-> {:status  200
          :headers (assoc default-headers "Content-Encoding" "zstd")
          :body    (-> body (zstd/compress 19))}
@@ -107,7 +108,7 @@
     (run!
       (fn [node]
         (ByteBuffer/.put buf ^bytes event-prefix)
-        (h/html->stream node lane-ctx buf)
+        (html/html->stream node lane-ctx buf)
         (ByteBuffer/.put buf ^bytes event-sufix))
       root)
     (.flip buf)))
@@ -120,20 +121,17 @@
     (fn handler [req]
       (let [zstd-ctx  (zstd/ctx zstd-level zstd-window)
             zstd-dst  (ByteBuffer/allocateDirect  (* 2 16384))
-            lane-ctx  ((req :hyperlith.core/select-lane))
             stream    (s/stream 0 nil)
             last-put_ (atom nil)
-            conns     (.lane-conns ^LaneCtx lane-ctx)
-            ;; Only merge ctx at the start of a connection (so cheap)
-            req       (u/fast-merge req (.dbs ^LaneCtx  lane-ctx))
+            conns     (req ::h/conns)
             render
-            (fn render []
+            (fn render [^LaneCtx lane-ctx]
               (try
                 (if-not (s/closed? stream)
                   ;; Only render again if previous event was sent
                   ;; this gives you back pressure and frame dropping.
                   (when (or (nil? @last-put_) (d/realized? @last-put_))
-                    (when-some [new-view (render-fn req)]
+                    (when-some [new-view (render-fn (.dbs lane-ctx) req)]
                       (let [html-dst ^ByteBuffer (.html-dst-buf
                                                    ^LaneCtx lane-ctx)
                             _        (html->stream! new-view lane-ctx)

@@ -433,11 +433,12 @@
    [:meta {:content "So many cells" :name "description"}]])
 
 (defview handler-root
-  {:path              "/" :shim-headers shim-headers :br-window-size 24
-   :on-close          (fn [{:keys [::h/tx! sid tabid]}]
-                        (tx! (partial remove-focus! sid tabid)))
-   :zstd-window       20}
-  [{:keys         [db sid tabid]
+  {:path        "/" :shim-headers shim-headers :br-window-size 24
+   :on-close    (fn [{:keys [::h/tx! sid tabid]}]
+                  (tx! (partial remove-focus! sid tabid)))
+   :zstd-window 20}
+  [{:keys [db]}
+   {:keys         [sid tabid]
     {:strs [x y]} :query-params
     :as           _req}]
   (let [init-jump-x      (h/parse-long x 0)
@@ -487,14 +488,14 @@
         [:h2 "X:"]
         [:input
          {:class "jump-input"
-          :type "number" :data-bind "jumpx"
+          :type  "number" :data-bind "jumpx"
           :data-effect
           (str  "$view-x;@peek(() => {$jumpx = Math.round(($view-x/"
             board-width-px")*"size")})")}]
         [:h2 "Y:"]
         [:input
          {:class "jump-input"
-          :type "number" :data-bind "jumpy"
+          :type  "number" :data-bind "jumpy"
           :data-effect
           (str  "$view-y;@peek(() => {$jumpy = Math.round(($view-y/"
             board-height-px")*"size")})")}]

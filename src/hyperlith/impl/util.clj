@@ -49,4 +49,10 @@
       :p99 (p 99)
       :max (peek s))))
 
-
+(defmacro while-some
+  {:clj-kondo/lint-as 'clojure.core/let}
+  [bindings & body]
+  `(loop []
+     (when-some ~bindings
+       ~@body
+       (recur))))
