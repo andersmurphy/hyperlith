@@ -1,19 +1,25 @@
 (ns hyperlith.impl.css
-  (:require [hyperlith.impl.assets :refer [static-asset]]))
+  (:require [hyperlith.impl.assets :refer [static-asset]]
+            [clojure.string :as str]))
 
 (let [to-str
-      (fn to-str [s]
+      (fn to-str
+        [s]
         (cond (keyword? s) (name s)
-              (vector? s)  (->> (map to-str s)
-                             (interpose " ")
-                             (apply str))
+              (vector? s)  (str/join " " (mapv to-str s))
               :else        (str s)))]
 
   (defn style-map->style [v]
-    (reduce-kv (fn [acc k v]
-                 (str acc (to-str k) ":" (to-str v)";"))
-      ""
-      (sort-by key v)))
+    (-> (reduce-kv (fn [^StringBuilder sb k v]
+                     (doto sb
+                       (.append (to-str k))
+                       (.append ":")
+                       (.append (to-str v))
+                       (.append ";")))
+          ;; TODO: pass buffer in from lane and use recursively
+          (StringBuilder. 128)
+          v)
+      (StringBuilder/.toString)))
 
   (defn format-rule [[k v]]
     (str
@@ -42,9 +48,3 @@
 
   (defn -- [css-var-name]
     (str "var(--" (to-str css-var-name) ")")))
-
-
-
-
-
-
