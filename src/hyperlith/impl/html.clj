@@ -10,7 +10,6 @@
     IPersistentSet
     Keyword
     MapEntry
-    Numbers
     Sequential]
    [hyperlith.impl.lane_context LaneCtx]
    [java.lang Iterable]
@@ -59,20 +58,22 @@
           (String/.getBytes node StandardCharsets/UTF_8)))
 
       write-escaped-string
-      (fn write-escaped-string [^String value ^ByteBuffer out]
+      (fn write-escaped-string [s ^ByteBuffer out]
         (write-string
-          (cond-> value
-            (pos? (.indexOf value "&"))  (.replace "&" "&amp;")
-            (pos? (.indexOf value "<"))  (.replace "<" "&lt;")
-            (pos? (.indexOf value ">"))  (.replace ">" "&gt;")
-            (pos? (.indexOf value "\"")) (.replace "\"" "&quot;")
-            (pos? (.indexOf value "'"))  (.replace "'" "&#39;"))
+          (if (string? s)
+            (cond-> ^String s
+              (pos? (.indexOf ^String s "&"))  (.replace "&" "&amp;")
+              (pos? (.indexOf ^String s "<"))  (.replace "<" "&lt;")
+              (pos? (.indexOf ^String s ">"))  (.replace ">" "&gt;")
+              (pos? (.indexOf ^String s "\"")) (.replace "\"" "&quot;")
+              (pos? (.indexOf ^String s "'"))  (.replace "'" "&#39;"))
+            (str s))
           out))
 
       write-attribute-string
       (fn write-attribute-string
-        [^ByteBuffer out ^String attribute-value]
-        (when (Numbers/isPos (.length attribute-value))
+        [^ByteBuffer out attribute-value]
+        (when attribute-value
           (write-bytes attribute-value-open out)
           (write-escaped-string attribute-value out)
           (write-bytes attribute-value-close out)))
@@ -87,7 +88,7 @@
               (let [^MapEntry entry (.next iterator)]
                 (write-string (.getName ^Keyword (.key entry)) out)
                 (write-bytes attribute-declaration-separator out)
-                (write-escaped-string (str (.val entry)) out)
+                (write-escaped-string (.val entry) out)
                 (when (.hasNext iterator)
                   (write-bytes attribute-declaration-end out))))
             (write-bytes attribute-value-close out))))
@@ -108,7 +109,7 @@
             (write-node lane-ctx attribute-value-open out)
             (while (.hasNext iterator)
               (when-let [item (.next iterator)]
-                (write-escaped-string (str item) out)
+                (write-escaped-string item out)
                 (when (.hasNext iterator)
                   (write-bytes attribute-class-separator out))))
             (write-bytes attribute-value-close out))))
@@ -224,7 +225,7 @@
       (fn? node)
       (write-node lane-ctx (node) out)
 
-      :else (write-escaped-string (str node) out)))
+      :else (write-escaped-string node out)))
   
   (defn write-attribute [lane-ctx attribute-value attribute-name builder]
     (cond
@@ -245,7 +246,7 @@
         (write-attribute-map builder attribute-value))
 
       :else
-      (write-attribute-string builder (str attribute-value)))))
+      (write-attribute-string builder attribute-value))))
 
 (defn html->stream [node lane-ctx ^ByteBuffer out]
   (write-node lane-ctx node out))
