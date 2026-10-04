@@ -39,3 +39,15 @@ Restart service manually:
 ```bash
 systemctl restart app.service
 ```
+
+View app logs:
+
+```bash
+journalctl -u app --since "30 minutes ago"
+```
+
+View overruns:
+
+```bash
+journalctl -u app --since "5 minutes ago" | grep -A 1 "WARNING: tick overrun"
+```
