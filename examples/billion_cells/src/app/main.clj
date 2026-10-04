@@ -555,7 +555,7 @@
 
 (defonce app_ (atom nil))
 
-(defn start-app! [& {:keys [dev?]}]
+(defn start-app! [& {:keys [mode]}]
   (reset! app_
     (h/start-app
       {:dbs                {:db {:name          "cells.db"
@@ -569,7 +569,7 @@
        :render-buffer-size (* 64 16384)
        :email              (h/env :email)
        :domain             (h/env :domain)
-       :dev?               dev?}))
+       :mode               mode}))
   (let [{{:keys [::h/tx!]} :ctx} @app_]
     (tx! (fn [db _] (migrations db)
            (d/escape-write-tx [db db]
@@ -577,10 +577,10 @@
              (d/q db ["VACUUM"]))))))
 
 (defn -main [& _]
-  (start-app!))
+  (start-app! :mode :prod))
 
 (comment
-  (do (start-app! :dev? true) nil)
+  (do (start-app! :mode :dev) nil)
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
 
   ;; stop server

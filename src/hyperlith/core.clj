@@ -2,7 +2,7 @@
   (:refer-clojure :exclude [parse-long])
   (:require
    [aleph.http :as http]
-   [clojure.main :refer [repl-caught]]   
+   [clojure.main :refer [repl-caught]]
    [hyperlith.core :as-alias h]
    [hyperlith.impl.assets]
    [hyperlith.impl.blocker :refer [wrap-blocker]]
@@ -22,8 +22,11 @@
    [hyperlith.impl.sqlite :as sqlite]
    [hyperlith.impl.trace]
    [hyperlith.impl.util :as u]
+   [manifold.deferred :as d]
+   [manifold.stream :as s]
    [ol.clave.ext.aleph :as clave-aleph])
   (:import
+   (manifold.stream.core IEventSink)
    (hyperlith.impl.lane_context LaneCtx)
    (java.net ServerSocket)
    [java.nio ByteBuffer]
@@ -213,9 +216,17 @@
                   Thread/.start)
                 lane-ctx))))))
 
+(def stub-stream
+  (reify IEventSink
+    (put      [_ _ _]     (d/success-deferred true))
+    (put      [_ _ _ _ _] (d/success-deferred true))
+    (isClosed [_] false)
+    (markClosed [_] nil)
+    (onClosed   [_ _] nil)))
+
 (defn start-app
   [{:keys [port ctx-start batch-fn batch-tick-ms
-           domain email dev? dbs render-pool-size render-buffer-size
+           domain email mode dbs render-pool-size render-buffer-size
            fragment-cache-size]
     :or   {port                8080
            batch-tick-ms       50
@@ -224,11 +235,15 @@
                                  (Runtime/getRuntime))
            render-buffer-size  (* 32 16384)
            fragment-cache-size (* 512 1024 1024)}}]
-  (let [port          (if dev? port 443)
+  (assert (#{:test :dev :prod} mode))
+  (let [port          (if (= mode :prod) 443 port)
         start-barrier (CyclicBarrier/new (inc render-pool-size))
         done-barrier  (CyclicBarrier/new (inc render-pool-size))
         render-queue  (ConcurrentLinkedQueue/new)
         conns         (ConcurrentHashMap/new)
+        stream-fn     (if (= mode :test)
+                        (fn strem-fn-stub [] stub-stream)
+                        (fn stream-fn [] (s/stream 0 nil)))
         lanes         (init-render-lanes
                         {:render-pool-size    render-pool-size
                          :render-buffer-size  render-buffer-size
@@ -253,7 +268,9 @@
                           (handler
                             (-> req
                               (u/fast-merge ctx)
-                              (assoc ::h/conns conns)))))
+                              (assoc
+                                ::h/conns conns
+                                ::h/stream-fn stream-fn)))))
         ;; Middleware make for messy error stacks.
         router        (-> router/router
                         wrap-ctx
@@ -270,26 +287,30 @@
                        :port                  port
                        ;; Actions payloads are small
                        :max-request-body-size 4096
-                       :request-buffer-size   4096}
-        server
-        (if dev?
-          (http/start-server router config)
-          (clave-aleph/start-server router
-            (merge
-              config
-              {:http-versions             [:http2 :http1]
-               ::clave-aleph/http-options {:port 80}
-               ::clave-aleph/config
-               {:domains [domain]
-                :issuers
-                [{:directory-url
-                  "https://acme-v02.api.letsencrypt.org/directory"
-                  :email email}]}})))]
-    {:wrapped-router router
-     :ctx            ctx
-     :stop!          (fn stop [& [_opts]]
-                       (clave-aleph/stop server)
-                       (->> ctx ::stop!
-                         (run! (fn [stop!] (stop!)))))}))
+                       :request-buffer-size   4096}]
+    (if (= mode :test)
+      {:wrapped-router router
+       :ctx            ctx
+       :conns          conns}
+      (let [server
+            (if (not= mode :prod)
+              (http/start-server router config)
+              (clave-aleph/start-server router
+                (merge
+                  config
+                  {:http-versions             [:http2 :http1]
+                   ::clave-aleph/http-options {:port 80}
+                   ::clave-aleph/config
+                   {:domains [domain]
+                    :issuers
+                    [{:directory-url
+                      "https://acme-v02.api.letsencrypt.org/directory"
+                      :email email}]}})))]
+        {:wrapped-router router
+         :ctx            ctx
+         :stop!          (fn stop [& [_opts]]
+                           (clave-aleph/stop server)
+                           (->> ctx ::stop!
+                             (run! (fn [stop!] (stop!)))))}))))
 
 

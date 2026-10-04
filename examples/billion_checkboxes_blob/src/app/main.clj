@@ -548,11 +548,10 @@
 
 (defonce app_ (atom nil))
 
-(defn start-app! [& {:keys [dev?]}]
+(defn start-app! [& {:keys [mode]}]
   (reset! app_
     (h/start-app
-      {:ctx-start
-       (fn [] {})
+      {:ctx-start (fn [] {})
        :dbs
        {:db {:name          "database-new.db"
              :pragma-writer {:cache_size 15625}
@@ -565,7 +564,7 @@
        :batch-tick-ms 100
        :email         (h/env :email)
        :domain        (h/env :domain)
-       :dev?          dev?}))
+       :mode          mode}))
   (let [{{:keys [::h/tx!]} :ctx} @app_]
     (tx! (fn [db _] (migrations db)
            (d/escape-write-tx [db db]
@@ -573,10 +572,10 @@
              (d/q db ["VACUUM"]))))))
 
 (defn -main [& _]
-  (start-app!))
+  (start-app! :mode :prod))
 
 (comment
-  (do (start-app! :dev? true) nil)
+  (do (start-app! :mode :dev) nil)
   ;; (clojure.java.browse/browse-url "http://localhost:8080/")
   ;; stop server
   ((@app_ :stop!))
@@ -686,3 +685,21 @@
           where       [= data ?blank-chunk]}
         {:blank-chunk blank-chunk})))
   ,)
+
+(comment ;; stubbed load testing
+
+  (def stub-router
+    (do (start-app! :mode :test)
+        (@app_ :wrapped-router)))
+
+  (count (@app_ :conns))
+
+  (dotimes [i 1000]
+    (stub-router
+      {:request-method :post
+       :uri            "/"
+       :headers        {"content-type"    "application/json"
+                        "accept-encoding" "zstd"
+                        "sec-fetch-site"  "same-origin"
+                        "cookie"          (str "__Host-sid=" "test-user-" i)}
+       :body           (h/edn->json {"tabid" "7dc673ca"})})))

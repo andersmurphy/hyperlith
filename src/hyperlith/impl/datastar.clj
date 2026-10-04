@@ -121,7 +121,7 @@
     (fn handler [req]
       (let [zstd-ctx  (zstd/ctx zstd-level zstd-window)
             zstd-dst  (ByteBuffer/allocateDirect  (* 2 16384))
-            stream    (s/stream 0 nil)
+            stream    ((req ::h/stream-fn))
             last-put_ (atom nil)
             conns     (req ::h/conns)
             render

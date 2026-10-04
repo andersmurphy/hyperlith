@@ -10,3 +10,6 @@
 
 (defn router [req]
   ((get (get @routes_ (:request-method req)) (:uri req) fallback) req))
+
+(comment
+  @routes_)
