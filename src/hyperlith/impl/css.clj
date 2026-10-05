@@ -4,22 +4,35 @@
 
 (let [to-str
       (fn to-str
-        [s]
-        (cond (keyword? s) (name s)
-              (vector? s)  (str/join " " (mapv to-str s))
-              :else        (str s)))]
+        ([s]
+         (cond (keyword? s) (name s)
+               (vector? s)  (str/join " " (mapv to-str s))
+               :else        (str s)))
+        ([^StringBuilder sb s]
+         (cond (keyword? s) (.append sb ^String (name s))
+               (vector? s)
+               (loop [more (next s)
+                      sep  " "]
+                 (when more
+                   (.append ^String sep)
+                   (to-str sb (first more))
+                   (recur (next more) sep)))
+               :else        (.append sb s))
+         sb))]
 
-  (defn style-map->style [v]
-    (-> (reduce-kv (fn [^StringBuilder sb k v]
-                     (doto sb
-                       (.append (to-str k))
-                       (.append ":")
-                       (.append (to-str v))
-                       (.append ";")))
-          ;; TODO: pass buffer in from lane and use recursively
-          (StringBuilder. 128)
-          v)
-      (StringBuilder/.toString)))
+
+  (defn style-map->style [^StringBuilder sb v]
+    (reduce-kv (fn [^StringBuilder sb k v]
+                 (doto sb
+                   (to-str k)
+                   (.append":")
+                   (to-str v)
+                   (.append ";")))
+      sb
+      v)
+    (let [s (StringBuilder/.toString sb)]
+      (.setLength sb 0)
+      s))
 
   (defn format-rule [[k v]]
     (str

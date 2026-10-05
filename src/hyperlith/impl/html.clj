@@ -95,10 +95,11 @@
 
       write-attribute-style
       (fn write-attribute-style
-        [^ByteBuffer out ^APersistentMap attribute-value]
+        [^LaneCtx lane-ctx ^ByteBuffer out ^APersistentMap attribute-value]
         (write-bytes attribute-value-open out)
-        (write-escaped-string ^String
-          (css/style-map->style attribute-value) out)
+        (write-string ^String
+          (let [sb (.string-builder lane-ctx)]
+            (css/style-map->style sb attribute-value)) out)
         (write-bytes attribute-value-close out))
 
       write-attribute-collection
@@ -242,7 +243,7 @@
 
       (instance? IPersistentMap attribute-value)
       (if (= attribute-name :style)
-        (write-attribute-style builder attribute-value)
+        (write-attribute-style lane-ctx builder attribute-value)
         (write-attribute-map builder attribute-value))
 
       :else
