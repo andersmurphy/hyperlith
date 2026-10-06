@@ -200,9 +200,16 @@
                      (let [cache (.fragment-cache lane-ctx)
                            b     (or (cache/get cache collection)
                                    (cache/put cache collection
-                                     (html->bytes (apply item
-                                                    (subvec collection 1))
-                                       lane-ctx)))]
+                                     (let [qd (.query-disabled lane-ctx)]
+                                         (reset! qd item)
+                                       (try
+                                         (html->bytes
+                                           (apply item
+                                             (subvec collection 1))
+                                           lane-ctx)
+                                         (finally
+                                           (reset! qd nil)))
+                                       )))]
                        (.put out ^bytes b))
 
                      :else
@@ -222,9 +229,6 @@
 
       (instance? Sequential node)
       (write-collection lane-ctx out node)
-      
-      (fn? node)
-      (write-node lane-ctx (node) out)
 
       :else (write-escaped-string node out)))
   

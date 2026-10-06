@@ -46,37 +46,45 @@
   ([conn sql]
    (q* conn sql nil))
   ([conn sql params]
-   (let [stmt (prepare-cached conn sql params)]
-     (with-stmt-reset [stmt stmt]
-       (let [code (int
-                    #_{:clj-kondo/ignore [:type-mismatch]}
-                    (api/step stmt))]
-         (case code
-           100 nil
-           101 nil
-           (throw (api/sqlite-ex-info (:pdb conn) code
-                    {:sql    sql
-                     :params params})))))))
+   (if-let [inside @(:query-disabled conn)]
+     (throw (ex-info
+              (str "q cannot be called inside: " inside "\n")
+              {:inside inside}))
+     (let [stmt (prepare-cached conn sql params)]
+       (with-stmt-reset [stmt stmt]
+         (let [code (int
+                      #_{:clj-kondo/ignore [:type-mismatch]}
+                      (api/step stmt))]
+           (case code
+             100 nil
+             101 nil
+             (throw (api/sqlite-ex-info (:pdb conn) code
+                      {:sql    sql
+                       :params params}))))))))
   ([conn sql params result-set-fn]
-   (let [stmt (prepare-cached conn sql params)]
-     (with-stmt-reset [stmt stmt]
-       (result-set-reducer result-set-fn
-         (reify
-           clojure.lang.IReduceInit
-           (reduce [_ f init]
-             (loop [ret init]
-               (let [code (int
-                            #_{:clj-kondo/ignore [:type-mismatch]}
-                            (api/step stmt))]
-                 (case code
-                   100 (let [result (f ret stmt)]
-                         (if (reduced? result)
-                           @result
-                           (recur result)))
-                   101 ret
-                   (throw (api/sqlite-ex-info (:pdb conn) code
-                            {:sql    sql
-                             :params params}))))))))))))
+   (if-let [inside @(:query-disabled conn)]
+     (throw (ex-info
+              (str "q cannot be called inside: " inside "\n")
+              {:inside inside}))
+     (let [stmt (prepare-cached conn sql params)]
+       (with-stmt-reset [stmt stmt]
+         (result-set-reducer result-set-fn
+           (reify
+             clojure.lang.IReduceInit
+             (reduce [_ f init]
+               (loop [ret init]
+                 (let [code (int
+                              #_{:clj-kondo/ignore [:type-mismatch]}
+                              (api/step stmt))]
+                   (case code
+                     100 (let [result (f ret stmt)]
+                           (if (reduced? result)
+                             @result
+                             (recur result)))
+                     101 ret
+                     (throw (api/sqlite-ex-info (:pdb conn) code
+                              {:sql    sql
+                               :params params})))))))))))))
 
 (def default-pragma
   {:cache_size   15625
@@ -102,7 +110,7 @@
   (conj (->> (merge default-pragma pragma)
           (mapv (fn [[k v]] (str "pragma " (name k) "=" v))))))
 
-(defn- new-conn!* [db-name {:keys [pragma read-only]}]
+(defn- new-conn!* [db-name {:keys [pragma read-only query-disabled]}]
   (let [flags      (if read-only
                           ;; SQLITE_OPEN_READONLY
                           0x00000001
@@ -111,24 +119,30 @@
         *pdb       (api/open-v2 db-name flags nil)
         stmt-cache (HashMap.)
         conn       {:pdb        *pdb
-                    :stmt-cache stmt-cache}]
+                    :stmt-cache stmt-cache
+                    :query-disabled query-disabled}]
     (->> (pragma->set-pragma-query pragma)
       (run! #(q* conn %)))
     conn))
 
 (defn new-conn!
-  [{:keys [name pragma pragma-writer read-only]}]
+  [{:keys [name pragma pragma-writer read-only query-disabled]}]
   (new-conn!* name
-    {:read-only read-only
-     :pragma    (merge pragma pragma-writer)}))
+    {:query-disabled (or query-disabled (atom nil))
+     :read-only        read-only
+     :pragma           (merge pragma pragma-writer)}))
 
 (def ^:dynamic *dbs* nil)
 
 (defn create-write-connections! [dbs]
   (into {} (map (fn [[k opts]] [k (new-conn! opts)])) dbs))
 
-(defn create-read-connections! [dbs]
-  (into {} (map (fn [[k opts]] [k (new-conn! (assoc opts :read-only true))]))
+(defn create-read-connections! [dbs query-disabled]
+  (into {} (map (fn [[k opts]]
+                  [k (new-conn!
+                       (assoc opts
+                         :read-only true
+                         :query-disabled query-disabled))]))
     dbs))
 
 (defn start-read-tx [db]
@@ -164,10 +178,10 @@
   [db [query-type query :as string-query] & [a b]]
   (let [params         (when (map? a) a)
         result-set-fn  (or (when-not (map? a) a)
-                        (when-not (map? b) b))
+                         (when-not (map? b) b))
         [sql & params] (if (string? query-type)
-                          string-query
-                          (hsql/format query {:params params}))]
+                         string-query
+                         (hsql/format query {:params params}))]
     (if result-set-fn
       `(q* ~db ~sql ~(vec params) ~result-set-fn)
       `(q* ~db ~sql ~(vec params)))))

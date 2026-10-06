@@ -191,11 +191,15 @@
                  :weigher    (fn [_k ^bytes v] (alength v))})]
     (->> (range render-pool-size)
       (mapv (fn [_]
-              (let [lane-ctx ^LaneCtx
+              (let [query-disabled (atom nil)
+                    lane-ctx ^LaneCtx
                     (lc/new-lane-ctx
-                      {:dbs            (sqlite/create-read-connections! dbs)
+                      {:query-disabled query-disabled
+                       :dbs            (sqlite/create-read-connections!
+                                         dbs
+                                         query-disabled)
                        :html-dst-buf   (ByteBuffer/allocateDirect
-                                       render-buffer-size)
+                                         render-buffer-size)
                        :fragment-cache cache})]
                 (-> (Thread.
                       ^Runnable

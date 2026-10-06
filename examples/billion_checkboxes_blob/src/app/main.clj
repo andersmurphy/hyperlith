@@ -366,12 +366,12 @@
     :data-id     chunk-id
     :data-action handler-check}
    (into []
-     (map-indexed (fn [local-id box] (Checkbox local-id box)))
+     (map-indexed (fn [local-id box] [Checkbox local-id box]))
      (.-b chunk-cells))])
 
 (defn EmptyChecks []
   (into []
-    (map-indexed (fn [local-id box] (Checkbox local-id box)))
+    (map-indexed (fn [local-id box] [Checkbox local-id box]))
     blank-chunk))
 
 (defn EmptyChunk [chunk-id]
@@ -387,19 +387,18 @@
 (defn UserView
   [db offset-data]
   {:content
-   (fn []
-     (->> (xy->chunk-ids offset-data)
-       (mapv (fn [chunk-id]
-               (or (first
-                     (d/q db
-                       '{select [id data]
-                         from   chunk
-                         where  [= id ?chunk-id]}
-                       {:chunk-id chunk-id}
-                       (fn [stmt]
-                         [Chunk (d/int stmt 0)
-                          (cache/blob->key (d/blob stmt 1))])))
-                 [EmptyChunk chunk-id])))))})
+   (->> (xy->chunk-ids offset-data)
+     (mapv (fn [chunk-id]
+             (or (first
+                   (d/q db
+                     '{select [id data]
+                       from   chunk
+                       where  [= id ?chunk-id]}
+                     {:chunk-id chunk-id}
+                     (fn [stmt]
+                       [Chunk (d/int stmt 0)
+                        (cache/blob->key (d/blob stmt 1))])))
+               [EmptyChunk chunk-id]))))})
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
@@ -694,7 +693,7 @@
 
   (count (@app_ :conns))
 
-  (dotimes [i 4000]
+  (dotimes [i 3000]
     (stub-router
       {:request-method :post
        :uri            "/"
