@@ -120,13 +120,14 @@
         (let [cache (.attr-name-cache lane-ctx)]
           ;; Attributes names are finite so we cache them in an unbounded cache
           ;; Each thread has it's own atom so we can read and then write
-          (or (when-let [v (@cache attribute-name)] (write-bytes v out) true)
+          (if-let [v (@cache attribute-name)]
+            (write-bytes v out)
             (let [start                 (.position out)
                   attribute-string-name (name attribute-name)]
               (write-bytes attribute-separator out)
               (write-string attribute-string-name out)
-              (swap! cache assoc attribute-name (region->byte-array! out start))
-              nil))))
+              (swap! cache assoc attribute-name
+                (region->byte-array! out start))))))
 
       write-element-attributes
       (fn write-element-attributes
@@ -146,12 +147,12 @@
               cache (.tag-open-cache lane-ctx)]
           ;; Tag names are finite so we cache them in an unbounded cache
           ;; Each thread has it's own atom so we can read and then write
-          (or (when-let [v (@cache tag)] (write-bytes v out) true)
+          (if-let [v (@cache tag)]
+            (write-bytes v out)
             (let [tag-name (name tag)]
               (write-bytes element-open-start-tag out)
               (write-string tag-name out)
-              (swap! cache assoc tag (region->byte-array! out start))
-              nil)))
+              (swap! cache assoc tag (region->byte-array! out start)))))
         (if (.hasNext element-iterator)
           (let [item (.next element-iterator)]
             (if (instance? IPersistentMap item)
@@ -170,13 +171,13 @@
               cache (.tag-close-cache lane-ctx)]
           ;; Tag names are finite so we cache them in an unbounded cache
           ;; Each thread has it's own atom so we can read and then write
-          (or (when-let [v (@cache tag)] (write-bytes v out) true)
+          (if-let [v (@cache tag)]
+            (write-bytes v out)
             (let [tag-name (name tag)]
               (write-bytes element-open-end-tag out)
               (write-string tag-name out)
               (write-bytes element-close-end-tag out)
-              (swap! cache assoc tag (region->byte-array! out start))
-              nil))))
+              (swap! cache assoc tag (region->byte-array! out start))))))
 
       write-element
       (fn write-element
@@ -197,20 +198,19 @@
                      (write-element lane-ctx out iterator item)
 
                      (fn? item)
-                     (let [cache (.fragment-cache lane-ctx)
-                           b     (or (cache/get cache collection)
-                                   (cache/put cache collection
-                                     (let [qd (.query-disabled lane-ctx)]
-                                         (reset! qd item)
-                                       (try
-                                         (html->bytes
-                                           (apply item
-                                             (subvec collection 1))
-                                           lane-ctx)
-                                         (finally
-                                           (reset! qd nil)))
-                                       )))]
-                       (.put out ^bytes b))
+                     (let [cache (.fragment-cache lane-ctx)]
+                       (if-let [b (cache/get cache collection)]
+                         (.put out ^bytes b)
+                         (cache/put cache collection
+                           (let [qd    (.query-disabled lane-ctx)
+                                 start (.position out)]
+                             (reset! qd item)
+                             (try
+                               (write-node lane-ctx
+                                 (apply item (subvec collection 1))
+                                 out)
+                               (region->byte-array! out start)
+                               (finally (reset! qd nil)))))))
 
                      :else
                      (do (write-node lane-ctx item out)
@@ -259,14 +259,12 @@
 (def doctype-html5 (String/.getBytes "<!DOCTYPE html>"))
 
 (defn html->bytes
-  ([node lane-ctx]
-   (html->bytes node lane-ctx (ByteBuffer/allocate 16384)))
-  ([node lane-ctx ^ByteBuffer out]
-   (let [start (.position out)]
-     (html->stream node lane-ctx out)
-     (let [b (region->byte-array! out start)]
-       (.clear out)
-       b))))
+  [node lane-ctx ^ByteBuffer out]
+  (let [start (.position out)]
+    (html->stream node lane-ctx out)
+    (let [b (region->byte-array! out start)]
+      (.clear out)
+      b)))
 
 (defn html->bytes-oneshot
   ([node]
