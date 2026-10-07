@@ -62,11 +62,11 @@
         (write-string
           (if (string? s)
             (cond-> ^String s
-              (pos? (.indexOf ^String s "&"))  (.replace "&" "&amp;")
-              (pos? (.indexOf ^String s "<"))  (.replace "<" "&lt;")
-              (pos? (.indexOf ^String s ">"))  (.replace ">" "&gt;")
-              (pos? (.indexOf ^String s "\"")) (.replace "\"" "&quot;")
-              (pos? (.indexOf ^String s "'"))  (.replace "'" "&#39;"))
+              (not (neg? (.indexOf ^String s "&")))  (.replace "&" "&amp;")
+              (not (neg? (.indexOf ^String s "<")))  (.replace "<" "&lt;")
+              (not (neg? (.indexOf ^String s ">")))  (.replace ">" "&gt;")
+              (not (neg? (.indexOf ^String s "\""))) (.replace "\"" "&quot;")
+              (not (neg? (.indexOf ^String s "'")))  (.replace "'" "&#39;"))
             (str s))
           out))
 
