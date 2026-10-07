@@ -14,7 +14,7 @@
                (loop [more (next s)
                       sep  " "]
                  (when more
-                   (.append ^String sep)
+                   (.append sb ^String sep)
                    (to-str sb (first more))
                    (recur (next more) sep)))
                :else        (.append sb s))
