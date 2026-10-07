@@ -15,7 +15,7 @@
    [manifold.deferred :as d]
    [manifold.stream :as s])
   (:import
-   (java.util.concurrent ConcurrentHashMap)
+   (java.util.concurrent ConcurrentHashMap$KeySetView)
    (hyperlith.impl.lane_context LaneCtx)
    (java.nio ByteBuffer)))
 
@@ -140,14 +140,12 @@
                         (->> (s/put! stream zstd-dst)
                           (reset! last-put_)))))
                   (do
-                    (ConcurrentHashMap/.remove conns
-                      (System/identityHashCode render))
+                    (ConcurrentHashMap$KeySetView/.remove conns render)
                     (zstd/close-ctx zstd-ctx)
                     (when on-close (on-close req))))
                 (catch Throwable t
                   (repl-caught t))))]
-        (ConcurrentHashMap/.put conns
-          (System/identityHashCode render) render)
+        (ConcurrentHashMap$KeySetView/.add conns render)
         (when on-open (on-open req))
         {:status  200
          :headers (assoc default-headers

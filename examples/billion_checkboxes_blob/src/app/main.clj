@@ -693,7 +693,7 @@
 
   (count (@app_ :conns))
 
-  (dotimes [i 3000]
+  (dotimes [i 5000]
     (stub-router
       {:request-method :post
        :uri            "/"

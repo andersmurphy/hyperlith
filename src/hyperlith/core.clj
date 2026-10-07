@@ -32,11 +32,11 @@
    [java.nio ByteBuffer]
    (java.util ArrayList Collection)
    (java.util.concurrent
-    ConcurrentHashMap
-    ConcurrentLinkedQueue
-    CyclicBarrier
-    Executors
-    LinkedBlockingQueue)))
+     ConcurrentLinkedQueue     
+     ConcurrentHashMap
+     CyclicBarrier
+     Executors
+     LinkedBlockingQueue)))
 
 (import-vars
   ;; ENV
@@ -143,9 +143,7 @@
                              (batch-fn ctx (seq batch))
                              (.addAll
                                ^ConcurrentLinkedQueue
-                               render-queue
-                               ^Collection
-                               (.values ^ConcurrentHashMap conns))
+                               render-queue ^Collection conns)
                              ;; Start renders
                              (.await ^CyclicBarrier start-barrier)
                              ;; Wait until all renders complete
@@ -244,7 +242,7 @@
         start-barrier (CyclicBarrier/new (inc render-pool-size))
         done-barrier  (CyclicBarrier/new (inc render-pool-size))
         render-queue  (ConcurrentLinkedQueue/new)
-        conns         (ConcurrentHashMap/new)
+        conns         (ConcurrentHashMap/newKeySet)
         stream-fn     (if (= mode :test)
                         (fn strem-fn-stub [] stub-stream)
                         (fn stream-fn [] (s/stream 0 nil)))
