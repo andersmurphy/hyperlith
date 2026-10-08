@@ -1,4 +1,6 @@
-(ns hyperlith.impl.lane-context)
+(ns hyperlith.impl.lane-context 
+  (:import
+   [java.util IdentityHashMap]))
 
 (defrecord LaneCtx
     [dbs attr-name-cache tag-open-cache tag-close-cache
@@ -10,9 +12,10 @@
   ([{:keys [dbs html-dst-buf fragment-cache query-disabled]}]
    (map->LaneCtx
      {:dbs             dbs
-      :tag-open-cache  (atom {})
-      :tag-close-cache (atom {})
-      :attr-name-cache (atom {})
+      ;; We use IdentityHashMap because keys are keywords
+      :tag-open-cache  (IdentityHashMap.)
+      :tag-close-cache (IdentityHashMap.)
+      :attr-name-cache (IdentityHashMap.)
       :html-dst-buf    html-dst-buf
       :query-disabled  query-disabled
       :string-builder  (StringBuilder. 16384)

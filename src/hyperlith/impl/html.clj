@@ -15,7 +15,10 @@
    [java.lang Iterable]
    [java.nio ByteBuffer]
    [java.nio.charset StandardCharsets]
-   [java.util HashSet Iterator]))
+   [java.util
+    HashSet
+    IdentityHashMap
+    Iterator]))
 
 (set! *warn-on-reflection* true)
 
@@ -120,13 +123,13 @@
         (let [cache (.attr-name-cache lane-ctx)]
           ;; Attributes names are finite so we cache them in an unbounded cache
           ;; Each thread has it's own atom so we can read and then write
-          (if-let [v (@cache attribute-name)]
+          (if-let [v  (IdentityHashMap/.get cache attribute-name)]
             (write-bytes v out)
             (let [start                 (.position out)
                   attribute-string-name (name attribute-name)]
               (write-bytes attribute-separator out)
               (write-string attribute-string-name out)
-              (swap! cache assoc attribute-name
+              (IdentityHashMap/.put cache attribute-name
                 (region->byte-array! out start))))))
 
       write-element-attributes
@@ -147,12 +150,12 @@
               cache (.tag-open-cache lane-ctx)]
           ;; Tag names are finite so we cache them in an unbounded cache
           ;; Each thread has it's own atom so we can read and then write
-          (if-let [v (@cache tag)]
+          (if-let [v (IdentityHashMap/.get cache tag)]
             (write-bytes v out)
             (let [tag-name (name tag)]
               (write-bytes element-open-start-tag out)
               (write-string tag-name out)
-              (swap! cache assoc tag (region->byte-array! out start)))))
+              (IdentityHashMap/.put cache tag (region->byte-array! out start)))))
         (if (.hasNext element-iterator)
           (let [item (.next element-iterator)]
             (if (instance? IPersistentMap item)
@@ -171,13 +174,14 @@
               cache (.tag-close-cache lane-ctx)]
           ;; Tag names are finite so we cache them in an unbounded cache
           ;; Each thread has it's own atom so we can read and then write
-          (if-let [v (@cache tag)]
+          (if-let [v (IdentityHashMap/.get cache tag)]
             (write-bytes v out)
             (let [tag-name (name tag)]
               (write-bytes element-open-end-tag out)
               (write-string tag-name out)
               (write-bytes element-close-end-tag out)
-              (swap! cache assoc tag (region->byte-array! out start))))))
+              (IdentityHashMap/.put cache tag
+                (region->byte-array! out start))))))
 
       write-element
       (fn write-element
