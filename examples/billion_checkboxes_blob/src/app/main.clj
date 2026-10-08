@@ -343,10 +343,10 @@
       (update-tab-data! db sid tabid
         #(assoc % :share-x jumpx :share-y jumpy :share-id (h/new-uid))))))
 
-(defn Checkbox [local-id state]
+(defn Checkbox [{:keys [id state]}]
   [:div {:class      "box"
          :data-color state
-         :data-id    local-id}])
+         :data-id    id}])
 
 (defn xy->chunk-id [x y]
   (+ x (* y board-size)))
@@ -358,29 +358,31 @@
         (xy->chunk-id x y))
     vec))
 
-(defn Chunk [chunk-id ^BlobKey chunk-cells]
+(defn Chunk [{:keys [id ^BlobKey cells]}]
   [:div
    {:class       "chunk"
-    :id          (str "chunk-" chunk-id)
+    :id          (str "chunk-" id)
     :data-ignore true
-    :data-id     chunk-id
+    :data-id     id
     :data-action handler-check}
    (into []
-     (map-indexed (fn [local-id box] [Checkbox local-id box]))
-     (.-b chunk-cells))])
+     (map-indexed
+       (fn [local-id state]
+         [Checkbox {:id local-id :state state}]))
+     (.-b cells))])
 
 (defn EmptyChecks []
   (into []
-    (map-indexed (fn [local-id box] [Checkbox local-id box]))
+    (map-indexed (fn [local-id box] [Checkbox [local-id box]]))
     blank-chunk))
 
-(defn EmptyChunk [chunk-id]
+(defn EmptyChunk [{:keys [id]}]
   [:div
    {:class             "chunk"
-    :id                (str "chunk-" chunk-id)
+    :id                (str "chunk-" id)
     :data-ignore-morph true
     :data-ignore       true
-    :data-id           chunk-id
+    :data-id           id
     :data-action       handler-check}
    [EmptyChecks]])
 
@@ -396,13 +398,13 @@
                        where  [= id ?chunk-id]}
                      {:chunk-id chunk-id}
                      (fn [stmt]
-                       [Chunk (d/int stmt 0)
-                        (cache/blob->key (d/blob stmt 1))])))
-               [EmptyChunk chunk-id]))))})
+                       [Chunk {:id    (d/int stmt 0)
+                               :cells (cache/blob->key (d/blob stmt 1))}])))
+               [EmptyChunk {:id chunk-id}]))))})
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
-(defn Palette [current-selected]
+(defn Palette [{:keys [current-selected]}]
   [:div {:class "palette"}
    (mapv (fn [state]
            [:div
@@ -506,7 +508,7 @@
         ;; firefox sometimes preserves scroll on refresh and we don't want that
         :data-init (scroll-to-xy-js init-jump-x init-jump-y)}
        [Jump]
-       [Palette (or (:color tab-data) 1)]
+       [Palette {:current-selected (or (:color tab-data) 1)}]
        [Info]]
       (when share-id
         [:div {:id share-id :data-ignore-morph true}

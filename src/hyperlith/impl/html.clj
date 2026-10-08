@@ -107,10 +107,10 @@
 
       write-attribute-collection
       (fn write-attribute-collection
-        [lane-ctx ^ByteBuffer out ^Iterable attribute-value]
+        [^ByteBuffer out ^Iterable attribute-value]
         (let [^Iterator iterator (.iterator attribute-value)]
           (when (.hasNext iterator)
-            (write-node lane-ctx attribute-value-open out)
+            (write-bytes attribute-value-open out)
             (while (.hasNext iterator)
               (when-let [item (.next iterator)]
                 (write-escaped-string item out)
@@ -191,6 +191,17 @@
           (while (.hasNext element-iterator)
             (write-node lane-ctx (.next element-iterator) out))
           (write-element-end-tag lane-ctx out tag)))
+      
+      invoke-component
+      (fn invoke-component
+        [f form]
+        (case (count form)
+          1 (f)
+          2 (f (nth form 1))
+          3 (f (nth form 1) (nth form 2))
+          4 (f (nth form 1) (nth form 2) (nth form 3))
+          5 (f (nth form 1) (nth form 2) (nth form 3) (nth form 4))
+          (apply f (subvec form 1))))
 
       write-collection
       (fn write-collection
@@ -210,9 +221,10 @@
                                  start (.position out)]
                              (reset! qd item)
                              (try
-                               (write-node lane-ctx
-                                 (apply item (subvec collection 1))
+                               (write-node lane-ctx (invoke-component item
+                                   collection)
                                  out)
+                               
                                (region->byte-array! out start)
                                (finally (reset! qd nil)))))))
 
@@ -244,10 +256,10 @@
       (instance? Boolean attribute-value) nil
 
       (instance? Sequential attribute-value)
-      (write-attribute-collection lane-ctx builder attribute-value)
+      (write-attribute-collection builder attribute-value)
 
       (instance? IPersistentSet attribute-value)
-      (write-attribute-collection lane-ctx builder attribute-value)
+      (write-attribute-collection builder attribute-value)
 
       (instance? IPersistentMap attribute-value)
       (if (= attribute-name :style)
@@ -285,6 +297,3 @@
         [:link {:id "css" :rel "stylesheet" :type "text/css" :href
                 "/a8jqbDm8qU3PYHTz9IJ9N4k8pKIRzSRSo"}])
     (String.)))
-
-;; Escape for SSE? (mostly code blocks)?
-;; Cache open/close tags similar to attr cache
