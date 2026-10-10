@@ -15,4 +15,4 @@
   (b/javac {:src-dirs   ["src"]
             :class-dir  class-dir
             :basis      basis
-            :javac-opts ["--release" "21"]}))
+            :javac-opts ["--release" "24"]}))
