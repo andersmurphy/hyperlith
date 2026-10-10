@@ -79,17 +79,19 @@
     (.toArray (.reinterpret ptr size) ValueLayout/JAVA_BYTE)))
 
 (defn- bind [stmt params]
-  (reduce
-    (fn [i param]
-      (cond
-        (integer? param) (Sqlite/bindInt64  stmt i param)
-        (double? param)  (Sqlite/bindDouble stmt i param)
-        (string? param)  (bind-text         stmt i param)
-        (nil? param)     (Sqlite/bindNull   stmt i)
-        :else            (bind-blob         stmt i param))
-      (inc i))
-    1 ;; starts at 1
-    params))
+  (let [n (count params)]
+    (loop [i 0]
+      (when (< i n)
+        (let [param (nth params i)
+              ;; starts at 1
+              col   (unchecked-inc i)]
+          (cond
+            (integer? param) (Sqlite/bindInt64  stmt col param)
+            (string? param)  (bind-text         stmt col param)
+            (double? param)  (Sqlite/bindDouble stmt col param)
+            (nil? param)     (Sqlite/bindNull   stmt col)
+            :else            (bind-blob         stmt col param))
+          (recur (unchecked-inc i)))))))
 
 (defn- prepare-cached [{:keys [pdb ^HashMap stmt-cache]} sql params]
   (let [stmt (or (HashMap/.get stmt-cache sql)
@@ -162,19 +164,19 @@
                                :params params})))))))))))))
 
 (def default-pragma
-  {:cache_size   15625
-   :page_size    4096
-   :journal_mode "WAL"
-   :synchronous  "NORMAL"
-   :temp_store   "MEMORY"
-   :foreign_keys false
+  {:cache_size         15625
+   :page_size          4096
+   :journal_mode       "WAL"
+   :synchronous        "NORMAL"
+   :temp_store         "MEMORY"
+   :foreign_keys       false
    ;; We own the wal checkpoint
    :wal_autocheckpoint 0
    ;; Because of WAL and a single writer at the application level
    ;; SQLITE_BUSY error should almost never happen, see:
    ;; https://sqlite.org/wal.html#sometimes_queries_return_sqlite_busy_in_wal_mode
    ;; However, they can happen if multiple process access the db
-   :busy_timeout 5000
+   :busy_timeout       5000
    ;; :optimize cannot be run on connection open when using application
    ;; function in indexes. As you will get a unknown function error.
    ;; https://sqlite.org/pragma.html#pragma_optimize
@@ -187,14 +189,14 @@
 
 (defn- new-conn!* [db-name {:keys [pragma read-only query-disabled]}]
   (let [flags      (if read-only
-                          ;; SQLITE_OPEN_READONLY
-                          0x00000001
-                          ;; SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
-                          (bit-or 0x00000002 0x00000004))
+                     ;; SQLITE_OPEN_READONLY
+                     0x00000001
+                     ;; SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
+                     (bit-or 0x00000002 0x00000004))
         *pdb       (open-v2 db-name flags nil)
         stmt-cache (HashMap.)
-        conn       {:pdb        *pdb
-                    :stmt-cache stmt-cache
+        conn       {:pdb            *pdb
+                    :stmt-cache     stmt-cache
                     :query-disabled query-disabled}]
     (->> (pragma->set-pragma-query pragma)
       (run! #(q* conn %)))
@@ -204,8 +206,8 @@
   [{:keys [name pragma pragma-writer read-only query-disabled]}]
   (new-conn!* name
     {:query-disabled (or query-disabled (atom nil))
-     :read-only        read-only
-     :pragma           (merge pragma pragma-writer)}))
+     :read-only      read-only
+     :pragma         (merge pragma pragma-writer)}))
 
 (def ^:dynamic *dbs* nil)
 
@@ -277,7 +279,7 @@
       where  [= id ?sid]
       limit  1}
     {:params {:sid 3}})
-  
+
   (macroexpand
     '(q db
        '{select [data]
