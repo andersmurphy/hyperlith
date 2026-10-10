@@ -16,3 +16,6 @@
             :class-dir  class-dir
             :basis      basis
             :javac-opts ["--release" "24"]}))
+
+;; To build java classes
+;; clojure -T:build jcompile
