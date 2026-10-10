@@ -1,16 +1,27 @@
 (ns hyperlith.impl.sqlite.api
-  "These function map directly to SQLite's C API."
   (:require
    [clojure.java.io :as io]
-   [clojure.string :as str]
-   [coffi.ffi :as ffi]
-   [coffi.mem :as mem]
-   [hyperlith.impl.sqlite.ffi-wrapper :as ffi-wrapper :refer [defcfn]])
+   [clojure.string  :as str])
   (:import
+   [java.lang.foreign
+    AddressLayout
+    Arena
+    FunctionDescriptor
+    Linker
+    MemoryLayout
+    MemorySegment
+    SegmentAllocator
+    SymbolLookup
+    ValueLayout]
+   [java.lang.invoke MethodHandle]
    [java.nio.file Files]
-   [java.lang.foreign MemorySegment SegmentAllocator]))
+   [java.nio.file.attribute FileAttribute]))
 
 (set! *warn-on-reflection* true)
+
+(def ^Linker linker (Linker/nativeLinker))
+
+(def ^Arena global-arena (Arena/global))
 
 (defn copy-resource [resource-path output-path]
   (with-open [in  (io/input-stream (io/resource resource-path))
@@ -24,7 +35,7 @@
             (str/includes? os-name "nux") "linux"
             (str/includes? os-name "mac") "macos"))))
 
-(defn load-bundled-library []
+(defn load-bundled-library ^SymbolLookup []
   (let [res-file
         (case (get-arch+os)
           "aarch64-linux"   "sqlite3_aarch64-linux-gnu.so"
@@ -38,186 +49,219 @@
           ("x86-windows"
            "x86_64-windows"
            "amd64-windows") "sqlite3_x86_64-windows-gnu.dll")
-        temp-lib-filename (str "sqlite4clj_temp_" res-file)]
-    (copy-resource res-file temp-lib-filename)
-    (ffi-wrapper/set-library! temp-lib-filename)
-    ;; We delete once loaded
-    (Files/deleteIfExists (.toPath (io/file temp-lib-filename)))))
+        temp-lib (Files/createTempFile "sqlite4clj_" (str "_" res-file)
+                   (make-array FileAttribute 0))]
+    (try
+      (copy-resource res-file (str temp-lib))
+      (SymbolLookup/libraryLookup (str temp-lib) global-arena)
+      (finally
+        (Files/deleteIfExists temp-lib)))))
 
-(defn load-system-library []
-  (ffi/load-system-library "sqlite3"))
+(defonce ^SymbolLookup sqlite-lookup
+  (load-bundled-library))
 
-;; Load appropriate SQLite library
-(let [src (System/getProperty "sqlite4clj.native-lib")]
-  (cond
-    ;; default to bundled
-    (or (nil? src)
-      (= src "bundled")) (load-bundled-library)
-    (= src "system")     (load-system-library)
-    :else
-    (ffi-wrapper/set-library! src)))
+(defn- find-sym ^MemorySegment [name]
+  (-> sqlite-lookup (.find name) (.orElseThrow)))
 
-(defcfn initialize
-  sqlite3_initialize [] ::mem/int)
+(defn- method-handle ^MethodHandle
+  ([sym-name args ret]
+   (.downcallHandle linker (find-sym sym-name)
+     (FunctionDescriptor/of ret
+       (into-array MemoryLayout args))
+     (into-array java.lang.foreign.Linker$Option [])))
+  ([sym-name args]
+   (.downcallHandle linker (find-sym sym-name)
+     (FunctionDescriptor/ofVoid
+       (into-array MemoryLayout args))
+     (into-array java.lang.foreign.Linker$Option []))))
 
-(defonce init-lib
-  (initialize))
+(def ^AddressLayout PTR ValueLayout/ADDRESS)
 
-(defcfn free
-  sqlite3_free
-  [::mem/pointer] ::mem/void)
+(defn- str->seg ^MemorySegment [^Arena arena ^String s]
+  (.allocateFrom arena s))
 
-(defcfn errmsg
-  sqlite3_errmsg
-  [::mem/pointer] ::mem/c-string)
+(def ^MemorySegment sqlite-static    (MemorySegment/ofAddress 0))
+(def ^MemorySegment sqlite-transient (MemorySegment/ofAddress -1))
 
-(defcfn errstr
-  sqlite3_errstr
-  [::mem/int] ::mem/c-string)
+(defn invoke ^MemorySegment [^MethodHandle mh & args]
+  (.invokeWithArguments mh (object-array args)))
+
+(let [mh (method-handle "sqlite3_initialize" [] ValueLayout/JAVA_INT)]
+  (defn initialize ^long [] (invoke mh)))
+
+(defonce ^:private _init (initialize))
+
+(let [mh (method-handle "sqlite3_free" [PTR])]
+  (defn free [^MemorySegment p]
+    (invoke mh (object-array [p]))))
+
+(let [mh (method-handle "sqlite3_errmsg" [PTR] PTR)]
+  (defn errmsg [^MemorySegment pdb]
+    (->  (invoke mh pdb)
+      (.reinterpret Long/MAX_VALUE)
+      (.getString 0))))
+
+(let [mh (method-handle "sqlite3_errstr" [ValueLayout/JAVA_INT] PTR)]
+  (defn errstr [^long code]
+    (-> ^MemorySegment (invoke mh (int code))
+      (.reinterpret Long/MAX_VALUE)
+      (.getString 0))))
+
+(defn sqlite-ok? [code] (= code 0))
 
 (defn sqlite-ex-info [pdb code data]
   (let [code-name (errstr code)
         message   (errmsg pdb)]
     (ex-info (str "SQLite error: " code-name "\n" message)
-      (assoc data
-        :code code-name
-        :message message))))
+      (assoc data :code code-name :message message))))
 
-(defn sqlite-ok? [code]
-  (= code 0))
+(let [mh (method-handle "sqlite3_open_v2"
+           [PTR PTR ValueLayout/JAVA_INT PTR] ValueLayout/JAVA_INT)]
+  (defn open-v2
+    [^String filename ^long flags vfs]
+    (with-open [arena (Arena/ofConfined)]
+      (let [ppdb    (.allocate arena PTR)
+            c-fname (str->seg arena filename)
+            c-vfs   (when vfs (str->seg arena vfs))
+            code    (int (invoke mh c-fname ppdb (int flags)
+                           (or c-vfs MemorySegment/NULL)))]
+        (if (sqlite-ok? code)
+          (.get ppdb PTR 0)
+          (throw (sqlite-ex-info (.get ppdb PTR 0)
+                   code {:filename filename})))))))
 
-(defcfn open-v2
-  "sqlite3_open_v2" [::mem/c-string ::mem/pointer ::mem/int
-                     ::mem/c-string] ::mem/int
-  sqlite3-open-native
-  [filename flags vfs]
-  (with-open [arena (mem/confined-arena)]
-    (let [pdb           (mem/alloc-instance ::mem/pointer arena)
-          filename-utf8 (String/new (String/.getBytes filename "UTF-8") "UTF-8")
-          vfs-utf8      (when vfs
-                          (String/new (String/.getBytes vfs "UTF-8") "UTF-8"))
-          code          (sqlite3-open-native filename-utf8
-                          pdb flags vfs-utf8)]
-      (if (sqlite-ok? code)
-        (mem/deserialize-from pdb ::mem/pointer)
-        (throw (sqlite-ex-info pdb code {:filename filename}))))))
+(let [mh (method-handle "sqlite3_close" [PTR] ValueLayout/JAVA_INT)]
+  (defn close [^MemorySegment pdb]
+    (invoke mh pdb)))
 
-(defcfn close
-  sqlite3_close
-  [::mem/pointer] ::mem/int)
+(let [mh (method-handle "sqlite3_prepare_v3"
+           [PTR PTR ValueLayout/JAVA_INT ValueLayout/JAVA_INT PTR PTR]
+           ValueLayout/JAVA_INT)]
+  (defn prepare-v3
+    [^MemorySegment pdb ^String sql]
+    (with-open [arena (Arena/ofConfined)]
+      (let [c-sql   (str->seg arena sql)
+            sql-len (int (dec (.byteSize c-sql)))
+            ppstmt  (.allocate arena PTR)
+            code    (int (invoke mh
+                           pdb c-sql sql-len
+                           (int 0x01) ;; SQLITE_PREPARE_PERSISTENT
+                           ppstmt
+                           MemorySegment/NULL))]
+        (if (sqlite-ok? code)
+          (.get ppstmt PTR 0)
+          (throw (sqlite-ex-info pdb code {:sql sql})))))))
 
-(defcfn prepare-v3
-  "sqlite3_prepare_v3"
-  [::mem/pointer ::mem/c-string ::mem/int
-   ::mem/int
-   ::mem/pointer ::mem/pointer] ::mem/int
-  sqlite3-prepare-native
-  [pdb sql]
-  (with-open [arena (mem/confined-arena)]
-    (let [ppStmt (mem/alloc-instance ::mem/pointer arena)
-          sql    (String/new (String/.getBytes sql "UTF-8") "UTF-8")
-          code   (sqlite3-prepare-native pdb sql -1
-                   0x01 ;; SQLITE_PREPARE_PERSISTENT
-                   ppStmt
-                   nil)]
-      (if (sqlite-ok? code)
-        (mem/deserialize-from ppStmt ::mem/pointer)
-        (throw (sqlite-ex-info pdb code {:sql sql}))))))
+(let [mh (method-handle "sqlite3_reset" [PTR]
+           ValueLayout/JAVA_INT)]
+  (defn reset [^MemorySegment stmt]
+    (invoke mh stmt)))
 
-(defcfn reset
-  sqlite3_reset
-  [::mem/pointer] ::mem/int)
+(let [mh (method-handle "sqlite3_clear_bindings" [PTR] ValueLayout/JAVA_INT)]
+  (defn clear-bindings [^MemorySegment stmt]
+    (invoke mh stmt)))
 
-(defcfn clear-bindings
-  sqlite3_clear_bindings
-  [::mem/pointer] ::mem/int)
+(let [mh (method-handle "sqlite3_bind_int64"
+           [PTR ValueLayout/JAVA_INT ValueLayout/JAVA_LONG]
+           ValueLayout/JAVA_INT)]
+  (defn bind-int [^MemorySegment stmt ^long idx ^long v]
+    (invoke mh stmt (int idx) v)))
 
-(defcfn bind-int
-  sqlite3_bind_int64
-  [::mem/pointer ::mem/int ::mem/long] ::mem/int)
+(let [mh (method-handle "sqlite3_bind_double"
+           [PTR ValueLayout/JAVA_INT ValueLayout/JAVA_DOUBLE]
+           ValueLayout/JAVA_INT)]
+  (defn bind-double [^MemorySegment stmt ^long idx ^double v]
+    (invoke mh stmt (int idx) v)))
 
-(defcfn bind-double
-  sqlite3_bind_double
-  [::mem/pointer ::mem/int ::mem/double] ::mem/int)
+(let [mh (method-handle "sqlite3_bind_null"
+           [PTR ValueLayout/JAVA_INT]
+           ValueLayout/JAVA_INT)]
+  (defn bind-null [^MemorySegment stmt ^long idx]
+    (invoke mh stmt (int idx))))
 
-(defcfn bind-null
-  sqlite3_bind_null
-  [::mem/pointer ::mem/int] ::mem/int)
+(let [mh (method-handle "sqlite3_bind_text"
+           [PTR ValueLayout/JAVA_INT PTR ValueLayout/JAVA_INT PTR]
+           ValueLayout/JAVA_INT)]
+  (defn bind-text [^MemorySegment stmt ^long idx text]
+    (with-open [arena (Arena/ofConfined)]
+      (let [s       (str text)
+            c-text  (str->seg arena s)
+            ;; byte length excluding the null terminator
+            n-bytes (int (dec (.byteSize c-text)))]
+        (invoke mh
+          stmt (int idx) c-text n-bytes sqlite-transient)))))
 
-(def sqlite-static (mem/as-segment 0))
-(def sqlite-transient (mem/as-segment -1))
-
-(defcfn bind-text
-  "sqlite3_bind_text"
-  [::mem/pointer ::mem/int ::mem/c-string ::mem/int
-   ::mem/pointer] ::mem/int
-  sqlite3-bind-text-native
-  [pdb idx text]
-  (let [text       (str text)
-        text-bytes (String/.getBytes text "UTF-8")]
-    (sqlite3-bind-text-native pdb idx
-      (String/new text-bytes "UTF-8")
-      (count text-bytes)
-      sqlite-transient)))
-
-(defn encode ^MemorySegment [arena blob]
-  (let [b-l     (alength ^bytes blob)
+(defn- encode
+  ^MemorySegment [^Arena arena ^bytes blob]
+  (let [b-l     (alength blob)
         segment (SegmentAllocator/.allocate arena b-l)]
-    (mem/write-bytes segment b-l 0 ^bytes blob)
+    (MemorySegment/copy blob 0 segment ValueLayout/JAVA_BYTE 0 b-l)
     segment))
 
-(defcfn bind-blob
-  "sqlite3_bind_blob"
-  [::mem/pointer ::mem/int ::mem/pointer ::mem/int
-   ::mem/pointer] ::mem/int
-  sqlite3-bind-blob-native
-  [pdb idx blob]
-  (with-open [arena (mem/confined-arena)]
-    (let [segment (encode arena blob)]
-      (sqlite3-bind-blob-native pdb idx segment
-        (MemorySegment/.byteSize segment)
-        sqlite-transient))))
+(let [mh (method-handle "sqlite3_bind_blob"
+           [PTR ValueLayout/JAVA_INT PTR ValueLayout/JAVA_INT PTR]
+           ValueLayout/JAVA_INT)]
+  (defn bind-blob [^MemorySegment stmt ^long idx ^bytes blob]
+    (with-open [arena (Arena/ofConfined)]
+      (let [seg  (encode arena blob)
+            size (int (.byteSize seg))]
+        (invoke mh stmt (int idx) seg size sqlite-transient)))))
 
-(defcfn step
-  sqlite3_step
-  [::mem/pointer] ::mem/int)
+(let [mh (method-handle "sqlite3_step"
+           [PTR]
+           ValueLayout/JAVA_INT)]
+  (defn step [^MemorySegment stmt]
+    (invoke mh stmt)))
 
-(defcfn column-count
-  sqlite3_column_count
-  [::mem/pointer] ::mem/int)
+(let [mh (method-handle "sqlite3_column_count"
+           [PTR]
+           ValueLayout/JAVA_INT)]
+  (defn column-count [^MemorySegment stmt]
+    (invoke mh stmt)))
 
-(defcfn column-double
-  sqlite3_column_double
-  [::mem/pointer ::mem/int] ::mem/double)
+(let [mh (method-handle "sqlite3_column_double"
+           [PTR ValueLayout/JAVA_INT]
+           ValueLayout/JAVA_DOUBLE)]
+  (defn column-double [^MemorySegment stmt ^long idx]
+    (invoke mh stmt (int idx))))
 
-(defcfn column-int
-  sqlite3_column_int64
-  [::mem/pointer ::mem/int] ::mem/long)
+(let [mh (method-handle "sqlite3_column_int64"
+           [PTR ValueLayout/JAVA_INT]
+           ValueLayout/JAVA_LONG)]
+  (defn column-int [^MemorySegment stmt ^long idx]
+    (invoke mh stmt (int idx))))
 
-(defcfn column-text
-  sqlite3_column_text
-  [::mem/pointer ::mem/int] ::mem/c-string)
+(let [mh (method-handle "sqlite3_column_text"
+           [PTR ValueLayout/JAVA_INT]
+           PTR)]
+  (defn column-text [^MemorySegment stmt ^long idx]
+    (-> ^MemorySegment (invoke mh stmt (int idx))
+      (.reinterpret Long/MAX_VALUE)
+      (.getString 0))))
 
-(defcfn column-bytes
-  sqlite3_column_bytes
-  [::mem/pointer ::mem/int] ::mem/int)
+(let [mh (method-handle "sqlite3_column_bytes"
+           [PTR ValueLayout/JAVA_INT]
+           ValueLayout/JAVA_INT)]
+  (defn column-bytes [^MemorySegment stmt ^long idx]
+    (invoke mh stmt (int idx))))
 
-(defcfn column-blob
-  "sqlite3_column_blob"
-  [::mem/pointer ::mem/int] ::mem/pointer
-  sqlite3_column_blob-native
-  [stmt idx]
-  (with-open [arena (mem/confined-arena)]
-    (let [result (sqlite3_column_blob-native stmt idx)
-          size   (column-bytes stmt idx)
-          blob   (mem/reinterpret result size arena)]
-      (.toArray blob java.lang.foreign.ValueLayout/JAVA_BYTE))))
+(let [mh (method-handle "sqlite3_column_blob"
+           [PTR ValueLayout/JAVA_INT]
+           PTR)]
+  (defn column-blob [^MemorySegment stmt ^long idx]
+    (let [ptr  ^MemorySegment (invoke mh stmt (int idx))
+          size (column-bytes stmt idx)
+          seg  (.reinterpret ptr size)]
+      (.toArray seg ValueLayout/JAVA_BYTE))))
 
-(defcfn column-type
-  sqlite3_column_type
-  [::mem/pointer ::mem/int] ::mem/int)
+(let [mh (method-handle "sqlite3_column_type"
+           [PTR ValueLayout/JAVA_INT]
+           ValueLayout/JAVA_INT)]
+  (defn column-type [^MemorySegment stmt ^long idx]
+    (invoke mh stmt (int idx))))
 
-(defcfn finalize
-  sqlite3_finalize
-  [::mem/pointer] ::mem/int)
-
+(let [mh (method-handle "sqlite3_finalize"
+           [PTR]
+           ValueLayout/JAVA_INT)]
+  (defn finalize [^MemorySegment stmt]
+    (invoke mh stmt)))

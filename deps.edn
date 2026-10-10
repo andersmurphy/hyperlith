@@ -2,6 +2,7 @@
  :deps
  {org.clojure/clojure {:mvn/version "1.13.0-alpha8"}
 
+  ;; JSON
   org.clojure/data.json {:mvn/version "2.5.1"}
 
   ;; HTTP
@@ -16,10 +17,7 @@
   ;; CACHING
   com.github.ben-manes.caffeine/caffeine {:mvn/version "3.2.4"}
 
-  ;; FFI
-  org.suskalo/coffi
-  {:git/url "https://github.com/IGJoshua/coffi"
-   :git/sha "03d74aedecfc7b38238f1cf8b676c1f7a00e1788"}
+  ;; QUERY BUILDER
   com.github.seancorfield/honeysql {:mvn/version "2.7.1437"}}
  :aliases
  {:dev
