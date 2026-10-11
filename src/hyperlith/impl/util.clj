@@ -14,11 +14,11 @@
         [cur val])
       val)))
 
-(defn parse-long
+(defn parse-long ^long
   ([x]
    (parse-long x nil))
   ([x default]
-   (if (string? x) (clojure.core/parse-long x) default)))
+   (if (string? x) (Long/parseLong x) default)))
 
 (defn resource->bytes [resource]
   (-> resource io/input-stream InputStream/.readAllBytes))

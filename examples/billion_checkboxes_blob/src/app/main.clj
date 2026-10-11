@@ -14,17 +14,17 @@
 (set! *warn-on-reflection* true)
 ;; (set! *unchecked-math* :warn-on-boxed)
 
-(def cell-size-px 32)
-(def chunk-size 16)
-(def chunk-size-px (* cell-size-px chunk-size))
-(def board-size (->> (math/pow chunk-size 2)
+(def ^:const cell-size-px 32)
+(def ^:const chunk-size 16)
+(def ^:const chunk-size-px (* cell-size-px chunk-size))
+(def ^:const board-size (->> (math/pow chunk-size 2)
                   (/ 1000000000)
                   math/sqrt
                   math/ceil
                   int))
-(def board-size-px (* cell-size-px chunk-size board-size))
-(def size (* board-size chunk-size))
-(def states
+(def ^:const board-size-px (* cell-size-px chunk-size board-size))
+(def ^:const size (* board-size chunk-size))
+(def ^:const states
   [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14])
 
 (def palette
@@ -324,7 +324,7 @@
                         (byte 0)))
                     chunk)))))))))
 
-(defn scroll-to-xy-js [x y]
+(defn scroll-to-xy-js [^long x ^long y]
   (str
     "$_view.scroll(" (int (* (/ x size) board-size-px))
     "," (int (* (/ y size) board-size-px)) ");"))
@@ -348,15 +348,16 @@
          :data-color state
          :data-id    id}])
 
-(defn xy->chunk-id [x y]
+(defn xy->chunk-id ^long [^long x ^long y]
   (+ x (* y board-size)))
 
 (defn xy->chunk-ids
   [{:keys [x-offset-items y-offset-items x-rendered-items y-rendered-items]}]
-  (-> (for [y (range y-offset-items (+ y-offset-items y-rendered-items))
-            x (range x-offset-items (+ x-offset-items x-rendered-items))]
-        (xy->chunk-id x y))
-    vec))
+  (into []
+    (mapcat (fn [y]
+              (let [start (+ x-offset-items (* y board-size))]
+                (range start (+ start x-rendered-items)))))
+    (range y-offset-items (+ y-offset-items y-rendered-items))))
 
 (defn Chunk [{:keys [id ^BlobKey cells]}]
   [:div
