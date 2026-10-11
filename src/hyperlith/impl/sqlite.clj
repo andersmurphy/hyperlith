@@ -1,11 +1,20 @@
 (ns hyperlith.impl.sqlite
-  (:require [honey.sql :as hsql])
-  (:import [java.util HashMap]
-           [hyperlith.impl.sqlite Sqlite]
-           [java.lang.foreign Arena AddressLayout MemorySegment
-            SegmentAllocator ValueLayout]))
+  (:require
+   [honey.sql :as hsql])
+  (:import
+   [clojure.lang Atom]
+   [hyperlith.impl.sqlite Sqlite]
+   [java.lang.foreign
+    AddressLayout
+    Arena
+    MemorySegment
+    SegmentAllocator
+    ValueLayout]
+   [java.util HashMap]))
 
 (set! *warn-on-reflection* true)
+
+(defrecord Conn [pdb stmt-cache query-disabled])
 
 (def ^AddressLayout PTR ValueLayout/ADDRESS)
 
@@ -93,9 +102,11 @@
             :else            (bind-blob         stmt col param))
           (recur (unchecked-inc i)))))))
 
-(defn- prepare-cached [{:keys [pdb ^HashMap stmt-cache]} sql params]
-  (let [stmt (or (HashMap/.get stmt-cache sql)
-               (let [stmt (prepare-v3 pdb sql)]
+(defn- prepare-cached [^Conn conn sql params]
+  (let [stmt-cache ^HashMap (.stmt-cache conn)
+        pdb        (.pdb conn)
+        stmt       (or (HashMap/.get stmt-cache sql)
+                     (let [stmt (prepare-v3 pdb sql)]
                  (HashMap/.put stmt-cache sql stmt)
                  stmt))]
     (bind stmt params)
@@ -120,10 +131,10 @@
     (when (first result) result)))
 
 (defn q*
-  ([conn sql]
+  ([^Conn conn sql]
    (q* conn sql nil))
-  ([conn sql params]
-   (if-let [inside @(:query-disabled conn)]
+  ([^Conn conn sql params]
+   (if-let [inside (deref ^Atom (.query-disabled conn))]
      (throw (ex-info
               (str "q cannot be called inside: " inside "\n")
               {:inside inside}))
@@ -135,11 +146,11 @@
            (case code
              100 nil
              101 nil
-             (throw (sqlite-ex-info (:pdb conn) code
+             (throw (sqlite-ex-info (.pdb conn) code
                       {:sql    sql
                        :params params}))))))))
-  ([conn sql params result-set-fn]
-   (if-let [inside @(:query-disabled conn)]
+  ([^Conn conn sql params result-set-fn]
+   (if-let [inside (deref ^Atom (.query-disabled conn))]
      (throw (ex-info
               (str "q cannot be called inside: " inside "\n")
               {:inside inside}))
@@ -159,7 +170,7 @@
                              @result
                              (recur result)))
                      101 ret
-                     (throw (sqlite-ex-info (:pdb conn) code
+                     (throw (sqlite-ex-info (.pdb conn) code
                               {:sql    sql
                                :params params})))))))))))))
 
@@ -195,9 +206,10 @@
                      (bit-or 0x00000002 0x00000004))
         *pdb       (open-v2 db-name flags nil)
         stmt-cache (HashMap.)
-        conn       {:pdb            *pdb
-                    :stmt-cache     stmt-cache
-                    :query-disabled query-disabled}]
+        conn       (map->Conn
+                     {:pdb            *pdb
+                      :stmt-cache     stmt-cache
+                      :query-disabled query-disabled})]
     (->> (pragma->set-pragma-query pragma)
       (run! #(q* conn %)))
     conn))
