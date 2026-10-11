@@ -76,8 +76,11 @@
     (Sqlite/bindBlob stmt (int idx) seg (int (.byteSize seg)) sqlite-static)))
 
 (defn column-text [^MemorySegment stmt ^long idx]
-  (-> (Sqlite/columnText stmt (int idx)) (.reinterpret Long/MAX_VALUE)
-    (.getString 0)))
+  (let [ptr (Sqlite/columnText stmt (int idx))]
+    (when-not (zero? (.address ptr))
+      (-> ptr
+        (.reinterpret Long/MAX_VALUE)
+        (.getString 0)))))
 
 (defn column-blob [^MemorySegment stmt ^long idx]
   (let [ptr  (Sqlite/columnBlob stmt (int idx))
@@ -120,6 +123,8 @@
          (Sqlite/clearBindings ~stmt-binding)))))
 
 (defn result-set-reducer [result-set-fn result-set]
+  ;; TODO: Might benefit from transient on large collections
+  ;; but how large?
   (let [result
         (reduce (fn [result stmt]
                   (conj result (result-set-fn stmt)))
