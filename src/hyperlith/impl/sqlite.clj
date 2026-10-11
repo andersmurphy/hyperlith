@@ -22,7 +22,6 @@
   (.allocateFrom arena s))
 
 (def ^MemorySegment sqlite-static    (MemorySegment/ofAddress 0))
-(def ^MemorySegment sqlite-transient (MemorySegment/ofAddress -1))
 
 (defn errmsg [^MemorySegment pdb]
   (-> (Sqlite/errmsg pdb) (.reinterpret Long/MAX_VALUE) (.getString 0)))
@@ -61,22 +60,20 @@
         (.get ppstmt PTR 0)
         (throw (sqlite-ex-info pdb code {:sql sql}))))))
 
-(defn bind-text [^MemorySegment stmt ^long idx text]
-  (with-open [arena (Arena/ofConfined)]
-    (let [c-text  (str->seg arena (str text))
-          n-bytes (int (dec (.byteSize c-text)))]
-      (Sqlite/bindText stmt (int idx) c-text n-bytes sqlite-transient))))
+(defn bind-text [^MemorySegment stmt ^long idx text ^Arena arena]
+  (let [c-text  (str->seg arena (str text))
+        n-bytes (int (dec (.byteSize c-text)))]
+    (Sqlite/bindText stmt (int idx) c-text n-bytes sqlite-static)))
 
-(defn- encode ^MemorySegment [^Arena arena ^bytes blob]
+(defn- encode ^MemorySegment [^bytes blob ^Arena arena]
   (let [b-l     (alength blob)
         segment (SegmentAllocator/.allocate arena b-l)]
     (MemorySegment/copy blob 0 segment ValueLayout/JAVA_BYTE 0 b-l)
     segment))
 
-(defn bind-blob [^MemorySegment stmt ^long idx ^bytes blob]
-  (with-open [arena (Arena/ofConfined)]
-    (let [seg (encode arena blob)]
-      (Sqlite/bindBlob stmt (int idx) seg (int (.byteSize seg)) sqlite-transient))))
+(defn bind-blob [^MemorySegment stmt ^long idx ^bytes blob ^Arena arena]
+  (let [seg (encode blob arena)]
+    (Sqlite/bindBlob stmt (int idx) seg (int (.byteSize seg)) sqlite-static)))
 
 (defn column-text [^MemorySegment stmt ^long idx]
   (-> (Sqlite/columnText stmt (int idx)) (.reinterpret Long/MAX_VALUE)
@@ -87,7 +84,7 @@
         size (Sqlite/columnBytes stmt (int idx))]
     (.toArray (.reinterpret ptr size) ValueLayout/JAVA_BYTE)))
 
-(defn- bind [stmt params]
+(defn- bind [stmt params arena]
   (let [n (count params)]
     (loop [i 0]
       (when (< i n)
@@ -96,20 +93,20 @@
               col   (unchecked-inc i)]
           (cond
             (integer? param) (Sqlite/bindInt64  stmt col param)
-            (string? param)  (bind-text         stmt col param)
+            (string? param)  (bind-text         stmt col param arena)
             (double? param)  (Sqlite/bindDouble stmt col param)
             (nil? param)     (Sqlite/bindNull   stmt col)
-            :else            (bind-blob         stmt col param))
+            :else            (bind-blob         stmt col param arena))
           (recur (unchecked-inc i)))))))
 
-(defn- prepare-cached [^Conn conn sql params]
+(defn- prepare-cached [^Conn conn sql params arena]
   (let [stmt-cache ^HashMap (.stmt-cache conn)
         pdb        (.pdb conn)
         stmt       (or (HashMap/.get stmt-cache sql)
                      (let [stmt (prepare-v3 pdb sql)]
                  (HashMap/.put stmt-cache sql stmt)
                  stmt))]
-    (bind stmt params)
+    (bind stmt params arena)
     stmt))
 
 (defmacro with-stmt-reset
@@ -138,41 +135,43 @@
      (throw (ex-info
               (str "q cannot be called inside: " inside "\n")
               {:inside inside}))
-     (let [stmt (prepare-cached conn sql params)]
-       (with-stmt-reset [stmt stmt]
-         (let [code (int
-                      #_{:clj-kondo/ignore [:type-mismatch]}
-                      (Sqlite/step stmt))]
-           (case code
-             100 nil
-             101 nil
-             (throw (sqlite-ex-info (.pdb conn) code
-                      {:sql    sql
-                       :params params}))))))))
+     (with-open [arena (Arena/ofConfined)]
+       (let [stmt (prepare-cached conn sql params arena)]
+         (with-stmt-reset [stmt stmt]
+           (let [code (int
+                        #_{:clj-kondo/ignore [:type-mismatch]}
+                        (Sqlite/step stmt))]
+             (case code
+               100 nil
+               101 nil
+               (throw (sqlite-ex-info (.pdb conn) code
+                        {:sql    sql
+                         :params params})))))))))
   ([^Conn conn sql params result-set-fn]
    (if-let [inside (deref ^Atom (.query-disabled conn))]
      (throw (ex-info
               (str "q cannot be called inside: " inside "\n")
               {:inside inside}))
-     (let [stmt (prepare-cached conn sql params)]
-       (with-stmt-reset [stmt stmt]
-         (result-set-reducer result-set-fn
-           (reify
-             clojure.lang.IReduceInit
-             (reduce [_ f init]
-               (loop [ret init]
-                 (let [code (int
-                              #_{:clj-kondo/ignore [:type-mismatch]}
-                              (Sqlite/step stmt))]
-                   (case code
-                     100 (let [result (f ret stmt)]
-                           (if (reduced? result)
-                             @result
-                             (recur result)))
-                     101 ret
-                     (throw (sqlite-ex-info (.pdb conn) code
-                              {:sql    sql
-                               :params params})))))))))))))
+     (with-open [arena (Arena/ofConfined)]
+       (let [stmt (prepare-cached conn sql params arena)]
+         (with-stmt-reset [stmt stmt]
+           (result-set-reducer result-set-fn
+             (reify
+               clojure.lang.IReduceInit
+               (reduce [_ f init]
+                 (loop [ret init]
+                   (let [code (int
+                                #_{:clj-kondo/ignore [:type-mismatch]}
+                                (Sqlite/step stmt))]
+                     (case code
+                       100 (let [result (f ret stmt)]
+                             (if (reduced? result)
+                               @result
+                               (recur result)))
+                       101 ret
+                       (throw (sqlite-ex-info (.pdb conn) code
+                                {:sql    sql
+                                 :params params}))))))))))))))
 
 (def default-pragma
   {:cache_size         15625
