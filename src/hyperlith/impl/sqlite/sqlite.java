@@ -62,6 +62,11 @@ public final class Sqlite {
         return LINKER.downcallHandle(find(name), FunctionDescriptor.of(ret, args));
     }
 
+    private static MethodHandle critFn(Boolean heap, String name, MemoryLayout ret, MemoryLayout... args) {
+        return LINKER.downcallHandle(find(name), FunctionDescriptor.of(ret, args),
+                                     Linker.Option.critical(heap));
+    }
+
     private static MethodHandle voidFn(String name, MemoryLayout... args) {
         return LINKER.downcallHandle(find(name), FunctionDescriptor.ofVoid(args));
     }
@@ -129,64 +134,64 @@ public final class Sqlite {
         return (int) FINALIZE.invokeExact(stmt);
     }
 
-    private static final MethodHandle BIND_INT64 = fn("sqlite3_bind_int64", INT, PTR, INT, LONG);
+    private static final MethodHandle BIND_INT64 = critFn(false, "sqlite3_bind_int64", INT, PTR, INT, LONG);
     public static int bindInt64(MemorySegment stmt, int i, long v) throws Throwable {
         return (int) BIND_INT64.invokeExact(stmt, i, v);
     }
 
-    private static final MethodHandle BIND_DOUBLE = fn("sqlite3_bind_double", INT, PTR, INT, DOUBLE);
+    private static final MethodHandle BIND_DOUBLE = critFn(false, "sqlite3_bind_double", INT, PTR, INT, DOUBLE);
     public static int bindDouble(MemorySegment stmt, int i, double v) throws Throwable {
         return (int) BIND_DOUBLE.invokeExact(stmt, i, v);
     }
 
-    private static final MethodHandle BIND_NULL = fn("sqlite3_bind_null", INT, PTR, INT);
+    private static final MethodHandle BIND_NULL = critFn(false, "sqlite3_bind_null", INT, PTR, INT);
     public static int bindNull(MemorySegment stmt, int i) throws Throwable {
         return (int) BIND_NULL.invokeExact(stmt, i);
     }
 
-    private static final MethodHandle BIND_TEXT = fn("sqlite3_bind_text", INT, PTR, INT, PTR, INT, PTR);
+    private static final MethodHandle BIND_TEXT = critFn(false, "sqlite3_bind_text", INT, PTR, INT, PTR, INT, PTR);
     public static int bindText(MemorySegment stmt, int i, MemorySegment text, int n,
                                MemorySegment destructor) throws Throwable {
         return (int) BIND_TEXT.invokeExact(stmt, i, text, n, destructor);
     }
 
-    private static final MethodHandle BIND_BLOB = fn("sqlite3_bind_blob", INT, PTR, INT, PTR, INT, PTR);
+    private static final MethodHandle BIND_BLOB = critFn(false, "sqlite3_bind_blob", INT, PTR, INT, PTR, INT, PTR);
     public static int bindBlob(MemorySegment stmt, int i, MemorySegment blob, int n,
                                MemorySegment destructor) throws Throwable {
         return (int) BIND_BLOB.invokeExact(stmt, i, blob, n, destructor);
     }
 
-    private static final MethodHandle COLUMN_COUNT = fn("sqlite3_column_count", INT, PTR);
+    private static final MethodHandle COLUMN_COUNT = critFn(false, "sqlite3_column_count", INT, PTR);
     public static int columnCount(MemorySegment stmt) throws Throwable {
         return (int) COLUMN_COUNT.invokeExact(stmt);
     }
 
-    private static final MethodHandle COLUMN_DOUBLE = fn("sqlite3_column_double", DOUBLE, PTR, INT);
+    private static final MethodHandle COLUMN_DOUBLE = critFn(false, "sqlite3_column_double", DOUBLE, PTR, INT);
     public static double columnDouble(MemorySegment stmt, int i) throws Throwable {
         return (double) COLUMN_DOUBLE.invokeExact(stmt, i);
     }
 
-    private static final MethodHandle COLUMN_INT64 = fn("sqlite3_column_int64", LONG, PTR, INT);
+    private static final MethodHandle COLUMN_INT64 = critFn(false, "sqlite3_column_int64", LONG, PTR, INT);
     public static long columnInt64(MemorySegment stmt, int i) throws Throwable {
         return (long) COLUMN_INT64.invokeExact(stmt, i);
     }
 
-    private static final MethodHandle COLUMN_TEXT = fn("sqlite3_column_text", PTR, PTR, INT);
+    private static final MethodHandle COLUMN_TEXT = critFn(false, "sqlite3_column_text", PTR, PTR, INT);
     public static MemorySegment columnText(MemorySegment stmt, int i) throws Throwable {
         return (MemorySegment) COLUMN_TEXT.invokeExact(stmt, i);
     }
 
-    private static final MethodHandle COLUMN_BYTES = fn("sqlite3_column_bytes", INT, PTR, INT);
+    private static final MethodHandle COLUMN_BYTES = critFn(false, "sqlite3_column_bytes", INT, PTR, INT);
     public static int columnBytes(MemorySegment stmt, int i) throws Throwable {
         return (int) COLUMN_BYTES.invokeExact(stmt, i);
     }
 
-    private static final MethodHandle COLUMN_BLOB = fn("sqlite3_column_blob", PTR, PTR, INT);
+    private static final MethodHandle COLUMN_BLOB = critFn(false, "sqlite3_column_blob", PTR, PTR, INT);
     public static MemorySegment columnBlob(MemorySegment stmt, int i) throws Throwable {
         return (MemorySegment) COLUMN_BLOB.invokeExact(stmt, i);
     }
 
-    private static final MethodHandle COLUMN_TYPE = fn("sqlite3_column_type", INT, PTR, INT);
+    private static final MethodHandle COLUMN_TYPE = critFn(false, "sqlite3_column_type", INT, PTR, INT);
     public static int columnType(MemorySegment stmt, int i) throws Throwable {
         return (int) COLUMN_TYPE.invokeExact(stmt, i);
     }

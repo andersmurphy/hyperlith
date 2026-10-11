@@ -75,7 +75,7 @@
 
 (defn column-blob [^MemorySegment stmt ^long idx]
   (let [ptr  (Sqlite/columnBlob stmt (int idx))
-        size (Sqlite/columnBytes stmt idx)]
+        size (Sqlite/columnBytes stmt (int idx))]
     (.toArray (.reinterpret ptr size) ValueLayout/JAVA_BYTE)))
 
 (defn- bind [stmt params]
@@ -267,9 +267,9 @@
 
 (def text column-text)
 (def blob column-blob)
-(defn real [^MemorySegment stmt ^long idx]
+(defn real ^double [^MemorySegment stmt ^long idx]
   (Sqlite/columnDouble stmt (int idx)))
-(defn int [^MemorySegment stmt ^long idx]
+(defn int ^long [^MemorySegment stmt ^long idx]
   (Sqlite/columnInt64 stmt (clojure.core/int idx)))
 
 (comment
