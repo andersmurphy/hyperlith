@@ -134,6 +134,8 @@
                    ^Runnable
                    (bound-fn* ;; binding conveyance
                      (fn batch-thread []
+                       ;; pipeline ignition
+                       (.await ^CyclicBarrier start-barrier)
                        (while (not (Thread/interrupted))
                          (let [next-tick (+ (System/currentTimeMillis)
                                            batch-tick-ms)
@@ -141,16 +143,17 @@
                            (.drainTo q batch)
                            (try
                              (batch-fn ctx (seq batch))
-                             (.addAll
-                               ^ConcurrentLinkedQueue
-                               render-queue ^Collection conns)
-                             ;; Start renders
-                             (.await ^CyclicBarrier start-barrier)
-                             ;; Wait until all renders complete
-                             (.await ^CyclicBarrier done-barrier)
                              (catch Throwable t
                                (repl-caught t)
                                (flush)))
+                           ;; Wait until all renders complete
+                           (.await ^CyclicBarrier done-barrier)
+                           ;; render queue
+                           (.addAll
+                             ^ConcurrentLinkedQueue
+                             render-queue ^Collection conns)
+                           ;; Start pipeline (renders + writer)
+                           (.await ^CyclicBarrier start-barrier)
                            (let [sleep-time-ms
                                  (- next-tick (System/currentTimeMillis))]
                              (when (< sleep-time-ms 0)

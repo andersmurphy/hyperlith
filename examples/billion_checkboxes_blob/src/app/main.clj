@@ -701,4 +701,36 @@
                         "accept-encoding" "zstd"
                         "sec-fetch-site"  "same-origin"
                         "cookie"          (str "__Host-sid=" "test-user-" i)}
-       :body           (h/edn->json {"tabid" "7dc673ca"})})))
+       :body           (edn->json-stream {"tabid" "7dc673ca"})}))
+
+  (do
+    (dotimes [_ 100000]
+      (stub-router
+        {:request-method :post
+         :uri            "/t_rqnpSL_NvK8EJhoBwkc6TNJ4VsLi1Fs"
+         :headers        {"content-type"    "application/json"
+                          "accept-encoding" "zstd"
+                          "sec-fetch-site"  "same-origin"
+                          "cookie"          "__Host-sid=test-user-1"}
+         :body           (edn->json-stream
+                           {"tabid"    "7dc673ca"
+                            "targetid" (str (rand-int 255))
+                            "parentid" (str (rand-int 1000))})}))
+    (println "Done"))
+
+  (def tx! (-> @app_ :ctx ::h/tx!))
+
+  ;; simulate slow TX
+  (do (dotimes [_ 300]
+        (tx! (fn [_ _] (Thread/sleep 90)))
+        (Thread/sleep 101))
+      (println "Done"))
+
+  ;; WARNING: tick overrun
+  {:n 76, :p50 100, :p95 987, :p99 1107, :max 1195}
+
+  ;; WARNING: tick overrun
+  {:n 194, :p50 100, :p95 100, :p99 104, :max 105}
+  
+  
+  )
