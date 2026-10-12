@@ -467,6 +467,8 @@
           :data-on:mousedown copy-xy-to-clipboard-js}
     [:strong {:class "pe-none"} "SHARE"]]])
 
+(def Virtual (vs/virtual {:id "view" :data-ref "_view"}))
+
 (defview handler-root
   {:path "/" :shim-headers shim-headers :br-window-size 24}
   [{:keys [db]}
@@ -484,26 +486,24 @@
        :class             "main"
        :data-on:mousedown on-mouse-down-js}
       [:div {:class "view-wrapper"}
-       (vs/virtual
-         {:id                    "view"
-          :data-ref              "_view"
-          :v/x                   {:item-size          chunk-size-px
-                                  :buffer-items       1
-                                  :max-rendered-items 5
-                                  :scroll-pos         x
-                                  :view-size          width
-                                  :item-count-fn      (fn [] board-size)
-                                  :chunk-size         chunk-size}
-          :v/y                   {:item-size          chunk-size-px
-                                  :buffer-items       1
-                                  :max-rendered-items 5
-                                  :scroll-pos         y
-                                  :view-size          height
-                                  :item-count-fn      (fn [] board-size)
-                                  :chunk-size         chunk-size}
-          :v/item-fn             (partial UserView db)
-          :v/scroll-handler-path handler-scroll
-          :v/resize-handler-path handler-resize})]
+       (Virtual
+         {:x                   {:item-size          chunk-size-px
+                                :buffer-items       1
+                                :max-rendered-items 5
+                                :scroll-pos         x
+                                :view-size          width
+                                :item-count-fn      (fn [] board-size)
+                                :chunk-size         chunk-size}
+          :y                   {:item-size          chunk-size-px
+                                :buffer-items       1
+                                :max-rendered-items 5
+                                :scroll-pos         y
+                                :view-size          height
+                                :item-count-fn      (fn [] board-size)
+                                :chunk-size         chunk-size}
+          :item-fn             (partial UserView db)
+          :scroll-handler-path handler-scroll
+          :resize-handler-path handler-resize})]
       [:div
        {:class     "controls-wrapper"
         ;; firefox sometimes preserves scroll on refresh and we don't want that

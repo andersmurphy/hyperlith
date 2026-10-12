@@ -432,6 +432,8 @@
    [:title "One billion cells"]
    [:meta {:content "So many cells" :name "description"}]])
 
+(def Virtual (vs/virtual-table {:id "view" :data-ref "_view" }))
+
 (defview handler-root
   {:path        "/" :shim-headers shim-headers :br-window-size 24
    :on-close    (fn [{:keys [::h/tx! sid tabid]}]
@@ -460,26 +462,24 @@
          "setTimeout(() => evt.target.classList.remove('pop'), 300)"
          "}")}
       [:div {:class "view-wrapper"}
-       (vs/virtual-table
-         {:id                    "view"
-          :data-ref              "_view"
-          :v/x                   {:item-size          chunk-width-px
-                                  :buffer-items       1
-                                  :max-rendered-items 5
-                                  :scroll-pos         x
-                                  :view-size          width
-                                  :item-count-fn      (fn [] board-size)
-                                  :chunk-size         chunk-size}
-          :v/y                   {:item-size          chunk-height-px
-                                  :buffer-items       2
-                                  :max-rendered-items 7
-                                  :scroll-pos         y
-                                  :view-size          height
-                                  :item-count-fn      (fn [] board-size)
-                                  :chunk-size         chunk-size}
-          :v/item-fn             (partial UserView db sid)
-          :v/scroll-handler-path handler-scroll
-          :v/resize-handler-path handler-resize})]
+       (Virtual
+         {:x                   {:item-size          chunk-width-px
+                                :buffer-items       1
+                                :max-rendered-items 5
+                                :scroll-pos         x
+                                :view-size          width
+                                :item-count-fn      (fn [] board-size)
+                                :chunk-size         chunk-size}
+          :y                   {:item-size          chunk-height-px
+                                :buffer-items       2
+                                :max-rendered-items 7
+                                :scroll-pos         y
+                                :view-size          height
+                                :item-count-fn      (fn [] board-size)
+                                :chunk-size         chunk-size}
+          :item-fn             (partial UserView db sid)
+          :scroll-handler-path handler-scroll
+          :resize-handler-path handler-resize})]
       [:div
        {:class     "controls-wrapper"
         ;; firefox sometimes preserves scroll on refresh and we don't want that
