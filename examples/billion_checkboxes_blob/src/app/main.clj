@@ -374,7 +374,7 @@
 
 (defn EmptyChecks []
   (into []
-    (map-indexed (fn [local-id box] [Checkbox [local-id box]]))
+    (map-indexed (fn [local-id box] [Checkbox {:id local-id :state box}]))
     blank-chunk))
 
 (defn EmptyChunk [{:keys [id]}]
