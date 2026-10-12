@@ -348,9 +348,6 @@
          :data-color state
          :data-id    id}])
 
-(defn xy->chunk-id ^long [^long x ^long y]
-  (+ x (* y board-size)))
-
 (defn xy->chunk-ids
   [{:keys [x-offset-items y-offset-items x-rendered-items y-rendered-items]}]
   (into []
