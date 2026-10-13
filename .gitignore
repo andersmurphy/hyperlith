@@ -8,3 +8,4 @@ target
 .clj-kondo
 !.clj-kondo/config.edn
 !.clj-kondo/app/*
+/sqlite-amalgamation/sqlite3.so

@@ -1,9 +1,6 @@
 # Hyperlith: the hypermedia based monolith
 
-This is a small and very opinionated fullstack [Datastar](https://data-star.dev/) framework mostly
-for my personal use. However, I felt there were some ideas in here that were worth sharing.
-
-Hyperlith only uses a subset of Datastar's feartures. If you want a production ready full featured Datastar Clojure SDK use [the official SDK](https://github.com/starfederation/datastar/tree/main/sdk/clojure). 
+This is a small and very opinionated fullstack [Datastar](https://data-star.dev/) framework mostly for my personal use. However, I felt there were some ideas in here that were worth sharing.
 
 >⚠️ **WARNING:**  API can change at any time! Use at your own risk. 
 
@@ -20,11 +17,11 @@ Hyperlith only uses a subset of Datastar's feartures. If you want a production r
 
 #### Why large/fat/main morphs (immediate mode)?
 
-By only using `data: mode morph` and always targeting the `main` element of the document the API can be massively simplified. This avoids having the explosion of endpoints you get with HTMX and makes reasoning about your app much simpler.
+By only using `event: datastar-patch-elements` and always targeting the `main` element of the document the API can be massively simplified. This avoids having the explosion of endpoints you get with HTMX and makes reasoning about your app much simpler.
 
 #### Why have single render function per page?
 
-By having a single render function per page you can simplify the reasoning about your app to `view = f(state)`. You can then reason about your pushed updates as a continuous signal rather than discrete event stream. The benefit of this is you don't have to handle missed events, disconnects and reconnects. When the state changes on the server you push down the latest view, not the delta between views. On the client idiomorph can translate that into fine grained dom updates.
+By having a single render function per page you can simplify the reasoning about your app to `view = f(state)`. You can then reason about your pushed updates as a continuous signal rather than discrete event stream. The benefit of this is you don't have to handle missed events, disconnects and reconnects. When the state changes on the server you push down the latest view, not the delta between views. On the client morph can translate that into fine grained dom updates.
 
 #### Why re-render on any database change?
 
@@ -40,11 +37,11 @@ This means you actually end up doing more work with a non homogeneous event syst
 
 #### Why no diffing?
 
-In theory you can optimise network and remove the need for idiomorph if you do diffing between the last view and the current view. However, in practice because the SSE stream is being compressed for the duration of a connection and html compresses really well you get amazing compression (reduction in size by 90-100x! Sometimes more) over a series of view re-renders. The compression is so good that in my experience it's more network efficient and more performant that fine grained updates with diffing (without any of the additional  complexity).
+In theory you can optimise network and remove the need for morph if you do diffing between the last view and the current view. However, in practice because the SSE stream is being compressed for the duration of a connection and html compresses really well you get amazing compression (ratios of  20000:1 sometimes more) over a series of view re-renders. The compression is so good that in my experience it's more network efficient and more performant that fine grained updates with diffing (without any of the additional  complexity).
 
 This approach avoids the additional challenges of view and session maintenance (increased server load and memory usage).
 
-My suspicion is websocket approaches in this space like Phoenix Liveview haven't stumbled across this because you don't get compression out of the box with websockets, and idiomorph is a relatively new invention. Intuitively you would think the diffing approach would be more performant so you wouldn't even consider this approach.
+My suspicion is websocket approaches in this space like Phoenix Liveview haven't stumbled across this because you don't get compression out of the box with websockets, and morph is a relatively new invention. Intuitively you would think the diffing approach would be more performant so you wouldn't even consider this approach.
 
 #### Signals are only for ephemeral client side state
 
@@ -60,7 +57,7 @@ View only signals, are signals that can only be changed by the server. These sho
 
 #### Actions should not update the view themselves directly
 
-Actions should not update the view via patch elements. This is because the changes they make would get overwritten on the next `render-fn` that pushes a new view down the updates SSE connection. However, they can still be used to update signals as those won't be changed by elements patch. This allows you to do things like validation on the server.
+Actions should not update the view via patch elements. This is because the changes they make would get overwritten on the next `render-fn` that pushes a new view down the updates SSE connection.
 
 #### Stateless
 
@@ -79,8 +76,6 @@ Batching pairs really well with CQRS as you have a resolution window, this defin
 
 Work sharing is the term I'm using for sharing renders between connected users. This can be useful when a lot of connected users share the same view. For example a leader board, game board, presence indicator etc. It ensures the work (eg: query and html generation) for that view is only done once regardless of the number of connected users.
 
-The simplest way to do this is to recalculate and cache values after after a batch has been run.
-
 #### Use `data-on:pointerdown/mousedown` over  `data-on:click`
 
 This is a small one but can make even the slowest of networks feel much snappier.
@@ -94,10 +89,6 @@ By hosting all assets on the same origin we avoid the need for CORS. This avoids
 #### Cookie based sessions
 
 Hyperlith uses a simple unguessable random uid for managing sessions. This should be used to look up further auth/permission information in the database.
-
-#### CSRF
-
-Double submit cookie pattern is used for CSRF.
 
 #### Rendering an initial shim
 
@@ -119,4 +110,4 @@ Hyperlith doesn't expose middleware and keeps the internal middleware to a minim
 
 #### Minimal dependencies
 
-Hyperlith tries to keep dependencies to a minimum. 
+Hyperlith tries to keep dependencies to a minimum.
