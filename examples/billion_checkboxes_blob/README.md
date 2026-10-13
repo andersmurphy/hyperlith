@@ -37,3 +37,9 @@ ssh root@checkboxes.andersmurphy.com "nc localhost:5555"
 ```
 ssh root@checkboxes.andersmurphy.com "systemctl restart app.service"
 ```
+
+## View overruns
+
+```bash
+ssh root@checkboxes.andersmurphy.com "journalctl -u app --since '5 minutes ago' | grep -A 1 'WARNING: tick overrun'"
+```

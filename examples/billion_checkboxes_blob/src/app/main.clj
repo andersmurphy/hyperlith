@@ -693,7 +693,11 @@
 
   (count (@app_ :conns))
 
-  (dotimes [i 5000]
+  (defn edn->json-stream [edn]
+    (java.io.ByteArrayInputStream.
+      (String/.getBytes (h/edn->json edn) "UTF-8")))
+
+  (dotimes [i 3000]
     (stub-router
       {:request-method :post
        :uri            "/"
