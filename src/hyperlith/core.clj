@@ -129,7 +129,8 @@
   (assert (not (nil? render-queue)))
   (let [overruns (atom [])
         q        (LinkedBlockingQueue/new)
-        ctx      (merge ctx (sqlite/create-write-connections! dbs))
+        dbs      (sqlite/create-write-connections! dbs)
+        ctx      (merge ctx dbs)
         t        (Thread.
                    ^Runnable
                    (bound-fn* ;; binding conveyance
@@ -148,6 +149,8 @@
                                (flush)))
                            ;; Wait until all renders complete
                            (.await ^CyclicBarrier done-barrier)
+                           ;; Checkpoint while no transactions are running
+                           (sqlite/checkpoint-all-dbs! dbs)
                            ;; render queue
                            (.addAll
                              ^ConcurrentLinkedQueue
@@ -208,15 +211,14 @@
                         (fn render-thread []
                           (while (not (Thread/interrupted))
                             (.await ^CyclicBarrier start-barrier)
-                              (run! sqlite/start-read-tx
-                                (vals (.dbs lane-ctx)))
+                            (let [dbs (vals (.dbs lane-ctx))]
+                              (run! sqlite/start-read-tx dbs)
                               (u/while-some
                                 [render (.poll
                                           ^ConcurrentLinkedQueue
                                           render-queue)]
                                 (render lane-ctx))
-                              (run! sqlite/end-read-tx
-                                (vals (.dbs lane-ctx)))
+                              (run! sqlite/end-read-tx dbs))
                             (.await ^CyclicBarrier done-barrier)))))
                   Thread/.start)
                 lane-ctx))))))

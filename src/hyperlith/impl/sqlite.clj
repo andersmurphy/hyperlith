@@ -225,19 +225,6 @@
      :read-only      read-only
      :pragma         (merge pragma pragma-writer)}))
 
-(def ^:dynamic *dbs* nil)
-
-(defn create-write-connections! [dbs]
-  (into {} (map (fn [[k opts]] [k (new-conn! opts)])) dbs))
-
-(defn create-read-connections! [dbs query-disabled]
-  (into {} (map (fn [[k opts]]
-                  [k (new-conn!
-                       (assoc opts
-                         :read-only true
-                         :query-disabled query-disabled))]))
-    dbs))
-
 (defn start-read-tx [db]
   (q* db "BEGIN DEFERRED"))
 
@@ -278,6 +265,22 @@
     (if result-set-fn
       `(q* ~db ~sql ~(vec params) ~result-set-fn)
       `(q* ~db ~sql ~(vec params)))))
+
+(defn create-write-connections! [dbs]
+  (into {} (map (fn [[k opts]] [k (new-conn! opts)])) dbs))
+
+(defn create-read-connections! [dbs query-disabled]
+  (into {} (map (fn [[k opts]]
+                  [k (new-conn!
+                       (assoc opts
+                         :read-only true
+                         :query-disabled query-disabled))]))
+    dbs))
+
+(defn checkpoint-all-dbs! [dbs]
+  (run!
+    (fn [db] (q db ["PRAGMA wal_checkpoint(TRUNCATE)"]))
+    (vals dbs)))
 
 (def format-query hsql/format)
 

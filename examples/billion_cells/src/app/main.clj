@@ -550,8 +550,7 @@
                         where  [= id ?chunk-id]}
                 {:chunk-id  chunk-id
                  :new-chunk (h/edn->json new-chunk)}))
-        @chunk-cache)))
-  (d/q db ["PRAGMA wal_checkpoint(TRUNCATE)"]))
+        @chunk-cache))))
 
 (defonce app_ (atom nil))
 

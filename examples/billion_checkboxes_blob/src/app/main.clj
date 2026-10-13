@@ -542,8 +542,7 @@
                         set    {id ?chunk-id data ?new-chunk}
                         where  [= id ?chunk-id]}
                 {:chunk-id chunk-id :new-chunk new-chunk}))
-        @chunk-cache)))
-  (d/q db ["PRAGMA wal_checkpoint(TRUNCATE)"]))
+        @chunk-cache))))
 
 (defonce app_ (atom nil))
 
@@ -567,7 +566,6 @@
   (let [{{:keys [::h/tx!]} :ctx} @app_]
     (tx! (fn [db _] (migrations db)
            (d/escape-write-tx [db db]
-             (d/q db ["PRAGMA wal_checkpoint(TRUNCATE)"])
              (d/q db ["VACUUM"]))))))
 
 (defn -main [& _]
@@ -728,13 +726,4 @@
   (do (dotimes [_ 300]
         (tx! (fn [_ _] (Thread/sleep 90)))
         (Thread/sleep 101))
-      (println "Done"))
-
-  ;; WARNING: tick overrun
-  {:n 76, :p50 100, :p95 987, :p99 1107, :max 1195}
-
-  ;; WARNING: tick overrun
-  {:n 194, :p50 100, :p95 100, :p99 104, :max 105}
-  
-  
-  )
+      (println "Done")))
