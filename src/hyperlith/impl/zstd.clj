@@ -27,7 +27,7 @@
 (defn compress-chunk! ^ByteBuffer
   [^ZstdCompressCtx ctx ^ByteBuffer dst ^ByteBuffer src]
   (.clear dst)
-  (.compressDirectByteBufferStream ctx dst src EndDirective/CONTINUE)
+  (.compressDirectByteBufferStream ctx dst src EndDirective/FLUSH)
   (try
     (when (.hasRemaining src)
       (throw (ex-info "zstd dst overflow"
