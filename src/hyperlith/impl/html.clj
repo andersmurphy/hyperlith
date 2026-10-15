@@ -22,6 +22,8 @@
 
 (set! *warn-on-reflection* true)
 
+(defrecord Component [k f])
+
 (declare write-node)
 (declare write-attribute)
 (declare html->bytes)
@@ -123,7 +125,7 @@
         (let [cache (.attr-name-cache lane-ctx)]
           ;; Attributes names are finite so we cache them in an unbounded cache
           ;; Each thread has it's own atom so we can read and then write
-          (if-let [v  (IdentityHashMap/.get cache attribute-name)]
+          (if-let [v (IdentityHashMap/.get cache attribute-name)]
             (write-bytes v out)
             (let [start                 (.position out)
                   attribute-string-name (name attribute-name)]
@@ -191,17 +193,6 @@
           (while (.hasNext element-iterator)
             (write-node lane-ctx (.next element-iterator) out))
           (write-element-end-tag lane-ctx out tag)))
-      
-      invoke-component
-      (fn invoke-component
-        [f form]
-        (case (count form)
-          1 (f)
-          2 (f (nth form 1))
-          3 (f (nth form 1) (nth form 2))
-          4 (f (nth form 1) (nth form 2) (nth form 3))
-          5 (f (nth form 1) (nth form 2) (nth form 3) (nth form 4))
-          (apply f (subvec form 1))))
 
       write-collection
       (fn write-collection
@@ -211,30 +202,13 @@
             (let [item (.next iterator)]
               (cond  (keyword? item)
                      (write-element lane-ctx out iterator item)
-
-                     (fn? item)
-                     (let [cache (.fragment-cache lane-ctx)]
-                       (if-let [b (cache/get cache collection)]
-                         (.put out ^bytes b)
-                         (cache/put cache collection
-                           (let [qd    (.query-disabled lane-ctx)
-                                 start (.position out)]
-                             (reset! qd item)
-                             (try
-                               (write-node lane-ctx (invoke-component item
-                                   collection)
-                                 out)
-                               
-                               (region->byte-array! out start)
-                               (finally (reset! qd nil)))))))
-
                      :else
                      (do (write-node lane-ctx item out)
                          (while (.hasNext iterator)
                            (write-node lane-ctx (.next iterator) out))))))))]
 
   (defn write-node
-    [lane-ctx node ^ByteBuffer out]
+    [^LaneCtx lane-ctx node ^ByteBuffer out]
     (cond
       (nil? node) nil
 
@@ -243,11 +217,26 @@
       (string? node)
       (write-escaped-string node out)
 
+      (instance? Component node)
+      (let [cache (.fragment-cache lane-ctx)]
+        (if-let [b (cache/get cache (.k ^Component node))]
+          (.put out ^bytes b)
+          (cache/put cache (.k ^Component node)
+            (let [qd    (.query-disabled lane-ctx)
+                  start (.position out)]
+              (reset! qd node)
+              (try
+                (write-node lane-ctx ((.f ^Component node))
+                  out)
+
+                (region->byte-array! out start)
+                (finally (reset! qd nil)))))))
+
       (instance? Sequential node)
       (write-collection lane-ctx out node)
 
       :else (write-escaped-string node out)))
-  
+
   (defn write-attribute [lane-ctx attribute-value attribute-name builder]
     (cond
       (instance? String attribute-value)

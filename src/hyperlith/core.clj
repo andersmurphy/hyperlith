@@ -51,7 +51,8 @@
   [hyperlith.impl.html
    html->stream
    html->bytes
-   html->bytes-oneshot]
+   html->bytes-oneshot
+   ->Component]
   ;; CRYPTO
   [hyperlith.impl.crypto
    new-uid

@@ -7,9 +7,7 @@
    [clojure.pprint :as pprint]
    [hyperlith.core :as h :refer [defaction defview]]
    [hyperlith.extras.ui.virtual-scroll :as vs]
-   [hyperlith.impl.cache :as cache]
-   [hyperlith.impl.sqlite :as d])
-  (:import (hyperlith.impl.cache BlobKey)))
+   [hyperlith.impl.sqlite :as d]))
 
 (set! *warn-on-reflection* true)
 ;; (set! *unchecked-math* :warn-on-boxed)
@@ -343,10 +341,11 @@
       (update-tab-data! db sid tabid
         #(assoc % :share-x jumpx :share-y jumpy :share-id (h/new-uid))))))
 
-(defn Checkbox [{:keys [id state]}]
-  [:div {:class      "box"
-         :data-color state
-         :data-id    id}])
+(defn Checkbox [id state]
+  (h/->Component [Checkbox id state]
+    (fn [] [:div {:class      "box"
+                  :data-color state
+                  :data-id    id}])))
 
 (defn xy->chunk-ids
   [{:keys [x-offset-items y-offset-items x-rendered-items y-rendered-items]}]
@@ -356,33 +355,39 @@
                 (range start (+ start x-rendered-items)))))
     (range y-offset-items (+ y-offset-items y-rendered-items))))
 
-(defn Chunk [{:keys [id ^BlobKey cells]}]
-  [:div
-   {:class       "chunk"
-    :id          (str "chunk-" id)
-    :data-ignore true
-    :data-id     id
-    :data-action handler-check}
-   (into []
-     (map-indexed
-       (fn [local-id state]
-         [Checkbox {:id local-id :state state}]))
-     (.-b cells))])
+(defn Chunk [id v cells]
+  (h/->Component [Chunk id v]
+    (fn []
+      [:div
+       {:class       "chunk"
+        :id          (str "chunk-" id)
+        :data-ignore true
+        :data-id     id
+        :data-action handler-check}
+       (into []
+         (map-indexed
+           (fn [local-id state]
+             (Checkbox local-id state)))
+         cells)])))
 
 (defn EmptyChecks []
-  (into []
-    (map-indexed (fn [local-id box] [Checkbox {:id local-id :state box}]))
-    blank-chunk))
+  (h/->Component [EmptyChecks]
+    (fn []
+      (into []
+        (map-indexed (fn [local-id box] (Checkbox local-id box)))
+        blank-chunk))))
 
-(defn EmptyChunk [{:keys [id]}]
-  [:div
-   {:class             "chunk"
-    :id                (str "chunk-" id)
-    :data-ignore-morph true
-    :data-ignore       true
-    :data-id           id
-    :data-action       handler-check}
-   [EmptyChecks]])
+(defn EmptyChunk [id]
+  (h/->Component [EmptyChunk id]
+    (fn []
+      [:div
+       {:class             "chunk"
+        :id                (str "chunk-" id)
+        :data-ignore-morph true
+        :data-ignore       true
+        :data-id           id
+        :data-action       handler-check}
+       (EmptyChecks)])))
 
 (defn UserView
   [db offset-data]
@@ -391,28 +396,29 @@
      (mapv (fn [chunk-id]
              (or (first
                    (d/q db
-                     '{select [id data]
+                     '{select [id v data]
                        from   chunk
                        where  [= id ?chunk-id]}
                      {:chunk-id chunk-id}
                      (fn [stmt]
-                       [Chunk {:id    (d/int stmt 0)
-                               :cells (cache/blob->key (d/blob stmt 1))}])))
-               [EmptyChunk {:id chunk-id}]))))})
+                       (Chunk (d/int stmt 0) (d/int stmt 1) (d/blob stmt 2)))))
+               (EmptyChunk chunk-id)))))})
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
-(defn Palette [{:keys [current-selected]}]
-  [:div {:class "palette"}
-   (mapv (fn [state]
-           [:div
-            {:data-id     state
-             :data-action handler-palette
-             :data-color  state
-             :class
-             ["palette-item" (when (= current-selected state)
-                               "palette-selected")]}])
-     (subvec states 1))])
+(defn Palette [current-selected]
+  (h/->Component [Palette]
+    (fn []
+      [:div {:class "palette"}
+       (mapv (fn [state]
+               [:div
+                {:data-id     state
+                 :data-action handler-palette
+                 :data-color  state
+                 :class
+                 ["palette-item" (when (= current-selected state)
+                                   "palette-selected")]}])
+         (subvec states 1))])))
 
 (def shim-headers
   [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
@@ -434,35 +440,39 @@
     "}"))
 
 (defn Info []
-  [[:h1 "One Billion Checkboxes"]
-   [:p "Built using "
-    [:a {:href "https://clojure.org/"} "Clojure"]
-    " and "
-    [:a {:href "https://data-star.dev"} "Datastar"]
-    " - "
-    [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "source"]
-    " - "
-    [:a {:href "https://andersmurphy.com/about"} "blog"]]])
+  (h/->Component [Info]
+    (fn []
+      [[:h1 "One Billion Checkboxes"]
+       [:p "Built using "
+        [:a {:href "https://clojure.org/"} "Clojure"]
+        " and "
+        [:a {:href "https://data-star.dev"} "Datastar"]
+        " - "
+        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "source"]
+        " - "
+        [:a {:href "https://andersmurphy.com/about"} "blog"]]])))
 
 (defn Jump []
-  [:div {:class "jump"}
-   [:h2 "X:"]
-   [:input {:class "jump-input"
-            :type  "number" :data-bind "jumpx"
-            :data-effect
-            (str  "$view-x;@peek(() => {$jumpx = "(scroll->cell-xy-js "$view-x")"})")}]
-   [:h2 "Y:"]
-   [:input
-    {:class "jump-input"
-     :type  "number" :data-bind "jumpy"
-     :data-effect
-     (str  "$view-y;@peek(() => {$jumpy = "(scroll->cell-xy-js "$view-y")"})")}]
-   [:div {:class "button" :data-action handler-jump}
-    [:strong {:class "pe-none"} "JUMP"]]
-   [:div {:class             "button"
-          :data-action       handler-share
-          :data-on:mousedown copy-xy-to-clipboard-js}
-    [:strong {:class "pe-none"} "SHARE"]]])
+  (h/->Component [Jump]
+    (fn []
+      [:div {:class "jump"}
+       [:h2 "X:"]
+       [:input {:class "jump-input"
+                :type  "number" :data-bind "jumpx"
+                :data-effect
+                (str  "$view-x;@peek(() => {$jumpx = "(scroll->cell-xy-js "$view-x")"})")}]
+       [:h2 "Y:"]
+       [:input
+        {:class "jump-input"
+         :type  "number" :data-bind "jumpy"
+         :data-effect
+         (str  "$view-y;@peek(() => {$jumpy = "(scroll->cell-xy-js "$view-y")"})")}]
+       [:div {:class "button" :data-action handler-jump}
+        [:strong {:class "pe-none"} "JUMP"]]
+       [:div {:class             "button"
+              :data-action       handler-share
+              :data-on:mousedown copy-xy-to-clipboard-js}
+        [:strong {:class "pe-none"} "SHARE"]]])))
 
 (def Virtual (vs/virtual {:id "view" :data-ref "_view"}))
 
@@ -505,9 +515,9 @@
        {:class     "controls-wrapper"
         ;; firefox sometimes preserves scroll on refresh and we don't want that
         :data-init (scroll-to-xy-js init-jump-x init-jump-y)}
-       [Jump]
-       [Palette {:current-selected (or (:color tab-data) 1)}]
-       [Info]]
+       (Jump)
+       (Palette (or (:color tab-data) 1))
+       (Info)]
       (when share-id
         [:div {:id share-id :data-ignore-morph true}
          [:div {:data-on:mousedown "el.remove()" :class "toast"}
@@ -527,9 +537,7 @@
   ;; Create tables
   (println "Running migrations...")
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS chunk(id INTEGER PRIMARY KEY, data BLOB)"])
-  (d/q db
-    ["CREATE TABLE IF NOT EXISTS chunk_html(chunk_id INTEGER PRIMARY KEY, data BLOB, FOREIGN KEY(chunk_id) REFERENCES chunk(id))"])
+    ["CREATE TABLE IF NOT EXISTS chunk(id INTEGER PRIMARY KEY, v INTEGER, data BLOB)"])
   (d/q db
     ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data TEXT) WITHOUT ROWID"]))
 
@@ -539,7 +547,9 @@
       (run! (fn [thunk] (thunk db chunk-cache)) thunks)
       (run! (fn [[chunk-id new-chunk]]
               (d/q db '{update chunk
-                        set    {id ?chunk-id data ?new-chunk}
+                        set    {id   ?chunk-id
+                                v    [+ v 1]
+                                data ?new-chunk}
                         where  [= id ?chunk-id]}
                 {:chunk-id chunk-id :new-chunk new-chunk}))
         @chunk-cache))))
@@ -611,14 +621,23 @@
           (pprint/pprint (d/blob stmt 1)))))))
 
 (comment ;; Example migration of for changing column type
+  (def tx! (-> @app_ :ctx ::h/tx!))
 
   (tx!
     (fn [db _]
+      (d/q db ["DROP TABLE IF EXISTS newchunk"])
       (d/q db
-        ["CREATE TABLE IF NOT EXISTS newchunk(id INTEGER PRIMARY KEY, data BLOB)"])
-      (d/q db ["INSERT INTO newchunk SELECT * FROM chunk"])
+        ["CREATE TABLE IF NOT EXISTS newchunk(id INTEGER PRIMARY KEY, v INTEGER, data BLOB)"])
+      (d/q db ["INSERT INTO newchunk SELECT id, 1, data FROM chunk"])
       (d/q db ["DROP TABLE chunk"])
-      (d/q db ["ALTER TABLE newchunk RENAME TO chunk"]))))
+      (d/q db ["ALTER TABLE newchunk RENAME TO chunk"])))
+
+  (tx!
+    (fn [db _]
+      (d/q db ["SELECT id, v FROM chunk"]
+        (fn [stmt] (println (d/int stmt 0) (d/int stmt 1))))))
+
+  )
 
 (comment ;; clearing a chunk
   (def tx! (-> @app_ :ctx ::h/tx!))
@@ -695,7 +714,7 @@
     (java.io.ByteArrayInputStream.
       (String/.getBytes (h/edn->json edn) "UTF-8")))
 
-  (dotimes [i 3000]
+  (dotimes [i 5000]
     (stub-router
       {:request-method :post
        :uri            "/"
