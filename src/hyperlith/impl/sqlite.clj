@@ -18,11 +18,6 @@
 
 (def ^AddressLayout PTR ValueLayout/ADDRESS)
 
-(defn- str->seg ^MemorySegment [^Arena arena ^String s]
-  (.allocateFrom arena s))
-
-(def ^MemorySegment sqlite-static    (MemorySegment/ofAddress 0))
-
 (defn errmsg [^MemorySegment pdb]
   (-> (Sqlite/errmsg pdb) (.reinterpret Long/MAX_VALUE) (.getString 0)))
 
@@ -37,11 +32,11 @@
     (ex-info (str "SQLite error: " code-name "\n" message)
       (assoc data :code code-name :message message))))
 
-(defn open-v2 [^String filename ^long flags vfs]
+(defn open-v2 [^String filename ^long flags ^String vfs]
   (with-open [arena (Arena/ofConfined)]
     (let [ppdb    (.allocate arena PTR)
-          c-fname (str->seg arena filename)
-          c-vfs   (when vfs (str->seg arena vfs))
+          c-fname (.allocateFrom arena filename)
+          c-vfs   (when vfs (.allocateFrom arena vfs))
           code    (Sqlite/openV2 c-fname ppdb (int flags)
                     (or c-vfs MemorySegment/NULL))]
       (if (sqlite-ok? code)
@@ -50,7 +45,7 @@
 
 (defn prepare-v3 [^MemorySegment pdb ^String sql]
   (with-open [arena (Arena/ofConfined)]
-    (let [c-sql   (str->seg arena sql)
+    (let [c-sql   (.allocateFrom arena sql)
           sql-len (int (dec (.byteSize c-sql)))
           ppstmt  (.allocate arena PTR)
           code    (Sqlite/prepareV3 pdb c-sql sql-len
@@ -60,20 +55,11 @@
         (.get ppstmt PTR 0)
         (throw (sqlite-ex-info pdb code {:sql sql}))))))
 
-(defn bind-text [^MemorySegment stmt ^long idx text ^Arena arena]
-  (let [c-text  (str->seg arena (str text))
-        n-bytes (int (dec (.byteSize c-text)))]
-    (Sqlite/bindText stmt (int idx) c-text n-bytes sqlite-static)))
-
 (defn- encode ^MemorySegment [^bytes blob ^Arena arena]
   (let [b-l     (alength blob)
         segment (SegmentAllocator/.allocate arena b-l)]
     (MemorySegment/copy blob 0 segment ValueLayout/JAVA_BYTE 0 b-l)
     segment))
-
-(defn bind-blob [^MemorySegment stmt ^long idx ^bytes blob ^Arena arena]
-  (let [seg (encode blob arena)]
-    (Sqlite/bindBlob stmt (int idx) seg (int (.byteSize seg)) sqlite-static)))
 
 (defn column-text [^MemorySegment stmt ^long idx]
   (let [ptr (Sqlite/columnText stmt (int idx))]
@@ -87,20 +73,45 @@
         size (Sqlite/columnBytes stmt (int idx))]
     (.toArray (.reinterpret ptr size) ValueLayout/JAVA_BYTE)))
 
-(defn- bind [stmt params arena]
-  (let [n (count params)]
-    (loop [i 0]
-      (when (< i n)
-        (let [param (nth params i)
-              ;; starts at 1
-              col   (unchecked-inc i)]
-          (cond
-            (integer? param) (Sqlite/bindInt64  stmt col param)
-            (string? param)  (bind-text         stmt col param arena)
-            (double? param)  (Sqlite/bindDouble stmt col param)
-            (nil? param)     (Sqlite/bindNull   stmt col)
-            :else            (bind-blob         stmt col param arena))
-          (recur (unchecked-inc i)))))))
+(let [sqlite-static (MemorySegment/ofAddress 0)
+
+      bind-text
+      (fn bind-text [^MemorySegment stmt ^long idx ^String text ^Arena arena]
+        (let [c-text  (.allocateFrom arena text)
+              n-bytes (int (dec (.byteSize c-text)))]
+          (Sqlite/bindText stmt (int idx) c-text n-bytes sqlite-static)))
+
+      bind-blob
+      (fn bind-blob [^MemorySegment stmt ^long idx ^bytes blob ^Arena arena]
+        (let [seg (encode blob arena)]
+          (Sqlite/bindBlob stmt (int idx) seg
+            (int (.byteSize seg)) sqlite-static)))
+
+      bind-dispatch
+      (fn bind-dispatch [stmt col param arena]
+        (cond
+          (integer? param) (Sqlite/bindInt64  stmt col param)
+          (string? param)  (bind-text         stmt col param arena)
+          (double? param)  (Sqlite/bindDouble stmt col param)
+          (nil? param)     (Sqlite/bindNull   stmt col)
+          :else            (bind-blob         stmt col param arena)))]
+
+  (defn- bind [stmt params arena]
+    (let [n (count params)]
+      (case n
+        0 nil
+        1 (bind-dispatch stmt 1 (nth params 0) arena)
+        2 (do
+            (bind-dispatch stmt 1 (nth params 0) arena)
+            (bind-dispatch stmt 2 (nth params 1) arena))
+        3 (do
+            (bind-dispatch stmt 1 (nth params 0) arena)
+            (bind-dispatch stmt 2 (nth params 1) arena)
+            (bind-dispatch stmt 3 (nth params 1) arena))
+        (loop [i 0]
+          (when (< i n)
+            (bind-dispatch stmt (unchecked-inc i) (nth params i) arena)
+            (recur (unchecked-inc i))))))))
 
 (defn- prepare-cached [^Conn conn sql params arena]
   (let [stmt-cache ^HashMap (.stmt-cache conn)
@@ -125,12 +136,10 @@
 (defn result-set-reducer [result-set-fn result-set]
   ;; TODO: Might benefit from transient on large collections
   ;; but how large?
-  (let [result
-        (reduce (fn [result stmt]
+  (reduce (fn [result stmt]
                   (conj result (result-set-fn stmt)))
           []
-          result-set)]
-    (when (first result) result)))
+          result-set))
 
 (defn q*
   ([^Conn conn sql]

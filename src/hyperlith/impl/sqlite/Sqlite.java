@@ -114,12 +114,12 @@ public final class Sqlite {
         return (int) PREPARE_V3.invokeExact(db, sql, nByte, flags, ppStmt, pzTail);
     }
 
-    private static final MethodHandle RESET = fn("sqlite3_reset", INT, PTR);
+    private static final MethodHandle RESET = critFn(false, "sqlite3_reset", INT, PTR);
     public static int reset(MemorySegment stmt) throws Throwable {
         return (int) RESET.invokeExact(stmt);
     }
 
-    private static final MethodHandle CLEAR_BINDINGS = fn("sqlite3_clear_bindings", INT, PTR);
+    private static final MethodHandle CLEAR_BINDINGS = critFn(false, "sqlite3_clear_bindings", INT, PTR);
     public static int clearBindings(MemorySegment stmt) throws Throwable {
         return (int) CLEAR_BINDINGS.invokeExact(stmt);
     }
