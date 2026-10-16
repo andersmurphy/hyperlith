@@ -123,6 +123,7 @@
             zstd-dst  (ByteBuffer/allocateDirect  (* 2 16384))
             stream    ((req ::h/stream-fn))
             last-put_ (atom nil)
+            last-view (atom nil)
             conns     (req ::h/conns)
             render
             (fn render [^LaneCtx lane-ctx]
@@ -131,14 +132,19 @@
                   ;; Only render again if previous event was sent
                   ;; this gives you back pressure and frame dropping.
                   (when (or (nil? @last-put_) (d/realized? @last-put_))
-                    (when-some [new-view (render-fn (.dbs lane-ctx) req)]
-                      (let [html-dst ^ByteBuffer (.html-dst-buf
-                                                   ^LaneCtx lane-ctx)
-                            _        (html->stream! new-view lane-ctx)
-                            _        (zstd/compress-chunk! zstd-ctx
-                                       zstd-dst html-dst)]
-                        (->> (s/put! stream zstd-dst)
-                          (reset! last-put_)))))
+                    (let [new-view (render-fn (.dbs lane-ctx) req)
+                          change?  (not (= new-view @last-view))
+                          ;; avoid holding onto view longer than a tick
+                          ;; helps prevent views becoming old gen
+                          _        (reset! last-view new-view)]
+                      (when change?
+                        (let [html-dst ^ByteBuffer (.html-dst-buf
+                                                     ^LaneCtx lane-ctx)
+                              _        (html->stream! new-view lane-ctx)
+                              _        (zstd/compress-chunk! zstd-ctx
+                                         zstd-dst html-dst)]
+                          (->> (s/put! stream zstd-dst)
+                            (reset! last-put_))))))
                   (do
                     (ConcurrentHashMap$KeySetView/.remove conns render)
                     (zstd/close-ctx zstd-ctx)

@@ -371,7 +371,7 @@
          cells)])))
 
 (defn EmptyChecks []
-  (h/->Component [EmptyChecks]
+  (h/->Component EmptyChecks
     (fn []
       (into []
         (map-indexed (fn [local-id box] (Checkbox local-id box)))
@@ -407,7 +407,7 @@
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
 (defn Palette [current-selected]
-  (h/->Component [Palette]
+  (h/->Component [Palette current-selected]
     (fn []
       [:div {:class "palette"}
        (mapv (fn [state]
@@ -440,7 +440,7 @@
     "}"))
 
 (defn Info []
-  (h/->Component [Info]
+  (h/->Component Info
     (fn []
       [[:h1 "One Billion Checkboxes"]
        [:p "Built using "
@@ -453,7 +453,7 @@
         [:a {:href "https://andersmurphy.com/about"} "blog"]]])))
 
 (defn Jump []
-  (h/->Component [Jump]
+  (h/->Component Jump
     (fn []
       [:div {:class "jump"}
        [:h2 "X:"]
