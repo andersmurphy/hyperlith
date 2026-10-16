@@ -22,7 +22,17 @@
 
 (set! *warn-on-reflection* true)
 
-(defrecord Component [k f])
+(deftype Component [k f]
+  Object
+  (equals [this o]
+    (or (identical? this o)
+      (and (instance? Component o)
+        (clojure.lang.Util/equals k (.-k ^Component o)))))
+  (hashCode [_]
+    (clojure.lang.Util/hash k))
+  clojure.lang.IHashEq
+  (hasheq [_]
+    (clojure.lang.Util/hash k)))
 
 (declare write-node)
 (declare write-attribute)
