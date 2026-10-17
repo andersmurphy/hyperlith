@@ -310,6 +310,7 @@
                                  (d/q db
                                    '{insert-into chunk
                                      values      [{id   ?chunk-id
+                                                   v    1
                                                    data ?blank-chunk}]}
                                    {:chunk-id    chunk-id
                                     :blank-chunk blank-chunk})
