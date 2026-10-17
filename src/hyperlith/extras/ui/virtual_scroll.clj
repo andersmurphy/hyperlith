@@ -79,20 +79,37 @@
     [threshold-low threshold-high offset-items
      max-size item-grid size rendered-items translate view-size]))
 
-(defn virtual-table [{:keys [id data-ref]}]
+(defn virtual-table [{:keys [id data-ref resize-handler-path
+                             scroll-handler-path ]}]
   (let [x-signal             (str id "-x")
         y-signal             (str id "-y")
         w-signal             (str id "-w")
         h-signal             (str id "-h")
-        signals              (h/edn->json {x-signal 0 y-signal 0})
-        attrs                {:id id :data-ref data-ref}
         virtual-table-id     (str id "-virtual-table")
         virtual-corner-id    (str id "-virtual-corner")
         virtual-header-id    (str id "-virtual-header")
         virtual-translate-id (str id "-virtual-translate")
         virtual-sidebar-id   (str id "-virtual-sidebar")
-        virtual-content-id   (str id "-virtual-content")]
-    (fn [{:keys [resize-handler-path scroll-handler-path item-fn x y]}]
+        virtual-content-id   (str id "-virtual-content")
+        virtual-logic-id     (str id "-virtual-logic")
+        attrs
+        {:id             id
+         :data-ref       data-ref
+         :data-signals__ifmissing
+         (h/edn->json {x-signal 0 y-signal 0})
+         ;; send up initial size on load
+         :data-init
+         (resize-js w-signal h-signal resize-handler-path)
+         :data-on:resize__debounce.100ms__window
+         (resize-js w-signal h-signal resize-handler-path)
+         :data-on:scroll (on-scroll-js x-signal y-signal)
+         :style          {:width               :100%
+                          :height              :100%
+                          :scroll-behavior     :smooth
+                          :overscroll-behavior :contain
+                          :overflow-anchor     :none
+                          :overflow            :scroll}}]
+    (fn [{:keys [item-fn x y]}]
       (let [[x-threshold-low x-threshold-high x-offset-items
              x-max-size x-item-grid x-size x-rendered-items
              x-translate]
@@ -116,86 +133,87 @@
                       :y-rendered-items y-rendered-items})
             x-item-grid      (str "min-content min-content "x-item-grid" auto")
             y-item-grid      (str "min-content min-content "y-item-grid" auto")]
-        [:div {:data-signals__ifmissing signals
-               :style                   {:width      :100%
-                                         :height     :100%
-                                         :max-width  x-max-size
-                                         :max-height y-max-size}}
-         [:div
-          (assoc attrs
-            ;; send up initial size on load
-            :data-init
-            (resize-js w-signal h-signal resize-handler-path)
-            :data-on:resize__debounce.100ms__window
-            (resize-js w-signal h-signal resize-handler-path)
-            :data-on:scroll (on-scroll-js x-signal y-signal)
-            ;; Handles user drag scrolling
-            :data-effect fetch-next-page?
-            :style {:scroll-behavior     :smooth
-                    :overscroll-behavior :contain
-                    :overflow-anchor     :none
-                    :overflow            :scroll
-                    :max-width           x-max-size
-                    :max-height          y-max-size
-                    :width               :100%
-                    :height              :100%})
-          [:div {:id    virtual-table-id
-                 :style {:position      :relative
-                         :width         x-size
-                         :height        y-size
-                         :display       :grid
-                         :grid-template (str y-item-grid "/" x-item-grid)}}
-           [:div {:id    virtual-corner-id
-                  :style {:display       :grid
-                          :grid-template "subgrid/subgrid"
-                          :position      :sticky
-                          :top           0
-                          :left          0
-                          :grid-column   1
-                          :grid-row      1
-                          :z-index       6}}
-            corner]
-           [:div {:id    virtual-header-id
-                  :style {:display       :grid
-                          :grid-template "subgrid/subgrid"
-                          :position      :sticky
-                          :top           0
-                          :grid-column   "3/-1"
-                          :grid-row      1
-                          :z-index       5}}
-            header]
-           [:div {:id    virtual-translate-id
-                  :style {:grid-column 2
-                          :grid-row    2
-                          :width       (str x-translate "px")
-                          :height      (str y-translate "px")}}]
-           [:div {:id    virtual-sidebar-id
-                  :style {:display       :grid
-                          :grid-template "subgrid/subgrid"
-                          :position      :sticky
-                          :left          0
-                          :grid-row      "3/-1"
-                          :grid-column   1
-                          :z-index       5}}
-            sidebar]
-           [:div {:id    virtual-content-id
-                  :style {:display       :grid
-                          :grid-template "subgrid/subgrid"
-                          :grid-area     "3/3/-2/-2"}}
-            content]]]]))))
+        [:div (assoc attrs :max-width x-max-size :max-height y-max-size)
+         [:div {:id          virtual-logic-id
+                ;; Handles user drag scrolling
+                :data-effect fetch-next-page?
+                :style       {:display :none}}]
+         [:div {:id    virtual-table-id
+                :style {:position      :relative
+                        :width         x-size
+                        :height        y-size
+                        :display       :grid
+                        :grid-template (str y-item-grid "/" x-item-grid)}}
+          [:div {:id    virtual-corner-id
+                 :style {:display       :grid
+                         :grid-template "subgrid/subgrid"
+                         :position      :sticky
+                         :top           0
+                         :left          0
+                         :grid-column   1
+                         :grid-row      1
+                         :z-index       6}}
+           corner]
+          [:div {:id    virtual-header-id
+                 :style {:display       :grid
+                         :grid-template "subgrid/subgrid"
+                         :position      :sticky
+                         :top           0
+                         :grid-column   "3/-1"
+                         :grid-row      1
+                         :z-index       5}}
+           header]
+          [:div {:id    virtual-translate-id
+                 :style {:grid-column 2
+                         :grid-row    2
+                         :width       (str x-translate "px")
+                         :height      (str y-translate "px")}}]
+          [:div {:id    virtual-sidebar-id
+                 :style {:display       :grid
+                         :grid-template "subgrid/subgrid"
+                         :position      :sticky
+                         :left          0
+                         :grid-row      "3/-1"
+                         :grid-column   1
+                         :z-index       5}}
+           sidebar]
+          [:div {:id    virtual-content-id
+                 :style {:display       :grid
+                         :grid-template "subgrid/subgrid"
+                         :grid-area     "3/3/-2/-2"}}
+           content]]]))))
 
 (defn virtual
-  [{:keys [id data-ref]}]
-  (let [x-signal             (str id "-x")
+  [{:keys [id data-ref resize-handler-path scroll-handler-path]}]
+  (let [;; All the stuff we only want to compute once
+        x-signal             (str id "-x")
         y-signal             (str id "-y")
         w-signal             (str id "-w")
         h-signal             (str id "-h")
-        signals              (h/edn->json {x-signal 0 y-signal 0})
-        attrs                {:id id :data-ref data-ref}
         virtual-table-id     (str id "-virtual-table")
         virtual-translate-id (str id "-virtual-translate")
-        virtual-view-id      (str id "-virtual-view")]
-    (fn [{:keys [resize-handler-path scroll-handler-path item-fn x y]}]
+        virtual-view-id      (str id "-virtual-view")
+        virtual-logic-id     (str id "-virtual-logic")
+        attrs
+        {:id                                     id
+         :data-ref                               data-ref
+         :data-signals__ifmissing                
+         (h/edn->json {x-signal 0 y-signal 0})
+         ;; send up initial size on load
+         :data-init                              
+         (resize-js w-signal h-signal resize-handler-path)
+         :data-on:resize__debounce.100ms__window 
+         (resize-js w-signal h-signal resize-handler-path)
+         :data-on:scroll                         
+         (on-scroll-js x-signal y-signal)
+         :style
+         {:width               :100%
+          :height              :100%
+          :scroll-behavior     :smooth
+          :overscroll-behavior :contain
+          :overflow-anchor     :none
+          :overflow            :scroll}}]
+    (fn [{:keys [item-fn x y]}]
       (let [[x-threshold-low x-threshold-high x-offset-items
              x-max-size x-item-grid x-size x-rendered-items
              x-translate x-view-size]
@@ -217,49 +235,32 @@
                       :x-rendered-items x-rendered-items
                       :y-offset-items   y-offset-items
                       :y-rendered-items y-rendered-items})]
-        [:div {:data-signals__ifmissing signals
-               :style                   {:width      :100%
-                                         :height     :100%
-                                         :max-width  x-max-size
-                                         :max-height y-max-size}}
-         [:div
-          (assoc attrs
-            ;; send up initial size on load
-            :data-init
-            (resize-js w-signal h-signal resize-handler-path)
-            :data-on:resize__debounce.100ms__window
-            (resize-js w-signal h-signal resize-handler-path)
-            :data-on:scroll (on-scroll-js x-signal y-signal)
-            ;; Handles user drag scrolling
-            :data-effect fetch-next-page?
-            :style {:scroll-behavior     :smooth
-                    :overscroll-behavior :contain
-                    :overflow-anchor     :none
-                    :overflow            :scroll
-                    :max-width           x-max-size
-                    :max-height          y-max-size
-                    :width               :100%
-                    :height              :100%})
-          [:div {:id    virtual-table-id
-                 :style {:position       :relative
-                         :width          x-size
-                         :height         y-size
-                         :contain        :strict
-                         :pointer-events :none}}
-           ;; Separate translate div to avoid recalculating style of grid
-           [:div {:id    virtual-translate-id
-                  :style {:position :absolute
-                          :contain  :strict
-                          :width    x-view-size
-                          :height   y-view-size
-                          :transform
-                          (str "translate("x-translate"px,"y-translate"px)")}}
-            [:div
-             {:id    virtual-view-id
-              :style {:display :grid
-                      :grid-template
-                      (str y-item-grid "/" x-item-grid)
-                      :width   x-view-size
-                      :height  y-view-size
-                      :contain :strict}}
-             content]]]]]))))
+        [:div (assoc attrs :max-width x-max-size :max-height y-max-size)
+         [:div ;; logic is it's own node as it changes all the time
+          {:id          virtual-logic-id
+           ;; Handles user drag scrolling
+           :data-effect fetch-next-page?
+           :style       {:display :none}}]
+         [:div {:id    virtual-table-id
+                :style {:position       :relative
+                        :width          x-size
+                        :height         y-size
+                        :contain        :strict
+                        :pointer-events :none}}
+          ;; Separate translate div to avoid recalculating style of grid
+          [:div {:id    virtual-translate-id
+                 :style {:position :absolute
+                         :contain  :strict
+                         :width    x-view-size
+                         :height   y-view-size
+                         :transform
+                         (str "translate("x-translate"px,"y-translate"px)")}}
+           [:div
+            {:id    virtual-view-id
+             :style {:display :grid
+                     :grid-template
+                     (str y-item-grid "/" x-item-grid)
+                     :width   x-view-size
+                     :height  y-view-size
+                     :contain :strict}}
+            content]]]]))))

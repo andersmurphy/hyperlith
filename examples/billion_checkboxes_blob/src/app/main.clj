@@ -474,7 +474,12 @@
               :data-on:mousedown copy-xy-to-clipboard-js}
         [:strong {:class "pe-none"} "SHARE"]]])))
 
-(def Virtual (vs/virtual {:id "view" :data-ref "_view"}))
+(def Virtual
+  (vs/virtual
+    {:id                  "view"
+     :data-ref            "_view"
+     :scroll-handler-path handler-scroll
+     :resize-handler-path handler-resize}))
 
 (defview handler-root
   {:path "/" :shim-headers shim-headers :br-window-size 24}
@@ -508,9 +513,7 @@
                                 :view-size          height
                                 :item-count-fn      (fn [] board-size)
                                 :chunk-size         chunk-size}
-          :item-fn             (partial UserView db)
-          :scroll-handler-path handler-scroll
-          :resize-handler-path handler-resize})]
+          :item-fn             (partial UserView db)})]
       [:div
        {:class     "controls-wrapper"
         ;; firefox sometimes preserves scroll on refresh and we don't want that

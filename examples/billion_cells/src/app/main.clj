@@ -432,7 +432,12 @@
    [:title "One billion cells"]
    [:meta {:content "So many cells" :name "description"}]])
 
-(def Virtual (vs/virtual-table {:id "view" :data-ref "_view" }))
+(def Virtual
+  (vs/virtual-table
+    {:id                  "view"
+     :data-ref            "_view"
+     :scroll-handler-path handler-scroll
+     :resize-handler-path handler-resize}))
 
 (defview handler-root
   {:path        "/" :shim-headers shim-headers :br-window-size 24
@@ -477,9 +482,7 @@
                                 :view-size          height
                                 :item-count-fn      (fn [] board-size)
                                 :chunk-size         chunk-size}
-          :item-fn             (partial UserView db sid)
-          :scroll-handler-path handler-scroll
-          :resize-handler-path handler-resize})]
+          :item-fn             (partial UserView db sid)})]
       [:div
        {:class     "controls-wrapper"
         ;; firefox sometimes preserves scroll on refresh and we don't want that
