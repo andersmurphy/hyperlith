@@ -120,7 +120,7 @@
 
 (defn start-batch-loop!
   [ctx {:keys [batch-fn batch-tick-ms dbs lanes start-barrier done-barrier
-               render-queue conns]}]
+               render-queue conns fragment-cache]}]
   (assert (not (nil? batch-tick-ms)))
   (assert (not (nil? batch-fn)))
   (assert (not (nil? dbs)))
@@ -128,6 +128,7 @@
   (assert (not (nil? start-barrier)))
   (assert (not (nil? done-barrier)))
   (assert (not (nil? render-queue)))
+  (assert (not (nil? fragment-cache)))
   (let [overruns (atom [])
         q        (LinkedBlockingQueue/new)
         dbs      (sqlite/create-write-connections! dbs)
@@ -150,6 +151,8 @@
                                (flush)))
                            ;; Wait until all renders complete
                            (.await ^CyclicBarrier done-barrier)
+                           ;; Cache maintenance while no renders are running
+                           (cache/clean-up! fragment-cache)
                            ;; Checkpoint while no transactions are running
                            (sqlite/checkpoint-all-dbs! dbs)
                            ;; render queue
@@ -183,17 +186,14 @@
 
 (defn- init-render-lanes
   [{:keys [render-pool-size dbs render-buffer-size start-barrier done-barrier
-           fragment-cache-size render-queue]}]
+           render-queue fragment-cache]}]
   (assert (not (nil? render-pool-size)))
   (assert (not (nil? render-buffer-size)))
   (assert (not (nil? dbs)))
   (assert (not (nil? start-barrier)))
   (assert (not (nil? done-barrier)))
   (assert (not (nil? render-queue)))
-  (assert (not (nil? fragment-cache-size)))
-  (let [cache (cache/init
-                {:max-weight fragment-cache-size
-                 :weigher    (fn [_k ^bytes v] (alength v))})]
+  (assert (not (nil? fragment-cache)))
     (->> (range render-pool-size)
       (mapv (fn [_]
               (let [query-disabled (atom nil)
@@ -205,7 +205,7 @@
                                          query-disabled)
                        :html-dst-buf   (ByteBuffer/allocateDirect
                                          render-buffer-size)
-                       :fragment-cache cache})]
+                       :fragment-cache fragment-cache})]
                 (-> (Thread.
                       ^Runnable
                       (bound-fn* ;; binding conveyance
@@ -222,7 +222,7 @@
                               (run! sqlite/end-read-tx dbs))
                             (.await ^CyclicBarrier done-barrier)))))
                   Thread/.start)
-                lane-ctx))))))
+                lane-ctx)))))
 
 (def stub-stream
   (reify IEventSink
@@ -252,25 +252,34 @@
         stream-fn     (if (= mode :test)
                         (fn strem-fn-stub [] stub-stream)
                         (fn stream-fn [] (s/stream 0 nil)))
+        cache         (cache/init
+                        {:max-weight fragment-cache-size
+                         :weigher    (fn [_k ^bytes v] (alength v))
+                         ;; Disable Caffeine's background maintenance we will 
+                         ;; run it manually every tick.
+                         :executor
+                         (reify java.util.concurrent.Executor
+                           (execute [_ _task] nil))})
         lanes         (init-render-lanes
-                        {:render-pool-size    render-pool-size
-                         :render-buffer-size  render-buffer-size
-                         :dbs                 dbs
-                         :start-barrier       start-barrier
-                         :done-barrier        done-barrier
-                         :render-queue        render-queue
-                         :fragment-cache-size fragment-cache-size})
+                        {:render-pool-size   render-pool-size
+                         :render-buffer-size render-buffer-size
+                         :dbs                dbs
+                         :start-barrier      start-barrier
+                         :done-barrier       done-barrier
+                         :render-queue       render-queue
+                         :fragment-cache     cache})
         _             (throw-if-port-in-use! port)
         ctx           (-> (ctx-start)
                         (start-batch-loop!
-                          {:lanes         lanes
-                           :dbs           dbs
-                           :batch-fn      batch-fn
-                           :batch-tick-ms batch-tick-ms
-                           :start-barrier start-barrier
-                           :done-barrier  done-barrier
-                           :render-queue  render-queue
-                           :conns         conns}))
+                          {:lanes          lanes
+                           :dbs            dbs
+                           :batch-fn       batch-fn
+                           :batch-tick-ms  batch-tick-ms
+                           :start-barrier  start-barrier
+                           :done-barrier   done-barrier
+                           :render-queue   render-queue
+                           :conns          conns
+                           :fragment-cache cache}))
         wrap-ctx      (fn [handler]
                         (fn [req]
                           (handler
