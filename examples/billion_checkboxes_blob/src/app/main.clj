@@ -572,11 +572,11 @@
               :page_size  4096
               ;; 100GB
               :mmap_size  100000000000}}}
-       :batch-fn      #'batch-fn
-       :batch-tick-ms 100
-       :email         (h/env :email)
-       :domain        (h/env :domain)
-       :mode          mode}))
+       :batch-fn  #'batch-fn
+       :tick-ms   100
+       :email     (h/env :email)
+       :domain    (h/env :domain)
+       :mode      mode}))
   (let [{{:keys [::h/tx!]} :ctx} @app_]
     (tx! (fn [db _] (migrations db)
            (d/escape-write-tx [db db]

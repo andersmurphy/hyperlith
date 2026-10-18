@@ -567,7 +567,7 @@
                                   :page_size  (* 4096 4)
                                   :mmap_size  268435456}}}
        :batch-fn           #'batch-fn
-       :batch-tick-ms      100
+       :tick-ms            100
        :render-buffer-size (* 64 16384)
        :email              (h/env :email)
        :domain             (h/env :domain)

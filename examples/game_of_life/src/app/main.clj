@@ -160,13 +160,13 @@
 (defn start-app! [& {:keys [mode]}]
   (reset! app_
     (h/start-app
-      {:ctx-start     ctx-start
-       :batch-fn      #'batch-fn
-       :batch-tick-ms 200
-       :email         (h/env :email)
-       :domain        (h/env :domain)
-       :mode          mode
-       :dbs           {}})))
+      {:ctx-start ctx-start
+       :batch-fn  #'batch-fn
+       :tick-ms   200
+       :email     (h/env :email)
+       :domain    (h/env :domain)
+       :mode      mode
+       :dbs       {}})))
 
 (defn -main [& _]
   (start-app! :mode :prod))
