@@ -16,10 +16,10 @@
 (def ^:const chunk-size 16)
 (def ^:const chunk-size-px (* cell-size-px chunk-size))
 (def ^:const board-size (->> (math/pow chunk-size 2)
-                  (/ 1000000000)
-                  math/sqrt
-                  math/ceil
-                  int))
+                          (/ 1000000000)
+                          math/sqrt
+                          math/ceil
+                          int))
 (def ^:const board-size-px (* cell-size-px chunk-size board-size))
 (def ^:const size (* board-size chunk-size))
 (def ^:const states
@@ -120,28 +120,35 @@
          :contain-intrinsic-height (str (* chunk-size cell-size-px)"px")
          :contain-intrinsic-width  (str (* chunk-size cell-size-px)"px")}]
 
+       [:.box
+        {:position       :relative
+         :width          "100%"
+         :height         "100%"
+         :box-sizing     :border-box
+         :font           :inherit
+         :font-size      :1.2rem
+         :color          :currentColor
+         :display        :grid
+         :place-content  :center
+         :pointer-events :all}]
+
        (let [padding 5]
-         [:.box
-          {:width          (str (- cell-size-px (* 2 padding)) "px")
-           :height         (str (- cell-size-px (* 2 padding)) "px")
-           :font           :inherit
-           :font-size      :1.2rem
-           :padding        (str padding "px")
-           :color          :currentColor
+         [".box::before"
+          {:content        "\"\""
+           :position       :absolute
+           :inset          (str padding "px")
            :border         "0.15em solid currentColor"
-           :border-radius  :0.15em
-           :display        :grid
-           :place-content  :center
-           :pointer-events :all}])
+           :border-radius  "0.15em"
+           :pointer-events :none}])
 
        (map-indexed
          (fn [i x]
-           [(str " :is(.box, .palette-item)[data-color='" (inc i) "']")
-            {:background-color
-             (format "#%06X" x)}])
+           [(str ".box[data-color='"(inc i)"']::before, "
+              ".palette-item[data-color='"(inc i)"']")
+            {:background-color (format "#%06X" x)}])
          palette)
 
-       [".box[data-color]:not([data-color='0'])::before"
+       [".box[data-color]:not([data-color='0'])::after"
         {:content    "\"\""
          :width      "0.50em"
          :height     "0.50em"
@@ -500,21 +507,21 @@
        :data-on:mousedown on-mouse-down-js}
       [:div {:class "view-wrapper"}
        (Virtual
-         {:x                   {:item-size          chunk-size-px
-                                :buffer-items       1
-                                :max-rendered-items 5
-                                :scroll-pos         x
-                                :view-size          width
-                                :item-count-fn      (fn [] board-size)
-                                :chunk-size         chunk-size}
-          :y                   {:item-size          chunk-size-px
-                                :buffer-items       1
-                                :max-rendered-items 5
-                                :scroll-pos         y
-                                :view-size          height
-                                :item-count-fn      (fn [] board-size)
-                                :chunk-size         chunk-size}
-          :item-fn             (partial UserView db)})]
+         {:x       {:item-size          chunk-size-px
+                    :buffer-items       1
+                    :max-rendered-items 5
+                    :scroll-pos         x
+                    :view-size          width
+                    :item-count-fn      (fn [] board-size)
+                    :chunk-size         chunk-size}
+          :y       {:item-size          chunk-size-px
+                    :buffer-items       1
+                    :max-rendered-items 5
+                    :scroll-pos         y
+                    :view-size          height
+                    :item-count-fn      (fn [] board-size)
+                    :chunk-size         chunk-size}
+          :item-fn (partial UserView db)})]
       [:div
        {:class     "controls-wrapper"
         ;; firefox sometimes preserves scroll on refresh and we don't want that
