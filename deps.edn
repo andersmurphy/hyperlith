@@ -1,6 +1,6 @@
 {:paths ["src" "resources" "classes"]
  :deps
- {org.clojure/clojure {:mvn/version "1.13.0-alpha8"}
+ {org.clojure/clojure {:mvn/version "1.13.0-alpha9"}
 
   ;; JSON
   org.clojure/data.json {:mvn/version "2.5.1"}
@@ -9,16 +9,16 @@
   aleph/aleph {:mvn/version "0.9.11"}
   com.outskirtslabs/clave
   {:git/url "https://github.com/outskirtslabs/clave.git"
-   :git/sha "04f7bf854bcbe379df14e3f9d7221af9d0c030d6"}
+   :git/sha "bfd23d048c6b1f11128dba9cb4b771823430e27c"}
 
   ;; COMPRESSION
-  com.github.luben/zstd-jni {:mvn/version "1.5.7-15"}
+  com.github.luben/zstd-jni {:mvn/version "1.5.7-24"}
 
   ;; CACHING
   com.github.ben-manes.caffeine/caffeine {:mvn/version "3.2.4"}
 
   ;; QUERY BUILDER
-  com.github.seancorfield/honeysql {:mvn/version "2.7.1437"}}
+  com.github.seancorfield/honeysql {:mvn/version "2.8.85"}}
  :aliases
  {:dev
   {:extra-paths ["dev"]
