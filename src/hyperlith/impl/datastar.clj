@@ -3,7 +3,7 @@
    [clojure.main :refer [repl-caught]]
    [clojure.string :as str]
    [hyperlith.impl.assets :refer [static-asset]]
-   [hyperlith.impl.crypto :as crypto]   
+   [hyperlith.impl.crypto :as crypto]
    [hyperlith.core :as-alias h]
    [hyperlith.impl.headers
     :refer [default-headers strict-transport]]
@@ -119,12 +119,12 @@
                             zstd-window 19}}]
   (router/add-route! [:post path]
     (fn handler [req]
-      (let [zstd-ctx  (zstd/ctx zstd-level zstd-window)
-            zstd-dst  (ByteBuffer/allocateDirect  (* 2 16384))
-            stream    ((req ::h/stream-fn))
-            last-put_ (atom nil)
-            last-view (atom nil)
-            conns     (req ::h/conns)
+      (let [zstd-ctx       (zstd/ctx zstd-level zstd-window)
+            zstd-dst       (ByteBuffer/allocateDirect  (* 2 16384))
+            stream         ((req ::h/stream-fn))
+            last-put_      (atom nil)
+            last-slim-view (atom nil)
+            conns          (req ::h/conns)
             render
             (fn render [^LaneCtx lane-ctx]
               (try
@@ -132,11 +132,9 @@
                   ;; Only render again if previous event was sent
                   ;; this gives you back pressure and frame dropping.
                   (when (or (nil? @last-put_) (d/realized? @last-put_))
-                    (let [new-view (render-fn (.dbs lane-ctx) req)
-                          change?  (not (= new-view @last-view))
-                          ;; avoid holding onto view longer than a tick
-                          ;; helps prevent views becoming old gen
-                          _        (reset! last-view new-view)]
+                    (let [new-view      (render-fn (.dbs lane-ctx) req)
+                          new-slim-view (html/slim-view new-view)
+                          change?       (not (= new-slim-view @last-slim-view))]
                       (when change?
                         (let [html-dst ^ByteBuffer (.html-dst-buf
                                                      ^LaneCtx lane-ctx)
@@ -144,7 +142,8 @@
                               _        (zstd/compress-chunk! zstd-ctx
                                          zstd-dst html-dst)]
                           (->> (s/put! stream zstd-dst)
-                            (reset! last-put_))))))
+                            (reset! last-put_)))
+                        (reset! last-slim-view new-slim-view))))
                   (do
                     (ConcurrentHashMap$KeySetView/.remove conns render)
                     (zstd/close-ctx zstd-ctx)

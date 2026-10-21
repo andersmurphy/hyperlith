@@ -34,6 +34,14 @@
   (hasheq [_]
     (clojure.lang.Util/hash k)))
 
+(letfn [(f [acc x]
+          (cond
+            (instance? Component x) (conj! acc (.k ^Component x))
+            (vector? x)             (reduce f acc x)
+            :else                   (conj! acc x)))]
+  (defn slim-view [x]
+    (persistent! (f (transient []) x))))
+
 (declare write-node)
 (declare write-attribute)
 (declare html->bytes)
