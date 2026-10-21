@@ -1,5 +1,7 @@
 # Hyperlith: the hypermedia based monolith
 
+>  Note: all my public writing and code is handcrafted by me.
+
 This is a small and very opinionated fullstack [Datastar](https://data-star.dev/) framework mostly for my personal use. However, I felt there were some ideas in here that were worth sharing.
 
 >⚠️ **WARNING:**  API can change at any time! Use at your own risk. Whilst Hyperlith is highly performant and battle tested, this is very much my personal playground. If you do want to depend on Hyperlith I highly recommend making your own fork. Or copying the parts that are useful to you.
