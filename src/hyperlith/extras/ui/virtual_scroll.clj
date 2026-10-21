@@ -133,7 +133,8 @@
                       :y-rendered-items y-rendered-items})
             x-item-grid      (str "min-content min-content "x-item-grid" auto")
             y-item-grid      (str "min-content min-content "y-item-grid" auto")]
-        [:div (assoc attrs :max-width x-max-size :max-height y-max-size)
+        [:div (-> (assoc-in attrs [:style :max-width] x-max-size)
+                (assoc-in [:style :max-height] y-max-size))
          [:div {:id          virtual-logic-id
                 ;; Handles user drag scrolling
                 :data-effect fetch-next-page?
@@ -235,7 +236,8 @@
                       :x-rendered-items x-rendered-items
                       :y-offset-items   y-offset-items
                       :y-rendered-items y-rendered-items})]
-        [:div (assoc attrs :max-width x-max-size :max-height y-max-size)
+        [:div (-> (assoc-in attrs [:style :max-width] x-max-size)
+                (assoc-in [:style :max-height] y-max-size))
          [:div ;; logic is it's own node as it changes all the time
           {:id          virtual-logic-id
            ;; Handles user drag scrolling
