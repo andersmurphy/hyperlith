@@ -5,7 +5,7 @@
    [clj-async-profiler.core :as prof]
    [clojure.math :as math]
    [clojure.pprint :as pprint]
-   [hyperlith.core :as h :refer [defaction defview]]
+   [hyperlith.core :as h :refer [defaction defview defc]]
    [hyperlith.extras.ui.virtual-scroll :as vs]
    [hyperlith.impl.sqlite :as d]))
 
@@ -349,11 +349,11 @@
       (update-tab-data! db sid tabid
         #(assoc % :share-x jumpx :share-y jumpy :share-id (h/new-uid))))))
 
-(defn Checkbox [id state]
-  (h/->Component [Checkbox id state]
-    (fn [] [:div {:class      "box"
-                  :data-color state
-                  :data-id    id}])))
+(defc Checkbox [id state]
+  {:key [Checkbox id state]}
+  [:div {:class      "box"
+         :data-color state
+         :data-id    id}])
 
 (defn xy->chunk-ids
   [{:keys [x-offset-items y-offset-items x-rendered-items y-rendered-items]}]
@@ -363,39 +363,36 @@
                 (range start (+ start x-rendered-items)))))
     (range y-offset-items (+ y-offset-items y-rendered-items))))
 
-(defn Chunk [id v cells]
-  (h/->Component [Chunk id v]
-    (fn []
-      [:div
-       {:class       "chunk"
-        :id          (str "chunk-" id)
-        :data-ignore true
-        :data-id     id
-        :data-action handler-check}
-       (into []
-         (map-indexed
-           (fn [local-id state]
-             (Checkbox local-id state)))
-         cells)])))
+(defc Chunk [id v cells]
+  {:key [Chunk id v]}
+  [:div
+   {:class       "chunk"
+    :id          (str "chunk-" id)
+    :data-ignore true
+    :data-id     id
+    :data-action handler-check}
+   (into []
+     (map-indexed
+       (fn [local-id state]
+         (Checkbox local-id state)))
+     cells)])
 
-(defn EmptyChecks []
-  (h/->Component EmptyChecks
-    (fn []
-      (into []
-        (map-indexed (fn [local-id box] (Checkbox local-id box)))
-        blank-chunk))))
+(defc EmptyChecks []
+  {:key EmptyChecks}
+  (into []
+    (map-indexed (fn [local-id box] (Checkbox local-id box)))
+    blank-chunk))
 
-(defn EmptyChunk [id]
-  (h/->Component [EmptyChunk id]
-    (fn []
-      [:div
-       {:class             "chunk"
-        :id                (str "chunk-" id)
-        :data-ignore-morph true
-        :data-ignore       true
-        :data-id           id
-        :data-action       handler-check}
-       (EmptyChecks)])))
+(defc EmptyChunk [id]
+  {:key [EmptyChunk id]}
+  [:div
+   {:class             "chunk"
+    :id                (str "chunk-" id)
+    :data-ignore-morph true
+    :data-ignore       true
+    :data-id           id
+    :data-action       handler-check}
+   (EmptyChecks)])
 
 (defn UserView
   [db offset-data]
@@ -414,19 +411,18 @@
 
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://checkboxes.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
-(defn Palette [current-selected]
-  (h/->Component [Palette current-selected]
-    (fn []
-      [:div {:class "palette"}
-       (mapv (fn [state]
-               [:div
-                {:data-id     state
-                 :data-action handler-palette
-                 :data-color  state
-                 :class
-                 ["palette-item" (when (= current-selected state)
-                                   "palette-selected")]}])
-         (subvec states 1))])))
+(defc Palette [current-selected]
+  {:key [Palette current-selected]}
+  [:div {:class "palette"}
+   (mapv (fn [state]
+           [:div
+            {:data-id     state
+             :data-action handler-palette
+             :data-color  state
+             :class
+             ["palette-item" (when (= current-selected state)
+                               "palette-selected")]}])
+     (subvec states 1))])
 
 (def shim-headers
   [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
@@ -447,40 +443,38 @@
     "setTimeout(() => evt.target.classList.remove('pop'), 300)"
     "}"))
 
-(defn Info []
-  (h/->Component Info
-    (fn []
-      [[:h1 "One Billion Checkboxes"]
-       [:p "Built using "
-        [:a {:href "https://clojure.org/"} "Clojure"]
-        " and "
-        [:a {:href "https://data-star.dev"} "Datastar"]
-        " - "
-        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "source"]
-        " - "
-        [:a {:href "https://andersmurphy.com/about"} "blog"]]])))
+(defc Info []
+  {:key Info}
+  [[:h1 "One Billion Checkboxes"]
+   [:p "Built using "
+    [:a {:href "https://clojure.org/"} "Clojure"]
+    " and "
+    [:a {:href "https://data-star.dev"} "Datastar"]
+    " - "
+    [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "source"]
+    " - "
+    [:a {:href "https://andersmurphy.com/about"} "blog"]]])
 
-(defn Jump []
-  (h/->Component Jump
-    (fn []
-      [:div {:class "jump"}
-       [:h2 "X:"]
-       [:input {:class "jump-input"
-                :type  "number" :data-bind "jumpx"
-                :data-effect
-                (str  "$view-x;@peek(() => {$jumpx = "(scroll->cell-xy-js "$view-x")"})")}]
-       [:h2 "Y:"]
-       [:input
-        {:class "jump-input"
-         :type  "number" :data-bind "jumpy"
-         :data-effect
-         (str  "$view-y;@peek(() => {$jumpy = "(scroll->cell-xy-js "$view-y")"})")}]
-       [:div {:class "button" :data-action handler-jump}
-        [:strong {:class "pe-none"} "JUMP"]]
-       [:div {:class             "button"
-              :data-action       handler-share
-              :data-on:mousedown copy-xy-to-clipboard-js}
-        [:strong {:class "pe-none"} "SHARE"]]])))
+(defc Jump []
+  {:key Jump}
+  [:div {:class "jump"}
+   [:h2 "X:"]
+   [:input {:class "jump-input"
+            :type  "number" :data-bind "jumpx"
+            :data-effect
+            (str  "$view-x;@peek(() => {$jumpx = "(scroll->cell-xy-js "$view-x")"})")}]
+   [:h2 "Y:"]
+   [:input
+    {:class "jump-input"
+     :type  "number" :data-bind "jumpy"
+     :data-effect
+     (str  "$view-y;@peek(() => {$jumpy = "(scroll->cell-xy-js "$view-y")"})")}]
+   [:div {:class "button" :data-action handler-jump}
+    [:strong {:class "pe-none"} "JUMP"]]
+   [:div {:class             "button"
+          :data-action       handler-share
+          :data-on:mousedown copy-xy-to-clipboard-js}
+    [:strong {:class "pe-none"} "SHARE"]]])
 
 (def Virtual
   (vs/virtual

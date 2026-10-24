@@ -12,7 +12,7 @@
    [hyperlith.impl.css]
    [hyperlith.impl.datastar :as ds]
    [hyperlith.impl.env]
-   [hyperlith.impl.html]
+   [hyperlith.impl.html :as html]
    [hyperlith.impl.json :refer [wrap-parse-json-body]]
    [hyperlith.impl.lane-context :as lc]
    [hyperlith.impl.namespaces :refer [import-vars]]
@@ -51,8 +51,7 @@
   [hyperlith.impl.html
    html->stream
    html->bytes
-   html->bytes-oneshot
-   ->Component]
+   html->bytes-oneshot]
   ;; CRYPTO
   [hyperlith.impl.crypto
    new-uid
@@ -100,6 +99,12 @@
          (ds/render-handler ~path (var ~sym-fn) ~opts)
          (def ~sym ~path))))
 
+(defmacro defc
+  {:clj-kondo/lint-as 'clojure.core/defn}
+  [sym args {:req! {k :key}} & body]
+  `(defn ~sym ~args
+     (html/->Component ~k (fn [] ~@body))))
+
 (defn throw-if-port-in-use! [port]
   (try
     (with-open [_ (ServerSocket. port)])
@@ -119,15 +124,8 @@
         {:status 500}))))
 
 (defn- init-render-lanes
-  [{:keys [render-pool-size dbs render-buffer-size
-           start-b done-b render-q fragment-cache]}]
-  (assert (not (nil? render-pool-size)))
-  (assert (not (nil? render-buffer-size)))
-  (assert (not (nil? dbs)))
-  (assert (not (nil? start-b)))
-  (assert (not (nil? done-b)))
-  (assert (not (nil? render-q)))
-  (assert (not (nil? fragment-cache)))
+  [{:keys! [render-pool-size dbs render-buffer-size
+            start-b done-b render-q fragment-cache]}]
   (->> (range render-pool-size)
     (mapv (fn [_]
             (let [query-disabled (atom nil)
@@ -159,15 +157,9 @@
               lane-ctx)))))
 
 (defn start-loop!
-  [ctx {:keys [batch-fn tick-ms dbs render-pool-size conns
-               fragment-cache-size]
-        :as   m}]
-  (assert (not (nil? tick-ms)))
-  (assert (not (nil? batch-fn)))
-  (assert (not (nil? dbs)))
-  (assert (not (nil? render-pool-size)))
-  (assert (not (nil? conns)))
-  (assert (not (nil? fragment-cache-size)))
+  [ctx {:keys! [batch-fn tick-ms dbs render-pool-size conns
+                fragment-cache-size]
+        :as    m}]
   (let [overruns (atom [])
         start-b  (CyclicBarrier/new (inc render-pool-size))
         done-b   (CyclicBarrier/new (inc render-pool-size))
