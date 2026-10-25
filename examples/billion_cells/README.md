@@ -37,3 +37,10 @@ ssh root@cells.andersmurphy.com "nc localhost:5555"
 ```
 ssh root@cells.andersmurphy.com "systemctl restart app.service"
 ```
+
+## For older VPS
+
+```
+clojure -T:build jcompile "-target" "23"
+clojure -Srepro -T:build uber "-target" "23"
+```
