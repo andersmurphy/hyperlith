@@ -10,15 +10,13 @@
     IPersistentSet
     Keyword
     MapEntry
-    Sequential]
+    Sequential
+    Volatile]
    [hyperlith.impl.lane_context LaneCtx]
    [java.lang Iterable]
    [java.nio ByteBuffer]
    [java.nio.charset StandardCharsets]
-   [java.util
-    HashSet
-    IdentityHashMap
-    Iterator]))
+   [java.util HashSet IdentityHashMap Iterator]))
 
 (set! *warn-on-reflection* true)
 
@@ -240,15 +238,15 @@
         (if-let [b (cache/get cache (.k ^Component node))]
           (.put out ^bytes b)
           (cache/put cache (.k ^Component node)
-            (let [qd    (.query-disabled lane-ctx)
+            (let [qd    ^Volatile (.query-disabled lane-ctx)
                   start (.position out)]
-              (reset! qd node)
+              (vreset! qd node)
               (try
                 (write-node lane-ctx ((.f ^Component node))
                   out)
 
                 (region->byte-array! out start)
-                (finally (reset! qd nil)))))))
+                (finally (vreset! qd nil)))))))
 
       (instance? Sequential node)
       (write-collection lane-ctx out node)

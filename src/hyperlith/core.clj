@@ -128,7 +128,7 @@
             start-b done-b render-batch render-cursor fragment-cache]}]
   (->> (range render-pool-size)
     (mapv (fn [_]
-            (let [query-disabled (atom nil)
+            (let [query-disabled (volatile! nil)
                   lane-ctx       ^LaneCtx
                   (lc/new-lane-ctx
                     {:query-disabled query-disabled

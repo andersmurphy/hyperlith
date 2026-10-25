@@ -2,7 +2,7 @@
   (:require
    [honey.sql :as hsql])
   (:import
-   [clojure.lang Atom]
+   [clojure.lang Volatile]
    [hyperlith.impl.sqlite Sqlite]
    [java.lang.foreign
     AddressLayout
@@ -145,7 +145,7 @@
   ([^Conn conn sql]
    (q* conn sql nil))
   ([^Conn conn sql params]
-   (if-let [inside (deref ^Atom (.query-disabled conn))]
+   (if-let [inside (deref ^Volatile (.query-disabled conn))]
      (throw (ex-info
               (str "q cannot be called inside: " inside "\n")
               {:inside inside}))
@@ -162,7 +162,7 @@
                         {:sql    sql
                          :params params})))))))))
   ([^Conn conn sql params result-set-fn]
-   (if-let [inside (deref ^Atom (.query-disabled conn))]
+   (if-let [inside (deref ^Volatile(.query-disabled conn))]
      (throw (ex-info
               (str "q cannot be called inside: " inside "\n")
               {:inside inside}))
