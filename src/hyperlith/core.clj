@@ -26,17 +26,17 @@
    [manifold.stream :as s]
    [ol.clave.ext.aleph :as clave-aleph])
   (:import
-   (manifold.stream.core IEventSink)
    (hyperlith.impl.lane_context LaneCtx)
    (java.net ServerSocket)
    [java.nio ByteBuffer]
    (java.util ArrayList Collection)
    (java.util.concurrent
-     ConcurrentLinkedQueue
-     ConcurrentHashMap
-     CyclicBarrier
-     Executors
-     LinkedBlockingQueue)))
+    ConcurrentHashMap
+    CyclicBarrier
+    Executors
+    LinkedBlockingQueue)
+   (java.util.concurrent.atomic AtomicInteger)
+   (manifold.stream.core IEventSink)))
 
 (import-vars
   ;; ENV
@@ -125,7 +125,7 @@
 
 (defn- init-render-lanes
   [{:keys! [render-pool-size dbs render-buffer-size
-            start-b done-b render-q fragment-cache]}]
+            start-b done-b render-batch render-cursor fragment-cache]}]
   (->> (range render-pool-size)
     (mapv (fn [_]
             (let [query-disabled (atom nil)
@@ -144,13 +144,20 @@
                       (fn render-thread []
                         (while (not (Thread/interrupted))
                           (.await ^CyclicBarrier start-b)
-                          (let [dbs (vals (.dbs lane-ctx))]
+                          (let [dbs  (vals (.dbs lane-ctx))
+                                batch ^java.lang.Object/1 @render-batch
+                                n    (alength batch)]
                             (run! sqlite/start-read-tx dbs)
-                            (u/while-some
-                              [render (.poll
-                                        ^ConcurrentLinkedQueue
-                                        render-q)]
-                              (render lane-ctx))
+                            (loop []
+                              ;; Cool thing here is we can change the step
+                              ;; so take 4 or 8 items instead of 1. Renders
+                              ;; would have to be sub very fast for this to
+                              ;; matter, potentially if you're work skipping.
+                              (let [i (AtomicInteger/.getAndIncrement
+                                        render-cursor)]
+                                (when (< i n)
+                                  ((aget batch i) lane-ctx)
+                                  (recur))))
                             (run! sqlite/end-read-tx dbs))
                           (.await ^CyclicBarrier done-b)))))
                 Thread/.start)
@@ -160,72 +167,75 @@
   [ctx {:keys! [batch-fn tick-ms dbs render-pool-size conns
                 fragment-cache-size]
         :as    m}]
-  (let [overruns (atom [])
-        start-b  (CyclicBarrier/new (inc render-pool-size))
-        done-b   (CyclicBarrier/new (inc render-pool-size))
-        render-q (ConcurrentLinkedQueue/new)
-        cache    (cache/init
-                   {:max-weight fragment-cache-size
-                    :weigher    (fn [_k ^bytes v] (alength v))
-                    ;; Disable Caffeine's background maintenance we will
-                    ;; run it manually every tick.
-                    :executor
-                    (reify java.util.concurrent.Executor
-                      (execute [_ _task] nil))})
-        _        (init-render-lanes
-                   (assoc m
-                     :render-q  render-q
-                     :start-b start-b
-                     :done-b  done-b
-                     :fragment-cache cache))
-        q        (LinkedBlockingQueue/new)
-        dbs      (sqlite/create-write-connections! dbs)
-        ctx      (merge ctx dbs)
-        t        (Thread.
-                   ^Runnable
-                   (bound-fn* ;; binding conveyance
-                     (fn loop-thread []
-                       ;; pipeline ignition
-                       (.await ^CyclicBarrier start-b)
-                       (while (not (Thread/interrupted))
-                         (let [next-tick (+ (System/currentTimeMillis)
-                                           tick-ms)
-                               batch     (ArrayList/new)]
-                           (.drainTo q batch)
-                           (try
-                             (batch-fn ctx (seq batch))
-                             (catch Throwable t
-                               (repl-caught t)
-                               (flush)))
-                           ;; Wait until all renders complete
-                           (.await ^CyclicBarrier done-b)
-                           ;; Cache maintenance while no renders are running
-                           (cache/clean-up! cache)
-                           ;; Checkpoint while no transactions are running
-                           (sqlite/checkpoint-all-dbs! dbs)
-                           ;; render queue
-                           (.addAll
-                             ^ConcurrentLinkedQueue
-                             render-q ^Collection conns)
-                           ;; Start pipeline (renders + writer)
-                           (.await ^CyclicBarrier start-b)
-                           (let [sleep-time-ms
-                                 (- next-tick (System/currentTimeMillis))]
-                             (when (< sleep-time-ms 0)
-                               ;; log overrun
-                               (when (= @overruns [])
-                                 (Thread/startVirtualThread
-                                   (fn [] (Thread/sleep 20000)
-                                     (println "WARNING: tick overrun")
-                                     (println (u/stats @overruns))
-                                     (reset! overruns []))))
-                               (swap! overruns conj
-                                 (- tick-ms sleep-time-ms)))
-                             (when (> sleep-time-ms 0)
-                               (when (not (= @overruns []))
-                                 (swap! overruns conj tick-ms))
-                               (Thread/sleep ^long sleep-time-ms))))))))
-        _        (Thread/.start t)]
+  (let [overruns      (atom [])
+        start-b       (CyclicBarrier/new (inc render-pool-size))
+        done-b        (CyclicBarrier/new (inc render-pool-size))
+        render-batch  (volatile! (object-array 0))
+        render-cursor (AtomicInteger. 0)
+        cache         (cache/init
+                        {:max-weight fragment-cache-size
+                         :weigher    (fn [_k ^bytes v] (alength v))
+                         ;; Disable Caffeine's background maintenance we will
+                         ;; run it manually every tick.
+                         :executor
+                         (reify java.util.concurrent.Executor
+                           (execute [_ _task] nil))})
+        _             (init-render-lanes
+                        (assoc m
+                          :render-batch  render-batch
+                          :render-cursor render-cursor
+                          :start-b start-b
+                          :done-b  done-b
+                          :fragment-cache cache))
+        q             (LinkedBlockingQueue/new)
+        dbs           (sqlite/create-write-connections! dbs)
+        ctx           (merge ctx dbs)
+        t
+        (Thread.
+          ^Runnable
+          (bound-fn* ;; binding conveyance
+            (fn loop-thread []
+              ;; pipeline ignition
+              (.await ^CyclicBarrier start-b)
+              (while (not (Thread/interrupted))
+                (let [next-tick (+ (System/currentTimeMillis)
+                                  tick-ms)
+                      batch     (ArrayList/new)]
+                  (.drainTo q batch)
+                  (try
+                    (batch-fn ctx (seq batch))
+                    (catch Throwable t
+                      (repl-caught t)
+                      (flush)))
+                  ;; Wait until all renders complete
+                  (.await ^CyclicBarrier done-b)
+                  ;; Cache maintenance while no renders are running
+                  (cache/clean-up! cache)
+                  ;; Checkpoint while no transactions are running
+                  (sqlite/checkpoint-all-dbs! dbs)
+                  ;; render queue
+                  (vreset! render-batch
+                    (.toArray ^Collection conns))
+                  (AtomicInteger/.set render-cursor 0)
+                  ;; Start pipeline (renders + writer)
+                  (.await ^CyclicBarrier start-b)
+                  (let [sleep-time-ms
+                        (- next-tick (System/currentTimeMillis))]
+                    (when (< sleep-time-ms 0)
+                      ;; log overrun
+                      (when (= @overruns [])
+                        (Thread/startVirtualThread
+                          (fn [] (Thread/sleep 20000)
+                            (println "WARNING: tick overrun")
+                            (println (u/stats @overruns))
+                            (reset! overruns []))))
+                      (swap! overruns conj
+                        (- tick-ms sleep-time-ms)))
+                    (when (> sleep-time-ms 0)
+                      (when (not (= @overruns []))
+                        (swap! overruns conj tick-ms))
+                      (Thread/sleep ^long sleep-time-ms))))))))
+        _             (Thread/.start t)]
     (-> (assoc ctx
           ::tx!
           (fn tx! [thunk] (LinkedBlockingQueue/.offer q thunk)) )
