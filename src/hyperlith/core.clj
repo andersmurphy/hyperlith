@@ -31,10 +31,10 @@
    [java.nio ByteBuffer]
    (java.util ArrayList Collection)
    (java.util.concurrent
-    ConcurrentHashMap
-    CyclicBarrier
-    Executors
-    LinkedBlockingQueue)
+     ConcurrentHashMap
+     CyclicBarrier
+     Executors
+     LinkedBlockingQueue)
    (java.util.concurrent.atomic AtomicInteger)
    (manifold.stream.core IEventSink)))
 
@@ -81,10 +81,15 @@
    json->edn
    edn->json])
 
+(defonce path-squid (atom 0))
+
+(defn gen-path-squid! []
+  (swap! path-squid inc))
+
 (defmacro defaction
   {:clj-kondo/lint-as 'clojure.core/defn}
   [sym args & body]
-  (let [path   (str "/" (crypto/digest (str *ns* "/" sym)))
+  (let [path   (str "/" (gen-path-squid!))
         sym-fn (symbol (str sym "-fn"))]
     `(do (defn ~sym-fn ~args ~@body)
          (ds/action-handler ~path (var ~sym-fn))
@@ -144,9 +149,9 @@
                       (fn render-thread []
                         (while (not (Thread/interrupted))
                           (.await ^CyclicBarrier start-b)
-                          (let [dbs  (vals (.dbs lane-ctx))
+                          (let [dbs   (vals (.dbs lane-ctx))
                                 batch ^java.lang.Object/1 @render-batch
-                                n    (alength batch)]
+                                n     (alength batch)]
                             (run! sqlite/start-read-tx dbs)
                             (loop []
                               ;; Cool thing here is we can change the step
