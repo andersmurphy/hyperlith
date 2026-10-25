@@ -15,11 +15,11 @@
   (mapv (fn [i] (str "__Host-sid=" "test-user-" i))
     (range 0 n)))
 
-(def tiles-with-data (edn/read-string (slurp "load-test-data.edn")))
+;; (def tiles-with-data (edn/read-string (slurp "load-test-data.edn")))
 
-(let [positions (atom tiles-with-data)]
-  (defn next-xy []
-    (peek (swap! positions pop))))
+;; (let [positions (atom tiles-with-data)]
+;;   (defn next-xy []
+;;     (peek (swap! positions pop))))
 
 (def headers
   {"Accept-Encoding" "zstd"
@@ -66,17 +66,17 @@
       users (gen-users 1000)]
   (println "Running against..." url)
   (views users (str url "/?u="))
-  ;; (actions users
-  ;;   (str url "/t_rqnpSL_NvK8EJhoBwkc6TNJ4VsLi1Fs")
-  ;;   (fn []
-  ;;     {"tabid"    "7dc673ca"
-  ;;      "targetid" (str (rand-int 255))
-  ;;      "parentid" (str 0)}))
   (actions users
-    (str url "/wp4BXB8NeCPWmq9C5rgU7-zyDP57-yYBk")
+    (str url "/4")
     (fn []
-      (let [[x y] (next-xy)]
-        {"tabid"  "7dc673ca"
-         "view-x" x
-         "view-y" y})))
+      {"tabid"    "7dc673ca"
+       "targetid" (str (rand-int 255))
+       "parentid" (str 0)}))
+  ;; (actions users
+  ;;   (str url "/1")
+  ;;   (fn []
+  ;;     (let [[x y] (next-xy)]
+  ;;       {"tabid"  "7dc673ca"
+  ;;        "view-x" x
+  ;;        "view-y" y})))
   (Thread/sleep 20000))
