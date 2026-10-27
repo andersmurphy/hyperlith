@@ -92,7 +92,7 @@
       (update :board fill-cell user-color (+ id 1))
       (update :board fill-cell user-color (+ id board-size)))))
 
-(defaction handler-tap-cell [{:keys [::h/tx! sid] {:strs [id]} :query-params}]
+(defaction handler-tap-cell [{::h/keys [tx! sid] {:strs [id]} :query-params}]
   (when id
     (tx! (fn [db] (swap! db fill-cross (parse-long id) sid)))))
 
@@ -110,7 +110,7 @@
 
 (defview render-home {:path        "/" :shim-headers shim-headers
                       :zstd-window 20}
-  [_ {:keys [board-cache _sid] :as _req}]
+  [_ {:keys [board-cache] :as _req}]
   [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
    [:main {:class "main" :id "morph"}
     [:h1 "Game of Life (multiplayer)"]
@@ -125,7 +125,7 @@
     @board-cache]])
 
 (defview render-home-embed {:path "/embed" :shim-headers shim-headers}
-  [_ {:keys [board-cache _sid] :as _req}]
+  [_ {:keys [board-cache] :as _req}]
   [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
    [:main {:class "main" :id "morph"}
     [:h1 "Game of Life (multiplayer)"]

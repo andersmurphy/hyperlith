@@ -267,7 +267,7 @@
   (byte-array (* chunk-size chunk-size)))
 
 (defaction handler-scroll
-  [{:keys [sid tabid ::h/tx!] {:keys [view-x view-y]} :body}]
+  [{::h/keys [sid tabid tx!] {:keys [view-x view-y]} :body}]
   (tx!
     (fn [db _]
       (update-tab-data! db sid tabid
@@ -276,7 +276,7 @@
            :y (max (int view-y) 0))))))
 
 (defaction handler-resize
-  [{:keys [sid tabid ::h/tx!] {:keys [view-h view-w]} :body}]
+  [{::h/keys [sid tabid tx!] {:keys [view-h view-w]} :body}]
   (when (and view-h view-w)
     (tx!
       (fn [db _]
@@ -286,7 +286,7 @@
              :width  (max (int view-w) 0)))))))
 
 (defaction handler-palette
-  [{:keys [sid tabid ::h/tx!] {:keys [targetid]} :body}]
+  [{::h/keys [sid tabid tx!] {:keys [targetid]} :body}]
   (let [color (parse-long targetid)]
     ;; 0 is an empty color (used for clearing)
     (when (<= 0 color (dec (count states)))
@@ -295,7 +295,7 @@
           (update-tab-data! db sid tabid #(assoc % :color color)))))))
 
 (defaction handler-check
-  [{:keys                       [sid tabid ::h/tx!]
+  [{::h/keys                    [sid tabid tx!]
     {:keys [targetid parentid]} :body}]
   (when (and targetid parentid)
     (let [cell-id  (int (parse-long targetid))
@@ -336,14 +336,14 @@
     "," (int (* (/ y size) board-size-px)) ");"))
 
 (defaction handler-jump
-  [{:keys [sid tabid ::h/tx!] {:keys [jumpx jumpy]} :body}]
+  [{::h/keys [sid tabid tx!] {:keys [jumpx jumpy]} :body}]
   (tx!
     (fn [db _]
       (update-tab-data! db sid tabid
         #(assoc % :jump-x jumpx :jump-y jumpy :jump-id (h/new-uid))))))
 
 (defaction handler-share
-  [{:keys [sid tabid ::h/tx!] {:keys [jumpx jumpy]} :body}]
+  [{::h/keys [sid tabid tx!] {:keys [jumpx jumpy]} :body}]
   (tx!
     (fn [db _]
       (update-tab-data! db sid tabid
@@ -486,7 +486,7 @@
 (defview handler-root
   {:path "/" :shim-headers shim-headers :br-window-size 24}
   [{:keys [db]}
-   {:keys         [sid tabid]
+   {::h/keys      [sid tabid]
     {:strs [x y]} :query-params
     :as           _req}]
   (let [init-jump-x                                     (h/parse-long x 0)

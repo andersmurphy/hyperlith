@@ -125,6 +125,7 @@
             last-put_      (atom nil)
             last-slim-view (atom nil)
             conns          (req ::h/conns)
+            domain         (req ::h/domain)
             render
             (fn render [^LaneCtx lane-ctx]
               (try

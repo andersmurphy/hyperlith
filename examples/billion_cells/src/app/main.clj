@@ -241,7 +241,7 @@
     (swap! chunk-cache assoc chunk-id new-chunk)))
 
 (defaction handler-scroll
-  [{:keys [sid tabid ::h/tx!] {:keys [view-x view-y]} :body}]
+  [{::h/keys [sid tabid tx!] {:keys [view-x view-y]} :body}]
   (tx!
     (fn [db _]
       (update-tab-data! db sid tabid
@@ -250,7 +250,7 @@
            :y (max (int view-y) 0))))))
 
 (defaction handler-resize
-  [{:keys [sid tabid ::h/tx!] {:keys [view-h view-w]} :body}]
+  [{::h/keys [sid tabid tx!] {:keys [view-h view-w]} :body}]
   (when (and view-h view-w)
     (tx!
       (fn [db _]
@@ -268,7 +268,7 @@
         #(update % focus-cell-id dissoc :focus)))))
 
 (defaction handler-focused
-  [{:keys                       [sid tabid ::h/tx!]
+  [{::h/keys                       [sid tabid tx!]
     {:keys [targetid parentid]} :body}]
   (when (and targetid parentid)
     (let [cell-id  (int (parse-long targetid))
@@ -287,7 +287,7 @@
                  :focus-cell-id cell-id))))))))
 
 (defaction handler-save-cell
-  [{:keys                                 [::h/tx!]
+  [{::h/keys                                 [tx!]
     {:keys [targetid parentid cellvalue]} :body}]
   (when (and targetid parentid)
     (let [cell-id  (int (parse-long targetid))
@@ -304,14 +304,14 @@
     "," (int (* (/ y size) board-height-px)) ");"))
 
 (defaction handler-jump
-  [{:keys [sid tabid ::h/tx!] {:keys [jumpx jumpy]} :body}]
+  [{::h/keys [sid tabid tx!] {:keys [jumpx jumpy]} :body}]
   (tx!
     (fn [db _]
       (update-tab-data! db sid tabid
         #(assoc % :jump-x jumpx :jump-y jumpy :jump-id (h/new-uid))))))
 
 (defaction handler-share
-  [{:keys [sid tabid ::h/tx!] {:keys [jumpx jumpy]} :body}]
+  [{::h/keys [sid tabid tx!] {:keys [jumpx jumpy]} :body}]
   (tx!
     (fn [db _]
       (update-tab-data! db sid tabid
@@ -441,11 +441,11 @@
 
 (defview handler-root
   {:path        "/" :shim-headers shim-headers :br-window-size 24
-   :on-close    (fn [{:keys [::h/tx! sid tabid]}]
+   :on-close    (fn [{::h/keys [tx! sid tabid]}]
                   (tx! (partial remove-focus! sid tabid)))
    :zstd-window 20}
   [{:keys [db]}
-   {:keys         [sid tabid]
+   {::h/keys         [sid tabid]
     {:strs [x y]} :query-params
     :as           _req}]
   (let [init-jump-x      (h/parse-long x 0)
@@ -468,21 +468,21 @@
          "}")}
       [:div {:class "view-wrapper"}
        (Virtual
-         {:x                   {:item-size          chunk-width-px
-                                :buffer-items       1
-                                :max-rendered-items 5
-                                :scroll-pos         x
-                                :view-size          width
-                                :item-count-fn      (fn [] board-size)
-                                :chunk-size         chunk-size}
-          :y                   {:item-size          chunk-height-px
-                                :buffer-items       2
-                                :max-rendered-items 7
-                                :scroll-pos         y
-                                :view-size          height
-                                :item-count-fn      (fn [] board-size)
-                                :chunk-size         chunk-size}
-          :item-fn             (partial UserView db sid)})]
+         {:x       {:item-size          chunk-width-px
+                    :buffer-items       1
+                    :max-rendered-items 5
+                    :scroll-pos         x
+                    :view-size          width
+                    :item-count-fn      (fn [] board-size)
+                    :chunk-size         chunk-size}
+          :y       {:item-size          chunk-height-px
+                    :buffer-items       2
+                    :max-rendered-items 7
+                    :scroll-pos         y
+                    :view-size          height
+                    :item-count-fn      (fn [] board-size)
+                    :chunk-size         chunk-size}
+          :item-fn (partial UserView db sid)})]
       [:div
        {:class     "controls-wrapper"
         ;; firefox sometimes preserves scroll on refresh and we don't want that
@@ -572,7 +572,7 @@
        :email              (h/env :email)
        :domain             (h/env :domain)
        :mode               mode}))
-  (let [{{:keys [::h/tx!]} :ctx} @app_]
+  (let [{{::h/keys [tx!]} :ctx} @app_]
     (tx! (fn [db _] (migrations db)
            (d/escape-write-tx [db db]
              (d/q db ["PRAGMA wal_checkpoint(TRUNCATE)"])

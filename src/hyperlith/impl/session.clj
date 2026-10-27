@@ -1,5 +1,6 @@
 (ns hyperlith.impl.session
-  (:require [hyperlith.impl.crypto :as crypto]))
+  (:require [hyperlith.impl.crypto :as crypto]
+            [hyperlith.core :as-alias h]))
 
 (defn get-sid [req]
   (try ;; In case we get garbage
@@ -25,12 +26,18 @@
                ;; unsafe and are not allowed to make anything other than
                ;; get requests.
                (= (get-in req [:headers "sec-fetch-site"]) "same-origin")))
-        (handler (assoc req :sid sid :tabid (:tabid body)))
+        (handler (assoc req
+                   ::h/sid sid
+                   ::h/tabid (:tabid body)
+                   ::h/domain (get-in req [:headers "host"])))
 
         ;; :get request and user does not have session we create one
         (= (:request-method req) :get)
         (let [new-sid (or sid (crypto/random-unguessable-uid))]
-          (-> (handler (assoc req :sid new-sid :tabid (:tabid body)))
+          (-> (handler (assoc req
+                         ::h/sid new-sid
+                         ::h/tabid (:tabid body)
+                         ::h/domain (get-in req [:headers "host"])))
               (assoc-in [:headers "Set-Cookie"]
                 ;; These cookies won't be set on local host on chrome/safari
                 ;; as it's using secure needs to be true and local host
