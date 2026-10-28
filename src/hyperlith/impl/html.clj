@@ -42,7 +42,6 @@
 
 (declare write-node)
 (declare write-attribute)
-(declare html->bytes)
 
 (defn str->bytes [s]
   (String/.getBytes s StandardCharsets/UTF_8))
@@ -278,14 +277,6 @@
   (write-node lane-ctx node out))
 
 (def doctype-html5 (String/.getBytes "<!DOCTYPE html>"))
-
-(defn html->bytes
-  [node lane-ctx ^ByteBuffer out]
-  (let [start (.position out)]
-    (html->stream node lane-ctx out)
-    (let [b (region->byte-array! out start)]
-      (.clear out)
-      b)))
 
 (defn html->bytes-oneshot
   ([node]

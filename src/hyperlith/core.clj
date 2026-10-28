@@ -50,7 +50,6 @@
   ;; HTML
   [hyperlith.impl.html
    html->stream
-   html->bytes
    html->bytes-oneshot]
   ;; CRYPTO
   [hyperlith.impl.crypto
