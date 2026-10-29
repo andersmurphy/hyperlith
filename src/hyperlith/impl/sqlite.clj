@@ -107,7 +107,12 @@
         3 (do
             (bind-dispatch stmt 1 (nth params 0) arena)
             (bind-dispatch stmt 2 (nth params 1) arena)
-            (bind-dispatch stmt 3 (nth params 1) arena))
+            (bind-dispatch stmt 3 (nth params 2) arena))
+        4 (do
+            (bind-dispatch stmt 1 (nth params 0) arena)
+            (bind-dispatch stmt 2 (nth params 1) arena)
+            (bind-dispatch stmt 3 (nth params 2) arena)
+            (bind-dispatch stmt 4 (nth params 3) arena))
         (loop [i 0]
           (when (< i n)
             (bind-dispatch stmt (unchecked-inc i) (nth params i) arena)
@@ -276,7 +281,11 @@
       `(q* ~db ~sql ~(vec params)))))
 
 (defn create-write-connections! [dbs]
-  (into {} (map (fn [[k opts]] [k (new-conn! opts)])) dbs))
+  (into {}
+    (map (fn [[k {:keys [migrations] :as opts}]]
+           (let [conn (new-conn! opts)]
+             (when migrations (migrations conn))
+             [k conn]))) dbs))
 
 (defn create-read-connections! [dbs query-disabled]
   (into {} (map (fn [[k opts]]

@@ -561,6 +561,7 @@
   (reset! app_
     (h/start-app
       {:dbs                {:db {:name          "cells.db"
+                                 :migrations    migrations
                                  :pragma-writer {:cache_size 8000}
                                  :pragma
                                  {:cache_size 2000
@@ -571,12 +572,7 @@
        :render-buffer-size (* 64 16384)
        :email              (h/env :email)
        :domain             (h/env :domain)
-       :mode               mode}))
-  (let [{{::h/keys [tx!]} :ctx} @app_]
-    (tx! (fn [db _] (migrations db)
-           (d/escape-write-tx [db db]
-             (d/q db ["PRAGMA wal_checkpoint(TRUNCATE)"])
-             (d/q db ["VACUUM"]))))))
+       :mode               mode})))
 
 (defn -main [& _]
   (start-app! :mode :prod))

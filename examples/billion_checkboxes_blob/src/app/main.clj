@@ -564,9 +564,9 @@
 (defn start-app! [& {:keys [mode]}]
   (reset! app_
     (h/start-app
-      {:ctx-start (fn [] {})
-       :dbs
+      {:dbs
        {:db {:name          "database-new.db"
+             :migrations    migrations
              :pragma-writer {:cache_size 15625}
              :pragma
              {:cache_size 2000
@@ -577,11 +577,7 @@
        :tick-ms   100
        :email     (h/env :email)
        :domain    (h/env :domain)
-       :mode      mode}))
-  (let [{{:keys [::h/tx!]} :ctx} @app_]
-    (tx! (fn [db _] (migrations db)
-           (d/escape-write-tx [db db]
-             (d/q db ["VACUUM"]))))))
+       :mode      mode})))
 
 (defn -main [& _]
   (start-app! :mode :prod))

@@ -183,7 +183,10 @@
                          ;; run it manually every tick.
                          :executor
                          (reify java.util.concurrent.Executor
-                           (execute [_ _task] nil))})
+                           (execute [_ _task] nil))})        
+        q             (LinkedBlockingQueue/new)
+        ;; Create writers before lanes
+        dbs           (sqlite/create-write-connections! dbs)
         _             (init-render-lanes
                         (assoc m
                           :render-batch  render-batch
@@ -191,8 +194,6 @@
                           :start-b start-b
                           :done-b  done-b
                           :fragment-cache cache))
-        q             (LinkedBlockingQueue/new)
-        dbs           (sqlite/create-write-connections! dbs)
         ctx           (merge ctx dbs)
         t
         (Thread.
