@@ -14,7 +14,7 @@
                       :body    body}
                compress? (update :body zstd/compress 19)
                compress? (assoc-in [:headers "Content-Encoding"] "zstd"))
-        path (str "/" (crypto/digest body))]
+        path (str "/" (crypto/digest-base64 body))]
     (router/add-route! [:get path] (fn [_] resp))))
 
 

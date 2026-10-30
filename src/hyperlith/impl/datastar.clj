@@ -76,7 +76,7 @@
          :headers (assoc default-headers "Content-Encoding" "zstd")
          :body    (-> body (zstd/compress 19))}
       ;; Etags ensure the shim is only sent again if it's contents have changed
-      (assoc-in [:headers "ETag"] (crypto/digest body)))))
+      (assoc-in [:headers "ETag"] (crypto/digest-base64 body)))))
 
 (defn shim-handler [path head-hiccup]
   (router/add-route! [:get path]

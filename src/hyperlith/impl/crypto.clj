@@ -26,13 +26,14 @@
   random-unguessable-uid)
 
 (defn digest
-  "Short digest, compact but with a higher collision rate."
   [data]
   (let [^byte/1 bytes (if (bytes? data)
                         data
                         (String/.getBytes (str data)))]
     (-> (doto (MessageDigest/getInstance "SHA256")
           (MessageDigest/.update bytes))
-        (MessageDigest/.digest)
-        bytes->base64
-        (subs 10))))
+      (MessageDigest/.digest))))
+
+(defn digest-base64
+  [data]
+  (-> data digest bytes->base64))
