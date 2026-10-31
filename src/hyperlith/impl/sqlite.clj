@@ -68,7 +68,7 @@
         (.reinterpret Long/MAX_VALUE)
         (.getString 0)))))
 
-(defn column-blob ^byte/1 [^MemorySegment stmt ^long idx]
+(defn column-blob ^bytes [^MemorySegment stmt ^long idx]
   (let [ptr  (Sqlite/columnBlob stmt (int idx))
         size (Sqlite/columnBytes stmt (int idx))]
     (.toArray (.reinterpret ptr size) ValueLayout/JAVA_BYTE)))
@@ -302,8 +302,8 @@
 
 (def format-query hsql/format)
 
-(def text ^String column-text)
-(def blob ^byte/1 column-blob)
+(def text column-text)
+(def blob column-blob)
 (defn real ^double [^MemorySegment stmt ^long idx]
   (Sqlite/columnDouble stmt (int idx)))
 (defn int ^long [^MemorySegment stmt ^long idx]
