@@ -308,6 +308,14 @@
   (Sqlite/columnDouble stmt (int idx)))
 (defn int ^long [^MemorySegment stmt ^long idx]
   (Sqlite/columnInt64 stmt (clojure.core/int idx)))
+(defn any [^MemorySegment stmt ^long n]
+  (case (Sqlite/columnType stmt n)
+    ;; See type codes here: https://sqlite.org/c3ref/c_blob.html
+    1 (Sqlite/columnInt64    stmt n)
+    2 (Sqlite/columnDouble stmt n)
+    3 (column-text   stmt n)
+    4 (column-blob   stmt n)
+    5 nil))
 
 (comment
   (hsql/format
