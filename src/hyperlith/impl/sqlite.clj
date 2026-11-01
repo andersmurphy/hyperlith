@@ -317,19 +317,11 @@
     4 (column-blob   stmt n)
     5 nil))
 
-(comment
-  (hsql/format
-    '{select [data]
-      from   session
-      where  [= id ?sid]
-      limit  1}
-    {:params {:sid 3}})
+(defn table-list [db]
+  (q db '{select [name] from pragma_table_list}
+    (fn [stmt] [(text stmt 0)])))
 
-  (macroexpand
-    '(q db
-       '{select [data]
-         from   session
-         where  [= id ?sid]
-         limit  1}
-       {:sid 1}
-       (fn []))))
+(defn table-columns [db table]
+  (q db '{select [name] from [[[pragma_table_info ?table]]]}
+    {:table (name table)}
+    (fn [stmt] (text stmt 0))))
