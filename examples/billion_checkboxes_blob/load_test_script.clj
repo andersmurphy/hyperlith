@@ -66,12 +66,12 @@
       users (gen-users 1000)]
   (println "Running against..." url)
   (views users (str url "/?u="))
-  (actions users
-    (str url "/4")
-    (fn []
-      {"tabid"    "7dc673ca"
-       "targetid" (str (rand-int 255))
-       "parentid" (str 0)}))
+  ;; (actions users
+  ;;   (str url "/4")
+  ;;   (fn []
+  ;;     {"tabid"    "7dc673ca"
+  ;;      "targetid" (str (rand-int 255))
+  ;;      "parentid" (str 0)}))
   ;; (actions users
   ;;   (str url "/1")
   ;;   (fn []

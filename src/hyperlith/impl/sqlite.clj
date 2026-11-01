@@ -96,37 +96,44 @@
           (nil? param)     (Sqlite/bindNull   stmt col)
           :else            (bind-blob         stmt col param arena)))]
 
-  (defn- bind [stmt params arena]
+  (defn- gen-bind-fn [stmt params]
     (let [n (count params)]
       (case n
-        0 nil
-        1 (bind-dispatch stmt 1 (nth params 0) arena)
-        2 (do
+        0 (fn [_params _arena] stmt)
+        1 (fn [params arena]
             (bind-dispatch stmt 1 (nth params 0) arena)
-            (bind-dispatch stmt 2 (nth params 1) arena))
-        3 (do
+            stmt)
+        2 (fn [params arena]
             (bind-dispatch stmt 1 (nth params 0) arena)
             (bind-dispatch stmt 2 (nth params 1) arena)
-            (bind-dispatch stmt 3 (nth params 2) arena))
-        4 (do
+            stmt)
+        3 (fn [params arena]
             (bind-dispatch stmt 1 (nth params 0) arena)
             (bind-dispatch stmt 2 (nth params 1) arena)
             (bind-dispatch stmt 3 (nth params 2) arena)
-            (bind-dispatch stmt 4 (nth params 3) arena))
-        (loop [i 0]
-          (when (< i n)
-            (bind-dispatch stmt (unchecked-inc i) (nth params i) arena)
-            (recur (unchecked-inc i))))))))
+            stmt)
+        4 (fn [params arena]
+            (bind-dispatch stmt 1 (nth params 0) arena)
+            (bind-dispatch stmt 2 (nth params 1) arena)
+            (bind-dispatch stmt 3 (nth params 2) arena)
+            (bind-dispatch stmt 4 (nth params 3) arena)
+            stmt)
+        (fn [params arena]
+          (loop [i 0]
+            (when (< i n)
+              (bind-dispatch stmt (unchecked-inc i) (nth params i) arena)
+              (recur (unchecked-inc i))))
+          stmt)))))
 
 (defn- prepare-cached [^Conn conn sql params arena]
   (let [stmt-cache ^HashMap (.stmt-cache conn)
         pdb        (.pdb conn)
-        stmt       (or (HashMap/.get stmt-cache sql)
-                     (let [stmt (prepare-v3 pdb sql)]
-                 (HashMap/.put stmt-cache sql stmt)
-                 stmt))]
-    (bind stmt params arena)
-    stmt))
+        bind-fn    (or (HashMap/.get stmt-cache sql)
+                     (let [stmt    (prepare-v3 pdb sql)
+                           bind-fn (gen-bind-fn stmt params)]
+                       (HashMap/.put stmt-cache sql bind-fn)
+                       bind-fn))]
+    (bind-fn params arena)))
 
 (defmacro with-stmt-reset
   {:clj-kondo/lint-as 'clojure.core/with-open}
@@ -157,9 +164,7 @@
      (with-open [arena (Arena/ofConfined)]
        (let [stmt (prepare-cached conn sql params arena)]
          (with-stmt-reset [stmt stmt]
-           (let [code (int
-                        #_{:clj-kondo/ignore [:type-mismatch]}
-                        (Sqlite/step stmt))]
+           (let [code (Sqlite/step stmt)]
              (case code
                100 nil
                101 nil
@@ -179,9 +184,7 @@
                clojure.lang.IReduceInit
                (reduce [_ f init]
                  (loop [ret init]
-                   (let [code (int
-                                #_{:clj-kondo/ignore [:type-mismatch]}
-                                (Sqlite/step stmt))]
+                   (let [code (Sqlite/step stmt)]
                      (case code
                        100 (let [result (f ret stmt)]
                              (if (reduced? result)
