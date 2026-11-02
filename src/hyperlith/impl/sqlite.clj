@@ -1,7 +1,9 @@
 (ns hyperlith.impl.sqlite
   (:require
+   [clojure.set :as set]
    [honey.sql :as hsql]
-   [hyperlith.impl.cache :as cache])
+   [hyperlith.impl.cache :as cache]
+   [clojure.string :as str])
   (:import
    [clojure.lang Volatile]
    [hyperlith.impl.sqlite Sqlite]
@@ -327,10 +329,27 @@
   (q db '{select [name] from pragma_table_list}
     (fn [stmt] [(text stmt 0)])))
 
+(defn- keyword-kebab [s]
+  (keyword (str/replace (name s) "_" "-")))
+
 (defn table-columns [db table]
   (q db '{select [name] from [[[pragma_table_info ?table]]]}
     {:table (name table)}
-    (fn [stmt] (text stmt 0))))
+    (fn [stmt] (keyword-kebab (text stmt 0)))))
+
+(defn add-column! [db table column]
+  (q db {:alter-table (keyword-kebab (name table))
+         :add-column  [(keyword-kebab column)]}))
+
+(defn ensure-columns!
+  "Adds columns to a table if they are missing. The columns will have no
+  type affinity. This is useful for sparse tables."
+  [db table columns]
+  (run!
+    (fn [column] (add-column! db table column))
+    (set/difference
+      (into #{} (map keyword-kebab columns))
+      (into #{} (table-columns db table)))))
 
 (comment
   (hsql/format
@@ -338,14 +357,4 @@
       from   session
       where  [= id ?sid]
       limit  1}
-    {:params {:sid 3}})
-
-  (hsql/format-dsl
-    '{select [data]
-      from   session
-      where  [= id ?sid]
-      limit  5}
-    {:params {:sid 3}})
-
-  (hsql/format
-    '{raw "BEGIN IMMEDIATE"}))
+    {:params {:sid 3}}))
