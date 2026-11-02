@@ -539,9 +539,9 @@
   ;; Create tables
   (println "Running migrations...")
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS chunk(id INTEGER PRIMARY KEY, data BLOB)"])
+    '{raw "CREATE TABLE IF NOT EXISTS chunk(id INTEGER PRIMARY KEY, data BLOB)"})
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"]))
+    '{raw "CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data BLOB) WITHOUT ROWID"}))
 
 (defn batch-fn [{:keys [db]} thunks]
   (let [chunk-cache (atom {})]

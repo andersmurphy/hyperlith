@@ -148,7 +148,7 @@
   ;; Create tables
   (println "Running migrations...")
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS chunk(id INTEGER PRIMARY KEY, v INTEGER, data BLOB)"])
+    '{raw "CREATE TABLE IF NOT EXISTS chunk(id INTEGER PRIMARY KEY, v INTEGER, data BLOB)"})
   (when (= 0 (first
                (d/q db '{select [[[count *]]] from chunk limit 1}
                  (fn [stmt] (d/int stmt 0)))))

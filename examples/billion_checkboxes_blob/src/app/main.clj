@@ -542,9 +542,9 @@
   ;; Create tables
   (println "Running migrations...")
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS chunk(id INTEGER PRIMARY KEY, v INTEGER, data BLOB)"])
+    '{raw "CREATE TABLE IF NOT EXISTS chunk(id INTEGER PRIMARY KEY, v INTEGER, data BLOB)"})
   (d/q db
-    ["CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data TEXT) WITHOUT ROWID"]))
+    '{raw "CREATE TABLE IF NOT EXISTS session(id TEXT PRIMARY KEY, data TEXT) WITHOUT ROWID"}))
 
 (defn batch-fn [{:keys [db]} thunks]
   (let [chunk-cache (atom {})]
@@ -604,13 +604,13 @@
 
   (tx!
     (fn [db _]
-      (d/q db ["pragma journal_mode"]
+      (d/q db '{raw "pragma journal_mode"}
         (fn [stmt]
           (pprint/pprint (d/text stmt 0))))))
 
   (tx!
     (fn [db _]
-      (d/q db ["pragma page_size"]
+      (d/q db '{raw "pragma page_size"}
         (fn [stmt]
           (pprint/pprint (d/text stmt 0))))))
 
@@ -626,16 +626,16 @@
 
   (tx!
     (fn [db _]
-      (d/q db ["DROP TABLE IF EXISTS newchunk"])
+      (d/q db '{raw "DROP TABLE IF EXISTS newchunk"})
       (d/q db
-        ["CREATE TABLE IF NOT EXISTS newchunk(id INTEGER PRIMARY KEY, v INTEGER, data BLOB)"])
-      (d/q db ["INSERT INTO newchunk SELECT id, 1, data FROM chunk"])
-      (d/q db ["DROP TABLE chunk"])
-      (d/q db ["ALTER TABLE newchunk RENAME TO chunk"])))
+        '{raw "CREATE TABLE IF NOT EXISTS newchunk(id INTEGER PRIMARY KEY, v INTEGER, data BLOB)"})
+      (d/q db '{raw "INSERT INTO newchunk SELECT id, 1, data FROM chunk"})
+      (d/q db '{raw "DROP TABLE chunk"})
+      (d/q db '{raw "ALTER TABLE newchunk RENAME TO chunk"})))
 
   (tx!
     (fn [db _]
-      (d/q db ["SELECT id, v FROM chunk"]
+      (d/q db '{raw "SELECT id, v FROM chunk"}
         (fn [stmt] (println (d/int stmt 0) (d/int stmt 1))))))
 
   )
@@ -656,8 +656,8 @@
 
   (tx! (fn [db _]
          (d/escape-write-tx [db db]
-           (d/q db ["PRAGMA wal_checkpoint(TRUNCATE)"])
-           (d/q db ["VACUUM"])))))
+           (d/q db '{raw "PRAGMA wal_checkpoint(TRUNCATE)"})
+           (d/q db '{raw "VACUUM"})))))
 
 (comment ;; Generate load test data
   (def tx! (-> @app_ :ctx ::h/tx!))

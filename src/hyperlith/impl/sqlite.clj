@@ -1,6 +1,7 @@
 (ns hyperlith.impl.sqlite
   (:require
-   [honey.sql :as hsql])
+   [honey.sql :as hsql]
+   [hyperlith.impl.cache :as cache])
   (:import
    [clojure.lang Volatile]
    [hyperlith.impl.sqlite Sqlite]
@@ -9,8 +10,7 @@
     Arena
     MemorySegment
     SegmentAllocator
-    ValueLayout]
-   [java.util HashMap]))
+    ValueLayout]))
 
 (set! *warn-on-reflection* true)
 
@@ -96,42 +96,46 @@
           (nil? param)     (Sqlite/bindNull   stmt col)
           :else            (bind-blob         stmt col param arena)))]
 
-  (defn- gen-bind-fn [stmt params]
-    (let [n (count params)]
+  (defn- gen-bind-fn [stmt params-fns]
+    (let [n                (count params-fns)
+          [a b c d :as ks] (mapv (fn [f] (if (fn? f) (f) (fn [_] f)))
+                             params-fns)]
       (case n
         0 (fn [_params _arena] stmt)
         1 (fn [params arena]
-            (bind-dispatch stmt 1 (nth params 0) arena)
+            (bind-dispatch stmt 1 (a params) arena)
             stmt)
         2 (fn [params arena]
-            (bind-dispatch stmt 1 (nth params 0) arena)
-            (bind-dispatch stmt 2 (nth params 1) arena)
+            (bind-dispatch stmt 1 (a params) arena)
+            (bind-dispatch stmt 2 (b params) arena)
             stmt)
         3 (fn [params arena]
-            (bind-dispatch stmt 1 (nth params 0) arena)
-            (bind-dispatch stmt 2 (nth params 1) arena)
-            (bind-dispatch stmt 3 (nth params 2) arena)
+            (bind-dispatch stmt 1 (a params) arena)
+            (bind-dispatch stmt 2 (b params) arena)
+            (bind-dispatch stmt 3 (c params) arena)
             stmt)
         4 (fn [params arena]
-            (bind-dispatch stmt 1 (nth params 0) arena)
-            (bind-dispatch stmt 2 (nth params 1) arena)
-            (bind-dispatch stmt 3 (nth params 2) arena)
-            (bind-dispatch stmt 4 (nth params 3) arena)
+            (bind-dispatch stmt 1 (a params) arena)
+            (bind-dispatch stmt 2 (b params) arena)
+            (bind-dispatch stmt 3 (c params) arena)
+            (bind-dispatch stmt 4 (d params) arena)
             stmt)
         (fn [params arena]
           (loop [i 0]
             (when (< i n)
-              (bind-dispatch stmt (unchecked-inc i) (nth params i) arena)
+              (bind-dispatch stmt (unchecked-inc i) ((nth ks i) params) arena)
               (recur (unchecked-inc i))))
           stmt)))))
 
-(defn- prepare-cached [^Conn conn sql params arena]
-  (let [stmt-cache ^HashMap (.stmt-cache conn)
+(defn- prepare-cached [^Conn conn query params arena]
+  (let [stmt-cache (.stmt-cache conn)
         pdb        (.pdb conn)
-        bind-fn    (or (HashMap/.get stmt-cache sql)
-                     (let [stmt    (prepare-v3 pdb sql)
-                           bind-fn (gen-bind-fn stmt params)]
-                       (HashMap/.put stmt-cache sql bind-fn)
+        bind-fn    (or (cache/get stmt-cache query)
+                     (let [[sql & param-fns] (hsql/format-dsl query
+                                               {:params params})
+                           stmt              (prepare-v3 pdb sql)
+                           bind-fn           (gen-bind-fn stmt param-fns)]
+                       (cache/put stmt-cache query bind-fn)
                        bind-fn))]
     (bind-fn params arena)))
 
@@ -149,30 +153,32 @@
   ;; TODO: Might benefit from transient on large collections
   ;; but how large?
   (reduce (fn [result stmt]
-                  (conj result (result-set-fn stmt)))
-          []
-          result-set))
+            (conj result (result-set-fn stmt)))
+    []
+    result-set))
 
-(defn q*
+(defn q
   ([^Conn conn sql]
-   (q* conn sql nil))
+   (q conn sql nil))
   ([^Conn conn sql params]
-   (if-let [inside (deref ^Volatile (.query-disabled conn))]
-     (throw (ex-info
-              (str "q cannot be called inside: " inside "\n")
-              {:inside inside}))
-     (with-open [arena (Arena/ofConfined)]
-       (let [stmt (prepare-cached conn sql params arena)]
-         (with-stmt-reset [stmt stmt]
-           (let [code (Sqlite/step stmt)]
-             (case code
-               100 nil
-               101 nil
-               (throw (sqlite-ex-info (.pdb conn) code
-                        {:sql    sql
-                         :params params})))))))))
+   (if (fn? params)
+     (q conn sql nil params)
+     (if-let [inside (deref ^Volatile (.query-disabled conn))]
+       (throw (ex-info
+                (str "q cannot be called inside: " inside "\n")
+                {:inside inside}))
+       (with-open [arena (Arena/ofConfined)]
+         (let [stmt (prepare-cached conn sql params arena)]
+           (with-stmt-reset [stmt stmt]
+             (let [code (Sqlite/step stmt)]
+               (case code
+                 100 nil
+                 101 nil
+                 (throw (sqlite-ex-info (.pdb conn) code
+                          {:sql    sql
+                           :params params}))))))))))
   ([^Conn conn sql params result-set-fn]
-   (if-let [inside (deref ^Volatile(.query-disabled conn))]
+   (if-let [inside (deref ^Volatile (.query-disabled conn))]
      (throw (ex-info
               (str "q cannot be called inside: " inside "\n")
               {:inside inside}))
@@ -219,69 +225,66 @@
   (conj (->> (merge default-pragma pragma)
           (mapv (fn [[k v]] (str "pragma " (name k) "=" v))))))
 
-(defn- new-conn!* [db-name {:keys [pragma read-only query-disabled]}]
+(defn- new-conn!* [db-name {:keys [pragma read-only query-disabled
+                                   max-entries]}]
   (let [flags      (if read-only
                      ;; SQLITE_OPEN_READONLY
                      0x00000001
                      ;; SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
                      (bit-or 0x00000002 0x00000004))
         *pdb       (open-v2 db-name flags nil)
-        stmt-cache (HashMap.)
+        stmt-cache (cache/init
+                     {:max-entries max-entries                      
+                      :executor
+                      ;; As each connection has it's own cache maintenance
+                      ;; can be done inline.
+                      (reify java.util.concurrent.Executor
+                        (execute [_ task]
+                          (.run ^Runnable task)))})
         conn       (map->Conn
                      {:pdb            *pdb
                       :stmt-cache     stmt-cache
                       :query-disabled query-disabled})]
     (->> (pragma->set-pragma-query pragma)
-      (run! #(q* conn %)))
+      (run! #(q conn {:raw %})))
     conn))
 
 (defn new-conn!
-  [{:keys [name pragma pragma-writer read-only query-disabled]}]
+  [{:keys [name pragma pragma-writer read-only query-disabled max-entries]}]
   (new-conn!* name
-    {:query-disabled (or query-disabled (atom nil))
+    {:max-entries    (or max-entries 500)
+     :query-disabled (or query-disabled (volatile! nil))
      :read-only      read-only
      :pragma         (merge pragma pragma-writer)}))
 
 (defn start-read-tx [db]
-  (q* db "BEGIN DEFERRED"))
+  (q db {:raw "BEGIN DEFERRED"}))
 
 (defn end-read-tx [db]
-  (q* db "COMMIT"))
+  (q db {:raw "COMMIT"}))
 
 (defmacro with-write-tx
   {:clj-kondo/lint-as 'clojure.core/with-open}
   [[tx db] & body]
   `(let [~tx ~db]
      (try
-       (q* ~tx "BEGIN IMMEDIATE")
+       (q ~tx {:raw "BEGIN IMMEDIATE"})
        ~@(butlast body)
        (let [r# ~(last body)]
-         (q* ~tx "COMMIT")
+         (q ~tx {:raw "COMMIT"})
          r#)
        (catch Throwable t#
          ;; Handles non SQLITE errors crashing a transaction
-         (q* ~tx "ROLLBACK")
+         (q ~tx {:raw "ROLLBACK"})
          (throw t#)))))
 
 (defmacro escape-write-tx
   {:clj-kondo/lint-as 'clojure.core/with-open}
   [[tx db] & body]
   `(let [~tx ~db]
-     (q* ~tx "COMMIT")
+     (q ~tx {:raw "COMMIT"})
      ~@body
-     (q* ~tx "BEGIN IMMEDIATE")))
-
-(defmacro q
-  [db [query-type query :as string-query] & [a b]]
-  (let [params         (when (map? a) a)
-        result-set-fn  (or (when-not (map? a) a)
-                         (when-not (map? b) b))
-        [sql & params] (if (string? query-type)
-                         string-query
-                         (hsql/format query {:params params}))]
-    (if result-set-fn
-      `(q* ~db ~sql ~(vec params) ~result-set-fn)
-      `(q* ~db ~sql ~(vec params)))))
+     (q ~tx {:raw "BEGIN IMMEDIATE"})))
 
 (defn create-write-connections! [dbs]
   (into {}
@@ -300,7 +303,7 @@
 
 (defn checkpoint-all-dbs! [dbs]
   (run!
-    (fn [db] (q db ["PRAGMA wal_checkpoint(TRUNCATE)"]))
+    (fn [db] (q db {:raw "PRAGMA wal_checkpoint(TRUNCATE)"}))
     (vals dbs)))
 
 (def format-query hsql/format)
@@ -328,3 +331,21 @@
   (q db '{select [name] from [[[pragma_table_info ?table]]]}
     {:table (name table)}
     (fn [stmt] (text stmt 0))))
+
+(comment
+  (hsql/format
+    '{select [data]
+      from   session
+      where  [= id ?sid]
+      limit  1}
+    {:params {:sid 3}})
+
+  (hsql/format-dsl
+    '{select [data]
+      from   session
+      where  [= id ?sid]
+      limit  5}
+    {:params {:sid 3}})
+
+  (hsql/format
+    '{raw "BEGIN IMMEDIATE"}))
