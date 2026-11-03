@@ -586,7 +586,15 @@
   ,)
 
 (comment
-  (def tx! (-> @app_ :ctx ::h/tx!))
+  (def tx! (-> @app_ ::h/tx!))
+
+  (tx!
+    (fn [db _]
+      (d/q db '{:create-table [:test :if-not-exists]
+                :with-columns [[:id :primary :key]]})
+      (d/ensure-columns! db :test ["far_out"])
+      (println (d/table-columns db :test))))
+  
 
   (tx!
     (fn [db _]

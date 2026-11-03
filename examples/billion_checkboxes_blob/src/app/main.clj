@@ -600,7 +600,7 @@
   )
 
 (comment ;; Example projection generation
-  (def tx! (-> @app_ :ctx ::h/tx!))
+  (def tx! (-> @app_ ::h/tx!))
 
   (tx!
     (fn [db _]
@@ -622,7 +622,7 @@
           (pprint/pprint (d/blob stmt 1)))))))
 
 (comment ;; Example migration of for changing column type
-  (def tx! (-> @app_ :ctx ::h/tx!))
+  (def tx! (-> @app_ ::h/tx!))
 
   (tx!
     (fn [db _]
@@ -641,7 +641,7 @@
   )
 
 (comment ;; clearing a chunk
-  (def tx! (-> @app_ :ctx ::h/tx!))
+  (def tx! (-> @app_ ::h/tx!))
 
   (tx!
     (fn [db _]
@@ -652,7 +652,7 @@
         {:blank-chunk blank-chunk}))),)
 
 (comment
-  (def tx! (-> @app_ :ctx ::h/tx!))
+  (def tx! (-> @app_ ::h/tx!))
 
   (tx! (fn [db _]
          (d/escape-write-tx [db db]
@@ -660,7 +660,7 @@
            (d/q db '{raw "VACUUM"})))))
 
 (comment ;; Generate load test data
-  (def tx! (-> @app_ :ctx ::h/tx!))
+  (def tx! (-> @app_ ::h/tx!))
 
   (def data (atom nil))
 
@@ -676,7 +676,7 @@
              (spit "load-test-data.edn"))))))
 
 (comment ;; Fill empty chunks
-  (def tx! (-> @app_ :ctx ::h/tx!))
+  (def tx! (-> @app_ ::h/tx!))
 
   (run!
     (fn [id]
@@ -693,7 +693,7 @@
   ,)
 
 (comment ;; Clear empty chunks
-  (def tx! (-> @app_ :ctx ::h/tx!))
+  (def tx! (-> @app_ ::h/tx!))
 
   (tx!
     (fn [db _]
@@ -707,9 +707,9 @@
 
   (def stub-router
     (do (start-app! :mode :test)
-        (@app_ :wrapped-router)))
+        (@app_ ::h/wrapped-router)))
 
-  (count (@app_ :conns))
+  (count (@app_ ::h/conns))
 
   (defn edn->json-stream [edn]
     (java.io.ByteArrayInputStream.
@@ -740,7 +740,7 @@
                             "parentid" (str (rand-int 1000))})}))
     (println "Done"))
 
-  (def tx! (-> @app_ :ctx ::h/tx!))
+  (def tx! (-> @app_ ::h/tx!))
 
   ;; simulate slow TX
   (do (dotimes [_ 300]

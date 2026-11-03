@@ -168,9 +168,9 @@
               lane-ctx)))))
 
 (defn start-loop!
-  [ctx {:keys! [batch-fn tick-ms dbs render-pool-size conns
-                fragment-cache-size]
-        :as    m}]
+  [{:keys! [batch-fn tick-ms dbs render-pool-size conns
+            fragment-cache-size]
+    :as    m}]
   (let [overruns      (atom [])
         start-b       (CyclicBarrier/new (inc render-pool-size))
         done-b        (CyclicBarrier/new (inc render-pool-size))
@@ -183,7 +183,7 @@
                          ;; run it manually every tick.
                          :executor
                          (reify java.util.concurrent.Executor
-                           (execute [_ _task] nil))})        
+                           (execute [_ _task] nil))})
         q             (LinkedBlockingQueue/new)
         ;; Create writers before lanes
         dbs           (sqlite/create-write-connections! dbs)
@@ -194,7 +194,6 @@
                           :start-b start-b
                           :done-b  done-b
                           :fragment-cache cache))
-        ctx           (merge ctx dbs)
         t
         (Thread.
           ^Runnable
@@ -208,7 +207,7 @@
                       batch     (ArrayList/new)]
                   (.drainTo q batch)
                   (try
-                    (batch-fn ctx (seq batch))
+                    (batch-fn dbs (seq batch))
                     (catch Throwable t
                       (repl-caught t)
                       (flush)))
@@ -241,11 +240,7 @@
                         (swap! overruns conj tick-ms))
                       (Thread/sleep ^long sleep-time-ms))))))))
         _             (Thread/.start t)]
-    (-> (assoc ctx
-          ::tx!
-          (fn tx! [thunk] (LinkedBlockingQueue/.offer q thunk)) )
-      (update ::stop!
-        conj (fn [] (Thread/.interrupt t))))))
+    (fn tx! [thunk] (LinkedBlockingQueue/.offer q thunk))))
 
 (def stub-stream
   (reify IEventSink
@@ -256,12 +251,11 @@
     (onClosed   [_ _] nil)))
 
 (defn start-app
-  [{:keys [port ctx-start batch-fn tick-ms
+  [{:keys [port batch-fn tick-ms
            domain email mode dbs render-pool-size render-buffer-size
            fragment-cache-size]
     :or   {port                8080
            tick-ms             50
-           ctx-start           (fn [] {})
            render-pool-size    (Runtime/.availableProcessors
                                  (Runtime/getRuntime))
            render-buffer-size  (* 32 16384)
@@ -273,23 +267,21 @@
                     (fn strem-fn-stub [] stub-stream)
                     (fn stream-fn [] (s/stream 0 nil)))
         _         (throw-if-port-in-use! port)
-        ctx       (-> (ctx-start)
-                    (start-loop!
-                      {:render-pool-size    render-pool-size
-                       :render-buffer-size  render-buffer-size
-                       :fragment-cache-size fragment-cache-size
-                       :dbs                 dbs
-                       :batch-fn            batch-fn
-                       :tick-ms             tick-ms
-                       :conns               conns}))
+        tx!       (start-loop!
+                    {:render-pool-size    render-pool-size
+                     :render-buffer-size  render-buffer-size
+                     :fragment-cache-size fragment-cache-size
+                     :dbs                 dbs
+                     :batch-fn            batch-fn
+                     :tick-ms             tick-ms
+                     :conns               conns})
         wrap-ctx  (fn [handler]
                     (fn [req]
                       (handler
-                        (-> req
-                          (u/fast-merge ctx)
-                          (assoc
-                            ::h/conns conns
-                            ::h/stream-fn stream-fn)))))
+                        (assoc req
+                          ::h/tx! tx!
+                          ::h/conns conns
+                          ::h/stream-fn stream-fn))))
         ;; Middleware make for messy error stacks.
         router    (-> router/router
                     wrap-ctx
@@ -307,29 +299,22 @@
                    ;; Actions payloads are small
                    :max-request-body-size 4096
                    :request-buffer-size   4096}]
-    (if (= mode :test)
-      {:wrapped-router router
-       :ctx            ctx
-       :conns          conns}
-      (let [server
-            (if (not= mode :prod)
-              (http/start-server router config)
-              (clave-aleph/start-server router
-                (merge
-                  config
-                  {:http-versions             [:http2 :http1]
-                   ::clave-aleph/http-options {:port 80}
-                   ::clave-aleph/config
-                   {:domains [domain]
-                    :issuers
-                    [{:directory-url
-                      "https://acme-v02.api.letsencrypt.org/directory"
-                      :email email}]}})))]
-        {:wrapped-router router
-         :ctx            ctx
-         :stop!          (fn stop [& [_opts]]
-                           (clave-aleph/stop server)
-                           (->> ctx ::stop!
-                             (run! (fn [stop!] (stop!)))))}))))
+    (case mode
+      :test nil
+      :prod (clave-aleph/start-server router
+              (merge
+                config
+                {:http-versions             [:http2 :http1]
+                 ::clave-aleph/http-options {:port 80}
+                 ::clave-aleph/config
+                 {:domains [domain]
+                  :issuers
+                  [{:directory-url
+                    "https://acme-v02.api.letsencrypt.org/directory"
+                    :email email}]}}))
+      :dev  (http/start-server router config))
+    {::h/wrapped-router router
+     ::h/tx!            tx!
+     ::h/conns          conns}))
 
 
