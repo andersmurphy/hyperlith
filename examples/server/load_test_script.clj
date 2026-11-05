@@ -63,17 +63,17 @@
         (Thread/sleep 5)))))
 
 (let [url   "http://localhost:8080"
-      users (gen-users 1000)]
+      users (gen-users 500)]
   (println "Running against..." url)
   (views users (str url "/?u="))
+  (actions users
+    (str url "/check")
+    (fn []
+      {"tabid"    "7dc673ca"
+       "targetid" (str (rand-int 255))
+       "parentid" (str 0)}))
   ;; (actions users
-  ;;   (str url "/4")
-  ;;   (fn []
-  ;;     {"tabid"    "7dc673ca"
-  ;;      "targetid" (str (rand-int 255))
-  ;;      "parentid" (str 0)}))
-  ;; (actions users
-  ;;   (str url "/1")
+  ;;   (str url "/scroll")
   ;;   (fn []
   ;;     (let [[x y] (next-xy)]
   ;;       {"tabid"  "7dc673ca"

@@ -1,6 +1,5 @@
 (ns hyperlith.impl.router
   (:require [hyperlith.core :as-alias h]
-            [hyperlith.impl.trace :as t]
             [clojure.string :as str]))
 
 (defn router [apps mode]
@@ -8,11 +7,15 @@
         get-domain (if (= mode :prod)
                      ;; for prod
                      (fn [req]
-                       (get-in req [:headers ":authority"]))
+                       (let [header (:headers req)]
+                         (or (get header ":authority")
+                           (get header "host"))))
                      ;; for localhost
-                     (fn [req] (-> (get-in req [:headers "host"])
-                                 (str/split #"\.localhost.*")
-                                 first)))
+                     (fn [req]
+                       (-> (:header req)
+                         (get "host")
+                         (str/split #"\.localhost.*")
+                         first)))
         routers    (into {} (map (fn [{:keys! [domain routes]}]
                                    [domain routes]))
                      apps)]
