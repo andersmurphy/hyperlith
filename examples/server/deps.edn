@@ -1,0 +1,18 @@
+{:paths   ["src" "resources"]
+ :deps    {org.clojure/clojure         {:mvn/version "1.13.0-alpha10"}
+           game_of_life/game_of_life   {:local/root "../game_of_life"}
+           billion_cells/billion_cells {:local/root "../billion_cells"}
+           billion_checkboxes/billion_checkboxes
+           {:local/root "../billion_checkboxes"}}
+ :aliases {:dev   {:jvm-opts
+                   ["--enable-native-access=ALL-UNNAMED"
+                    "-Duser.timezone=UTC"
+                    "-XX:+UseZGC"
+                    "-XX:+ZGenerational"
+                    "-XX:+UseCompactObjectHeaders"
+                    "-XX:+UseCompressedOops"
+                    "-Djdk.attach.allowAttachSelf"
+                    "-XX:+EnableDynamicAgentLoading"]}
+           :build {:deps       {io.github.clojure/tools.build
+                                {:git/tag "v0.10.5" :git/sha "2a21b7a"}}
+                   :ns-default build}}}

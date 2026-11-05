@@ -237,15 +237,15 @@
         (if-let [b (cache/get cache (.k ^Component node))]
           (.put out ^bytes b)
           (cache/put cache (.k ^Component node)
-            (let [qd    ^Volatile (.query-disabled lane-ctx)
+            (let [in    ^Volatile (.in-component? lane-ctx)
                   start (.position out)]
-              (vreset! qd node)
+              (vreset! in node)
               (try
                 (write-node lane-ctx ((.f ^Component node))
                   out)
 
                 (region->byte-array! out start)
-                (finally (vreset! qd nil)))))))
+                (finally (vreset! in nil)))))))
 
       (instance? Sequential node)
       (write-collection lane-ctx out node)

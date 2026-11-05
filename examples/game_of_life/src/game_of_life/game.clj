@@ -1,5 +1,5 @@
 ;; This code based of (with some modifications): https://github.com/kaepr/game-of-life-cljs/blob/80ff8a16804e03d35d056cc3c64f4d0be9ce301e/src/app/game.cljs#L1C1-L83C6
-(ns app.game)
+(ns game-of-life.game)
 
 (def grid-config
   {:name      "Square"

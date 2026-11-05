@@ -5,11 +5,11 @@
 (defrecord LaneCtx
     [dbs attr-name-cache tag-open-cache tag-close-cache
      html-dst-buf fragment-cache string-builder
-     query-disabled])
+     in-component?])
 
 (defn new-lane-ctx ^LaneCtx
   ([] (new-lane-ctx nil))
-  ([{:keys [dbs html-dst-buf fragment-cache query-disabled]}]
+  ([{:keys [dbs html-dst-buf fragment-cache in-component?]}]
    (map->LaneCtx
      {:dbs             dbs
       ;; We use IdentityHashMap because keys are keywords
@@ -17,6 +17,6 @@
       :tag-close-cache (IdentityHashMap.)
       :attr-name-cache (IdentityHashMap.)
       :html-dst-buf    html-dst-buf
-      :query-disabled  query-disabled
+      :in-component?   in-component?
       :string-builder  (StringBuilder. 16384)
       :fragment-cache  fragment-cache})))

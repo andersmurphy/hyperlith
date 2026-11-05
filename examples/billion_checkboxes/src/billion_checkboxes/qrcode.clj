@@ -1,4 +1,4 @@
-(ns app.qrcode
+(ns billion-checkboxes.qrcode
   (:import [io.nayuki.qrcodegen QrCode QrCode$Ecc]))
 
 (defn url->qrcode-svg [url & {:keys [dark light]}]

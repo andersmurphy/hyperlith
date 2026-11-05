@@ -1,4 +1,4 @@
-(ns app.main
+(ns billion-cells.main
   (:gen-class)
   (:require
    [clojure.math :as math]
@@ -240,7 +240,7 @@
         new-chunk (update-fn old-chunk)]
     (swap! chunk-cache assoc chunk-id new-chunk)))
 
-(defaction handler-scroll
+(defaction handler-scroll {:path "/scroll"}
   [{::h/keys [sid tabid tx!] {:keys [view-x view-y]} :body}]
   (tx!
     (fn [db _]
@@ -249,7 +249,7 @@
            :x (max (int view-x) 0)
            :y (max (int view-y) 0))))))
 
-(defaction handler-resize
+(defaction handler-resize {:path "/resize"}
   [{::h/keys [sid tabid tx!] {:keys [view-h view-w]} :body}]
   (when (and view-h view-w)
     (tx!
@@ -267,8 +267,8 @@
         ;; Should this be tab id too?
         #(update % focus-cell-id dissoc :focus)))))
 
-(defaction handler-focused
-  [{::h/keys                       [sid tabid tx!]
+(defaction handler-focused {:path "/focuse"}
+  [{::h/keys                    [sid tabid tx!]
     {:keys [targetid parentid]} :body}]
   (when (and targetid parentid)
     (let [cell-id  (int (parse-long targetid))
@@ -286,8 +286,8 @@
               #(assoc % :focus-chunk-id chunk-id
                  :focus-cell-id cell-id))))))))
 
-(defaction handler-save-cell
-  [{::h/keys                                 [tx!]
+(defaction handler-save-cell {:path "/save"}
+  [{::h/keys                              [tx!]
     {:keys [targetid parentid cellvalue]} :body}]
   (when (and targetid parentid)
     (let [cell-id  (int (parse-long targetid))
@@ -303,14 +303,14 @@
   (str "$_view.scroll(" (int (* (/ x size) board-width-px))
     "," (int (* (/ y size) board-height-px)) ");"))
 
-(defaction handler-jump
+(defaction handler-jump {:path "/jump"}
   [{::h/keys [sid tabid tx!] {:keys [jumpx jumpy]} :body}]
   (tx!
     (fn [db _]
       (update-tab-data! db sid tabid
         #(assoc % :jump-x jumpx :jump-y jumpy :jump-id (h/new-uid))))))
 
-(defaction handler-share
+(defaction handler-share {:path "/share"}
   [{::h/keys [sid tabid tx!] {:keys [jumpx jumpy]} :body}]
   (tx!
     (fn [db _]
@@ -321,7 +321,7 @@
   (cond
     (and focus (= focus sid))
     (let [on-load  (str "$cellvalue = '" (or value "") "';el.focus();")
-          on-input (str "@post('" handler-save-cell "')")
+          on-input (str "@post('" (handler-save-cell :path) "')")
           id       (str "focus-" local-id)]
       [:div {:class "focus-cell"}
        [:input
@@ -341,14 +341,14 @@
     [:div {:class "focus-cell"}
      [:p {:class       "focus-other"
           :data-id     local-id
-          :data-action handler-focused}
+          :data-action (handler-focused :path)}
       value]]
 
     :else [:p
            {:class "cell"
             :data-id     local-id
             :data-value  value
-            :data-action handler-focused}
+            :data-action (handler-focused :path)}
            value]))
 
 (defn xy->chunk-id [x y]
@@ -428,7 +428,7 @@
 (def copy-xy-to-clipboard-js "navigator.clipboard.writeText(`https://cells.andersmurphy.com?x=${$jumpx}&y=${$jumpy}`)")
 
 (def shim-headers
-  [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
+  [[:link {:id "css" :rel "stylesheet" :type "text/css" :href (css :path)}]
    [:title "One billion cells"]
    [:meta {:content "So many cells" :name "description"}]])
 
@@ -436,8 +436,8 @@
   (vs/virtual-table
     {:id                  "view"
      :data-ref            "_view"
-     :scroll-handler-path handler-scroll
-     :resize-handler-path handler-resize}))
+     :scroll-handler-path (handler-scroll :path)
+     :resize-handler-path (handler-resize :path)}))
 
 (defview handler-root
   {:path        "/" :shim-headers shim-headers :br-window-size 24
@@ -453,7 +453,7 @@
         tab-data         (get-tab-data db sid tabid)
         {:keys [x y height width share-id share-x share-y jump-id jump-x
                 jump-y]} tab-data]
-    [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
+    [[:link {:id "css" :rel "stylesheet" :type "text/css" :href (css :path)}]
      [:main
       {:class "main" :id "morph"
        :data-on:mousedown
@@ -503,11 +503,11 @@
           (str  "$view-y;@peek(() => {$jumpy = Math.round(($view-y/"
             board-height-px")*"size")})")}]
         [:div {:class       "button"
-               :data-action handler-jump}
+               :data-action (handler-jump :path)}
          [:strong {:class "pe-none"} "GO"]]
         [:div
          {:class             "button"
-          :data-action       handler-share
+          :data-action       (handler-share :path)
           :data-on:mousedown copy-xy-to-clipboard-js}
          [:strong {:class "pe-none"} "SHARE"]]]
        [:h1 "One Billion Cells"]
@@ -557,21 +557,39 @@
 
 (defonce app_ (atom nil))
 
+(def routes
+  (->> (mapv :routes
+         [h/datastar
+          h/datastar-source-map
+          css
+          handler-scroll
+          handler-resize
+          handler-focused
+          handler-save-cell
+          handler-jump
+          handler-share
+          handler-root])
+    (apply merge)))
+
+(def app
+  {:domain   "cells.andersmurphy.com"
+   :db       {:name          "cells.db"
+              :migrations    migrations
+              :pragma-writer {:cache_size 8000}
+              :pragma
+              {:cache_size 2000
+               :page_size  (* 4096 4)
+               :mmap_size  268435456}}
+   :routes   #'routes
+   :batch-fn #'batch-fn})
+
 (defn start-app! [& {:keys [mode]}]
   (reset! app_
-    (h/start-app
-      {:dbs                {:db {:name          "cells.db"
-                                 :migrations    migrations
-                                 :pragma-writer {:cache_size 8000}
-                                 :pragma
-                                 {:cache_size 2000
-                                  :page_size  (* 4096 4)
-                                  :mmap_size  268435456}}}
-       :batch-fn           #'batch-fn
+    (h/start-server!
+      {:apps               [app]
        :tick-ms            100
        :render-buffer-size (* 64 16384)
        :email              (h/env :email)
-       :domain             (h/env :domain)
        :mode               mode})))
 
 (defn -main [& _]
@@ -579,10 +597,7 @@
 
 (comment
   (do (start-app! :mode :dev) nil)
-  ;; (clojure.java.browse/browse-url "http://localhost:8080/")
-
-  ;; stop server
-  ((@app_ :stop!))
+  ;; (clojure.java.browse/browse-url "http://cells.andersmurphy.com.localhost:8080/")
   ,)
 
 (comment

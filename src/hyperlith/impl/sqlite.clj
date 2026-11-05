@@ -288,25 +288,16 @@
      ~@body
      (q ~tx {:raw "BEGIN IMMEDIATE"})))
 
-(defn create-write-connections! [dbs]
-  (into {}
-    (map (fn [[k {:keys [migrations] :as opts}]]
-           (let [conn (new-conn! opts)]
-             (when migrations (migrations conn))
-             [k conn]))) dbs))
+(defn new-write-conn! [{:keys [migrations] :as db-opts}]
+  (let [conn (new-conn! db-opts)]
+    (when migrations (migrations conn))
+    conn))
 
-(defn create-read-connections! [dbs query-disabled]
-  (into {} (map (fn [[k opts]]
-                  [k (new-conn!
-                       (assoc opts
-                         :read-only true
-                         :query-disabled query-disabled))]))
-    dbs))
-
-(defn checkpoint-all-dbs! [dbs]
-  (run!
-    (fn [db] (q db {:raw "PRAGMA wal_checkpoint(TRUNCATE)"}))
-    (vals dbs)))
+(defn new-read-conn! [db-opts query-disabled]
+  (new-conn!
+    (assoc db-opts
+      :read-only true
+      :query-disabled query-disabled)))
 
 (def format-query hsql/format)
 
@@ -348,8 +339,8 @@
   (run!
     (fn [column] (add-column! db table column))
     (set/difference
-      (into #{} (map keyword-kebab columns))
-      (into #{} (table-columns db table)))))
+      (into #{} (map keyword-kebab) columns)
+      (into #{} (table-columns db table) ))))
 
 (comment
   (hsql/format

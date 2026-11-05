@@ -1,7 +1,7 @@
-(ns app.main
+(ns game-of-life.main
   (:gen-class)
   (:require
-   [app.game :as game]
+   [game-of-life.game :as game]
    [hyperlith.impl.sqlite :as d]
    [hyperlith.core :as h :refer [defaction defview defc]]))
 
@@ -82,13 +82,14 @@
       (fill-cell user-color (+ id 1))
       (fill-cell user-color (+ id board-size)))))
 
-(defaction handler-tap-cell [{::h/keys [tx! sid] {:strs [id]} :query-params}]
+(defaction handler-tap-cell {:path "/tap"}
+  [{::h/keys [tx! sid] {:strs [id]} :query-params}]
   (when id
     (tx! (fn [_ board]
            (fill-cross board (parse-long id) sid)))))
 
 (def shim-headers
-  [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
+  [[:link {:id "css" :rel "stylesheet" :type "text/css" :href (css :path)}]
    [:title "Game of Life"]
     [:meta {:content "Conway's Game of Life" :name "description"}]])
 
@@ -100,7 +101,8 @@
 (defc Board [board version]
   {:key [Board version]}
   [:div {:data-on:pointerdown
-         (str "@post(`" handler-tap-cell "?id=${evt.target.dataset.id}`)")}
+         (str "@post(`" (handler-tap-cell :path)
+           "?id=${evt.target.dataset.id}`)")}
    [:div {:class "board"}
     (into []
       (comp
@@ -109,10 +111,9 @@
             (Cell id color-class))))
       board)]])
 
-(defview render-home {:path        "/" :shim-headers shim-headers
-                      :zstd-window 20}
+(defview handler-home {:path "/" :shim-headers shim-headers :zstd-window 20}
   [{:keys [db]} _req]
-  [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
+  [[:link {:id "css" :rel "stylesheet" :type "text/css" :href (css :path)}]
    [:main {:class "main" :id "morph"}
     [:h1 "Game of Life (multiplayer)"]
     [:p "Built with ❤️ using "
@@ -130,9 +131,9 @@
                               (fn [stmt] [(d/blob stmt 0) (d/int stmt 1)]))]
       (Board board version))]])
 
-(defview render-home-embed {:path "/embed" :shim-headers shim-headers}
+(defview handler-home-embed {:path "/embed" :shim-headers shim-headers}
   [{:keys [db]} _req]
-  [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
+  [[:link {:id "css" :rel "stylesheet" :type "text/css" :href (css :path)}]
    [:main {:class "main" :id "morph"}
     [:h1 "Game of Life (multiplayer)"]
     [:p "Built with ❤️ using Clojure and Datastar 🚀"]
@@ -175,32 +176,43 @@
 
 (defonce app_ (atom nil))
 
+(def routes
+  (->> (mapv :routes
+         [h/datastar
+          h/datastar-source-map
+          css
+          handler-home
+          handler-home-embed
+          handler-tap-cell])
+    (apply merge)))
+
+(def app
+  {:domain   "example.andersmurphy.com"
+   :db       {:name          "gol.db"
+              :migrations    migrations
+              :pragma-writer {:cache_size 15625}
+              :pragma
+              {:cache_size 2000
+               :page_size  4096
+               ;; 1GB
+               :mmap_size  1000000000}}
+   :routes   #'routes
+   :batch-fn #'batch-fn})
+
 (defn start-app! [& {:keys [mode]}]
   (reset! app_
-    (h/start-app
-      {:batch-fn #'batch-fn
-       :tick-ms  100
-       :email    (h/env :email)
-       :domain   (h/env :domain)
-       :mode     mode
-       :dbs      {:db {:name          "gol.db"
-                       :migrations    migrations
-                       :pragma-writer {:cache_size 15625}
-                       :pragma
-                       {:cache_size 2000
-                        :page_size  4096
-                        ;; 1GB
-                        :mmap_size  1000000000}}}})))
+    (h/start-server!
+      {:apps    [app]
+       :tick-ms 100
+       :email   (h/env :email)
+       :mode    mode})))
 
 (defn -main [& _]
   (start-app! :mode :prod))
 
 (comment
   (do (start-app! :mode :dev) nil)
-  ;; (clojure.java.browse/browse-url "http://localhost:8080/")
-
-  ;; stop server
-  ((@app_ :stop!))
+  ;; (clojure.java.browse/browse-url "http://example.andersmurphy.com.localhost:8080/")
 
   ,)
 

@@ -1,7 +1,7 @@
-(ns app.main
+(ns billion-checkboxes.main
   (:gen-class)
   (:require
-   [app.qrcode :as qrcode]
+   [billion-checkboxes.qrcode :as qrcode]
    [clj-async-profiler.core :as prof]
    [clojure.math :as math]
    [clojure.pprint :as pprint]
@@ -266,7 +266,7 @@
 (def ^byte/1 blank-chunk
   (byte-array (* chunk-size chunk-size)))
 
-(defaction handler-scroll
+(defaction handler-scroll {:path "/scroll"}
   [{::h/keys [sid tabid tx!] {:keys [view-x view-y]} :body}]
   (tx!
     (fn [db _]
@@ -275,7 +275,7 @@
            :x (max (int view-x) 0)
            :y (max (int view-y) 0))))))
 
-(defaction handler-resize
+(defaction handler-resize {:path "/resize"}
   [{::h/keys [sid tabid tx!] {:keys [view-h view-w]} :body}]
   (when (and view-h view-w)
     (tx!
@@ -285,7 +285,7 @@
              :height (max (int view-h) 0)
              :width  (max (int view-w) 0)))))))
 
-(defaction handler-palette
+(defaction handler-palette {:path "/palette"}
   [{::h/keys [sid tabid tx!] {:keys [targetid]} :body}]
   (let [color (parse-long targetid)]
     ;; 0 is an empty color (used for clearing)
@@ -294,7 +294,7 @@
         (fn [db _]
           (update-tab-data! db sid tabid #(assoc % :color color)))))))
 
-(defaction handler-check
+(defaction handler-check {:path "/check"}
   [{::h/keys                    [sid tabid tx!]
     {:keys [targetid parentid]} :body}]
   (when (and targetid parentid)
@@ -335,14 +335,14 @@
     "$_view.scroll(" (int (* (/ x size) board-size-px))
     "," (int (* (/ y size) board-size-px)) ");"))
 
-(defaction handler-jump
+(defaction handler-jump {:path "/jump"}
   [{::h/keys [sid tabid tx!] {:keys [jumpx jumpy]} :body}]
   (tx!
     (fn [db _]
       (update-tab-data! db sid tabid
         #(assoc % :jump-x jumpx :jump-y jumpy :jump-id (h/new-uid))))))
 
-(defaction handler-share
+(defaction handler-share {:path "/share"}
   [{::h/keys [sid tabid tx!] {:keys [jumpx jumpy]} :body}]
   (tx!
     (fn [db _]
@@ -370,7 +370,7 @@
     :id          (str "chunk-" id)
     :data-ignore true
     :data-id     id
-    :data-action handler-check}
+    :data-action (handler-check :path)}
    (into []
      (map-indexed
        (fn [local-id state]
@@ -391,7 +391,7 @@
     :data-ignore-morph true
     :data-ignore       true
     :data-id           id
-    :data-action       handler-check}
+    :data-action       (handler-check :path)}
    (EmptyChecks)])
 
 (defn UserView
@@ -417,7 +417,7 @@
    (mapv (fn [state]
            [:div
             {:data-id     state
-             :data-action handler-palette
+             :data-action (handler-palette :path)
              :data-color  state
              :class
              ["palette-item" (when (= current-selected state)
@@ -425,7 +425,7 @@
      (subvec states 1))])
 
 (def shim-headers
-  [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
+  [[:link {:id "css" :rel "stylesheet" :type "text/css" :href (css :path)}]
    [:title "One billion checkboxes"]
    [:link {:rel "icon" :type "image/png" :href icon}]
    [:meta {:content "So many checkboxes" :name "description"}]])
@@ -472,7 +472,7 @@
    [:div {:class "button" :data-action handler-jump}
     [:strong {:class "pe-none"} "JUMP"]]
    [:div {:class             "button"
-          :data-action       handler-share
+          :data-action       (handler-share :path)
           :data-on:mousedown copy-xy-to-clipboard-js}
     [:strong {:class "pe-none"} "SHARE"]]])
 
@@ -480,8 +480,8 @@
   (vs/virtual
     {:id                  "view"
      :data-ref            "_view"
-     :scroll-handler-path handler-scroll
-     :resize-handler-path handler-resize}))
+     :scroll-handler-path (handler-scroll :path)
+     :resize-handler-path (handler-resize :path)}))
 
 (defview handler-root
   {:path "/" :shim-headers shim-headers :br-window-size 24}
@@ -494,7 +494,7 @@
         tab-data                                        (get-tab-data db sid tabid)
         {:keys [x y height width share-id
                 share-x share-y jump-x jump-y jump-id]} tab-data]
-    [[:link {:id "css" :rel "stylesheet" :type "text/css" :href css}]
+    [[:link {:id "css" :rel "stylesheet" :type "text/css" :href (css :path)}]
      [:main
       {:id                "morph"
        :class             "main"
@@ -561,33 +561,47 @@
 
 (defonce app_ (atom nil))
 
+(def routes
+  (->> (mapv :routes
+         [h/datastar
+          h/datastar-source-map
+          css
+          handler-scroll
+          handler-resize
+          handler-palette
+          handler-check
+          handler-jump
+          handler-share
+          handler-root])
+    (apply merge)))
+
+(def app
+  {:domain   "checkboxes.andersmurphy.com"
+   :db       {:name          "database-new.db"
+              :migrations    migrations
+              :pragma-writer {:cache_size 15625}
+              :pragma
+              {:cache_size 2000
+               :page_size  4096
+               ;; 100GB
+               :mmap_size  100000000000}}
+   :routes   #'routes
+   :batch-fn #'batch-fn})
+
 (defn start-app! [& {:keys [mode]}]
   (reset! app_
-    (h/start-app
-      {:dbs
-       {:db {:name          "database-new.db"
-             :migrations    migrations
-             :pragma-writer {:cache_size 15625}
-             :pragma
-             {:cache_size 2000
-              :page_size  4096
-              ;; 100GB
-              :mmap_size  100000000000}}}
-       :batch-fn  #'batch-fn
-       :tick-ms   100
-       :email     (h/env :email)
-       :domain    (h/env :domain)
-       :mode      mode})))
+    (h/start-server!
+      {:apps    [app]
+       :tick-ms 100
+       :email   (h/env :email)
+       :mode    mode})))
 
 (defn -main [& _]
   (start-app! :mode :prod))
 
 (comment
   (do (start-app! :mode :dev) nil)
-  ;; (clojure.java.browse/browse-url "http://localhost:8080/")
-  ;; stop server
-  ((@app_ :stop!))
-
+  ;; (clojure.java.browse/browse-url "http://checkboxes.andersmurphy.com.localhost:8080/")
   ,)
 
 (comment ;; Profiling
