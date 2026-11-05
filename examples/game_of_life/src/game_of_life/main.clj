@@ -1,5 +1,4 @@
 (ns game-of-life.main
-  (:gen-class)
   (:require
    [game-of-life.game :as game]
    [hyperlith.impl.sqlite :as d]
@@ -204,11 +203,7 @@
     (h/start-server!
       {:apps    [app]
        :tick-ms 100
-       :email   (h/env :email)
        :mode    mode})))
-
-(defn -main [& _]
-  (start-app! :mode :prod))
 
 (comment
   (do (start-app! :mode :dev) nil)

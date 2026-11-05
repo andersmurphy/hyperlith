@@ -12,7 +12,7 @@
                            (get header "host"))))
                      ;; for localhost
                      (fn [req]
-                       (-> (:header req)
+                       (-> (:headers req)
                          (get "host")
                          (str/split #"\.localhost.*")
                          first)))

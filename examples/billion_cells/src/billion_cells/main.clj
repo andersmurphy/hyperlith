@@ -1,5 +1,4 @@
 (ns billion-cells.main
-  (:gen-class)
   (:require
    [clojure.math :as math]
    [clojure.pprint :as pprint]
@@ -589,11 +588,7 @@
       {:apps               [app]
        :tick-ms            100
        :render-buffer-size (* 64 16384)
-       :email              (h/env :email)
        :mode               mode})))
-
-(defn -main [& _]
-  (start-app! :mode :prod))
 
 (comment
   (do (start-app! :mode :dev) nil)
