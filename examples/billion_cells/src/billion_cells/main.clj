@@ -554,8 +554,6 @@
                  :new-chunk (h/edn->json new-chunk)}))
         @chunk-cache))))
 
-(defonce app_ (atom nil))
-
 (def routes
   (->> (mapv :routes
          [h/datastar
@@ -582,19 +580,6 @@
    :routes   #'routes
    :batch-fn #'batch-fn})
 
-(defn start-app! [& {:keys [mode]}]
-  (reset! app_
-    (h/start-server!
-      {:apps               [app]
-       :tick-ms            100
-       :render-buffer-size (* 64 16384)
-       :mode               mode})))
-
-(comment
-  (do (start-app! :mode :dev) nil)
-  ;; (clojure.java.browse/browse-url "http://cells.andersmurphy.com.localhost:8080/")
-  ,)
-
 (comment
   (def tx! (-> @app_ ::h/tx!))
 
@@ -604,7 +589,6 @@
                 :with-columns [[:id :primary :key]]})
       (d/ensure-columns! db :test ["far_out"])
       (println (d/table-columns db :test))))
-  
 
   (tx!
     (fn [db _]

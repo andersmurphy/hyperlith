@@ -173,8 +173,6 @@
                      :max-rows board-size
                      :max-cols board-size})})))
 
-(defonce app_ (atom nil))
-
 (def routes
   (->> (mapv :routes
          [h/datastar
@@ -197,31 +195,6 @@
                :mmap_size  1000000000}}
    :routes   #'routes
    :batch-fn #'batch-fn})
-
-(defn start-app! [& {:keys [mode]}]
-  (reset! app_
-    (h/start-server!
-      {:apps    [app]
-       :tick-ms 100
-       :mode    mode})))
-
-(comment
-  (do (start-app! :mode :dev) nil)
-  ;; (clojure.java.browse/browse-url "http://example.andersmurphy.com.localhost:8080/")
-
-  ,)
-
-(comment
-  (require '[clj-async-profiler.core :as prof])
-
-  (prof/start {:event :alloc})
-  (prof/start)
-  (prof/stop)
-  (prof/serve-ui 7777)
-  ;; (clojure.java.browse/browse-url "http://localhost:7777/")
-  )
-
-
 
 
  

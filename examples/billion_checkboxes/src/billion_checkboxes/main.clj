@@ -1,7 +1,6 @@
 (ns billion-checkboxes.main
   (:require
    [billion-checkboxes.qrcode :as qrcode]
-   [clj-async-profiler.core :as prof]
    [clojure.math :as math]
    [clojure.pprint :as pprint]
    [hyperlith.core :as h :refer [defaction defview defc]]
@@ -558,8 +557,6 @@
                 {:chunk-id chunk-id :new-chunk new-chunk}))
         @chunk-cache))))
 
-(defonce app_ (atom nil))
-
 (def routes
   (->> (mapv :routes
          [h/datastar
@@ -586,27 +583,6 @@
                :mmap_size  100000000000}}
    :routes   #'routes
    :batch-fn #'batch-fn})
-
-(defn start-app! [& {:keys [mode]}]
-  (reset! app_
-    (h/start-server!
-      {:apps    [app]
-       :tick-ms 100
-       :mode    mode})))
-
-(comment
-  (do (start-app! :mode :dev) nil)
-  ;; (clojure.java.browse/browse-url "http://checkboxes.andersmurphy.com.localhost:8080/")
-  ,)
-
-(comment ;; Profiling
-
-  (prof/start {:event :alloc})
-  (prof/start)
-  (prof/stop)
-  (prof/serve-ui 7777)
-  ;; (clojure.java.browse/browse-url "http://localhost:7777/")
-  )
 
 (comment ;; Example projection generation
   (def tx! (-> @app_ ::h/tx!))
@@ -648,25 +624,6 @@
         (fn [stmt] (println (d/int stmt 0) (d/int stmt 1))))))
 
   )
-
-(comment ;; clearing a chunk
-  (def tx! (-> @app_ ::h/tx!))
-
-  (tx!
-    (fn [db _]
-      (d/q db
-        '{update chunk
-          set    {data ?blank-chunk}
-          where  [= id 0]}
-        {:blank-chunk blank-chunk}))),)
-
-(comment
-  (def tx! (-> @app_ ::h/tx!))
-
-  (tx! (fn [db _]
-         (d/escape-write-tx [db db]
-           (d/q db '{raw "PRAGMA wal_checkpoint(TRUNCATE)"})
-           (d/q db '{raw "VACUUM"})))))
 
 (comment ;; Generate load test data
   (def tx! (-> @app_ ::h/tx!))
@@ -711,48 +668,3 @@
           where       [= data ?blank-chunk]}
         {:blank-chunk blank-chunk})))
   ,)
-
-(comment ;; stubbed load testing
-
-  (def stub-router
-    (do (start-app! :mode :test)
-        (@app_ ::h/wrapped-router)))
-
-  (count (@app_ ::h/conns))
-
-  (defn edn->json-stream [edn]
-    (java.io.ByteArrayInputStream.
-      (String/.getBytes (h/edn->json edn) "UTF-8")))
-
-  (dotimes [i 5000]
-    (stub-router
-      {:request-method :post
-       :uri            "/"
-       :headers        {"content-type"    "application/json"
-                        "accept-encoding" "zstd"
-                        "sec-fetch-site"  "same-origin"
-                        "cookie"          (str "__Host-sid=" "test-user-" i)}
-       :body           (edn->json-stream {"tabid" "7dc673ca"})}))
-
-  (do
-    (dotimes [_ 100000]
-      (stub-router
-        {:request-method :post
-         :uri            "/t_rqnpSL_NvK8EJhoBwkc6TNJ4VsLi1Fs"
-         :headers        {"content-type"    "application/json"
-                          "accept-encoding" "zstd"
-                          "sec-fetch-site"  "same-origin"
-                          "cookie"          "__Host-sid=test-user-1"}
-         :body           (edn->json-stream
-                           {"tabid"    "7dc673ca"
-                            "targetid" (str (rand-int 255))
-                            "parentid" (str (rand-int 1000))})}))
-    (println "Done"))
-
-  (def tx! (-> @app_ ::h/tx!))
-
-  ;; simulate slow TX
-  (do (dotimes [_ 300]
-        (tx! (fn [_ _] (Thread/sleep 90)))
-        (Thread/sleep 101))
-      (println "Done")))
