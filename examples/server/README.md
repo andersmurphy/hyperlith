@@ -6,8 +6,12 @@ clojure -Srepro -T:build uber
 
 ## Run jar locally
 
-```
-java -Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl}" -jar target/app.jar -m app.main -Duser.timezone=UTC -XX:+UseZGC -XX:+ZGenerational -XX:+UseCompactObjectHeaders -XX:+UseCompressedOops
+```bash
+java \
+  -Duser.timezone=UTC \
+  -Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl}" \
+  -XX:+UseZGC -XX:+UseCompactObjectHeaders \
+  -jar target/app.jar -m app.main
 ```
 
 ## Deploy

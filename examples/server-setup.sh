@@ -25,7 +25,11 @@ RestartSec=5s
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 WorkingDirectory=/home/app
-ExecStart=/usr/bin/java -Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl}" -jar app.jar -m app.main -Duser.timezone=UTC -XX:+UseZGC -XX:InitialRAMPercentage 75.0 -XX:MaxRAMPercentage 75.0 -XX:MinRAMPercentage 75.0 -XX:+UseCompactObjectHeaders -XX:+UseCompressedOops
+ExecStart=/usr/bin/java \
+  -Duser.timezone=UTC \
+  -Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl}" \
+  -XX:+UseZGC -XX:+UseCompactObjectHeaders \
+  -jar app.jar -m app.main
 
 [Install]
 WantedBy=multi-user.target
