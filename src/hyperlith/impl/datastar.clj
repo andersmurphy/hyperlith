@@ -39,9 +39,9 @@
   ;; mess with each other. To get around this an unused query param
   ;; is added to the url.
 
-  ;; Retry Infinity means we always try to reconnect. The other defaults
-  ;; mean that this will at most take 30s (default max backoff).
-  "@post(window.location.pathname + (window.location.search + '&u=').replace(/^&/,'?'), {retryInterval: 1000, retryScaler: 1, retryMaxCount: Infinity, openWhenHidden: false, retry: 'error'})")
+  ;; Retry Infinity means we always try to reconnect. We only retry on
+  ;; network error.
+  "@post(window.location.pathname + (window.location.search + '&u=').replace(/^&/,'?'), {retryInterval: 1000, retryScaler: 1, retryMaxCount: Infinity, openWhenHidden: false, retry: 'auto'})")
 
 (def tabid-js
   ;; Higher collision risk is acceptable here as it only needs to be
