@@ -5,7 +5,7 @@ set -e
 # Dependencies
 apt-get update
 apt-get upgrade
-apt-get -y install openjdk-25-jre-headless ufw
+apt-get -y install openjdk-26-jre-headless ufw
 
 # App user (you cannot login as this user)
 useradd -rms /usr/sbin/nologin app

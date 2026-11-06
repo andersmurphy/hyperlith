@@ -88,3 +88,7 @@
         (tx! (fn [_ _] (Thread/sleep 90)))
         (Thread/sleep 101))
       (println "Done")))
+
+(comment
+  (.. java.lang.management.ManagementFactory getRuntimeMXBean getInputArguments)
+  )

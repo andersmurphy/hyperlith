@@ -9,9 +9,7 @@
                  ["--enable-native-access=ALL-UNNAMED"
                   "-Duser.timezone=UTC"
                   "-XX:+UseZGC"
-                  "-XX:+ZGenerational"
                   "-XX:+UseCompactObjectHeaders"
-                  "-XX:+UseCompressedOops"
                   "-Djdk.attach.allowAttachSelf"
                   "-XX:+EnableDynamicAgentLoading"
                   ;; For analysing GC pauses

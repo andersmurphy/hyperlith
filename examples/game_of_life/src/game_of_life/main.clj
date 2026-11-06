@@ -121,7 +121,7 @@
      [:a {:href "https://data-star.dev"} "Datastar"]
      "🚀"]
     [:p "Source code can be found "
-     [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/app/main.clj"} "here"]
+     [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/game_of_life/src/game_of_life/main.clj"} "here"]
      " - " [:a {:href "https://andersmurphy.com/about"} "blog"]]
     (let [[[board version]] (d/q db '{select [data v]
                                       from   chunk

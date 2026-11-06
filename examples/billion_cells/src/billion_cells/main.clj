@@ -515,7 +515,9 @@
         " and "
         [:a {:href "https://data-star.dev"} "Datastar"]
         " - "
-        [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_cells/src/app/main.clj" } "source"]
+        [:a {:href
+             "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_cells/src/billion_cells/main.clj"
+              } "source"]
         " - "
         [:a {:href "https://andersmurphy.com/about"} "blog"]]]
       (when share-id

@@ -449,7 +449,7 @@
     " and "
     [:a {:href "https://data-star.dev"} "Datastar"]
     " - "
-    [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes_blob/src/app/main.clj" } "source"]
+    [:a {:href "https://github.com/andersmurphy/hyperlith/blob/master/examples/billion_checkboxes/src/billion_checkboxes/main.clj"} "source"]
     " - "
     [:a {:href "https://andersmurphy.com/about"} "blog"]]])
 

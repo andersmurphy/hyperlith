@@ -9,13 +9,13 @@
 (defn clean [_]
   (b/delete {:path "classes"}))
 
-;; Run with  "-target" "23"
+;; Run with  "-target" "26"
 (defn jcompile [_]
   (clean nil)
   (b/javac {:src-dirs   ["src"]
             :class-dir  class-dir
             :basis      basis
-            :javac-opts ["--release" "23"]}))
+            :javac-opts ["--release" "26"]}))
 
 ;; To build java classes
 ;; clojure -T:build jcompile
