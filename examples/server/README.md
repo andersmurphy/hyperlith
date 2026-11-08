@@ -4,14 +4,42 @@
 clojure -Srepro -T:build uber
 ```
 
-## Run jar locally
+## Run jar for prod
 
 ```bash
 java \
   -Duser.timezone=UTC \
   -Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl}" \
   -XX:+UseZGC -XX:+UseCompactObjectHeaders \
-  -jar target/app.jar -m app.main
+  -jar target/app.jar prod
+```
+
+## Run jar for dev 
+
+No https/h2.
+
+```bash
+java \
+  -Duser.timezone=UTC \
+  -Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl :server-daemon false}" \
+  -XX:+UseZGC -XX:+UseCompactObjectHeaders \
+  -Djdk.attach.allowAttachSelf \
+  -XX:+EnableDynamicAgentLoading \
+  -jar target/app.jar dev
+```
+
+## Run jar without http-server 
+
+Can be useful for profiling and tests.
+
+```bash
+java \
+  -Duser.timezone=UTC \
+  -Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl :server-daemon false}" \
+  -XX:+UseZGC -XX:+UseCompactObjectHeaders \
+  -Djdk.attach.allowAttachSelf \
+  -XX:+EnableDynamicAgentLoading \
+  -jar target/app.jar test
 ```
 
 ## Deploy

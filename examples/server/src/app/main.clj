@@ -18,8 +18,8 @@
        :email              (h/env :email)
        :mode               mode})))
 
-(defn -main [& _]
-  (start-app! :mode :prod))
+(defn -main [& args]
+  (start-app! :mode (or (keyword (first args)) :prod)))
 
 (comment
   (do (start-app! :mode :dev) nil)
@@ -44,8 +44,7 @@
 (comment ;; stubbed load testing
 
   (def stub-router
-    (do (start-app! :mode :test)
-        (@app_ ::h/wrapped-router)))
+    (@app_ ::h/wrapped-router))
 
   (count (@app_ ::h/conns))
 

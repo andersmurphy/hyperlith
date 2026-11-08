@@ -29,7 +29,7 @@ ExecStart=/usr/bin/java \
   -Duser.timezone=UTC \
   -Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl}" \
   -XX:+UseZGC -XX:+UseCompactObjectHeaders \
-  -jar app.jar -m app.main
+  -jar app.jar prod
 
 [Install]
 WantedBy=multi-user.target
