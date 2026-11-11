@@ -43,6 +43,14 @@
    "X-Frame-Options"         "deny"
    "Cache-Control"           "no-cache, must-revalidate"})
 
+(def sse-headers
+  {"Strict-Transport-Security" strict-transport
+   "Content-Type"              "text/event-stream"
+   "Cache-Control"             "no-store"
+   "X-Content-Type-Options"    "nosniff"
+   "X-Frame-Options"           "deny"
+   "Content-Encoding"          "zstd"})
+
 (defn wrap-response-headers [handler csp-overrides]
   (let [default-headers
         (assoc default-headers

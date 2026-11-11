@@ -5,7 +5,7 @@
    [hyperlith.impl.assets :refer [static-asset]]
    [hyperlith.impl.crypto :as crypto]
    [hyperlith.core :as-alias h]
-   [hyperlith.impl.headers :refer [strict-transport]]
+   [hyperlith.impl.headers :as headers]
    [hyperlith.impl.html :as html]
    [hyperlith.impl.json :as json]
    [hyperlith.impl.util :as u]
@@ -160,9 +160,7 @@
       (ConcurrentHashMap$KeySetView/.add conns render)
       (when on-open (on-open req))
       {:status  200
-       :headers {"Content-Type"     "text/event-stream"
-                 "Cache-Control"    "no-store"
-                 "Content-Encoding" "zstd"}
+       :headers headers/sse-headers
        :body    stream})))
 
 (defn view-handler [render-fn {:keys! [path] :as opts}]
