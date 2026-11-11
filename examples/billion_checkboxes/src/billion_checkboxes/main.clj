@@ -425,7 +425,7 @@
 (def shim-headers
   [[:link {:id "css" :rel "stylesheet" :type "text/css" :href (css :path)}]
    [:title "One billion checkboxes"]
-   [:link {:rel "icon" :type "image/png" :href icon}]
+   [:link {:rel "icon" :type "image/png" :href (:path icon)}]
    [:meta {:content "So many checkboxes" :name "description"}]])
 
 (defn scroll->cell-xy-js [n]
@@ -561,6 +561,7 @@
   (->> (mapv :routes
          [h/datastar
           h/datastar-source-map
+          icon
           css
           handler-scroll
           handler-resize
