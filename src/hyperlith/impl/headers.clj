@@ -62,6 +62,6 @@
     (fn [req]
       (let [resp (handler req)]
         (if (:body resp)
-          (update resp :header merge-defaults)
+          (update resp :headers merge-defaults)
           ;; If we don't have a body we still want to be strict and no-store
           (assoc resp :headers empty-body-headers))))))
