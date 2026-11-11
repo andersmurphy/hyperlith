@@ -12,7 +12,7 @@
 (defn start-app! [& {:keys [mode]}]
   (reset! app_
     (h/start-server!
-      {:apps               [cells/app boxes/app gol/app]
+      {:apps               [boxes/app cells/app gol/app]
        :tick-ms            100
        :render-buffer-size (* 64 16384)
        :email              (h/env :email)
@@ -48,7 +48,7 @@
   (def stub-router
     (@app_ ::h/wrapped-router))
 
-  (count (@app_ ::h/conns))
+  (mapv #(-> % :conns count) (@app_ ::h/apps))
 
   (defn edn->json-stream [edn]
     (java.io.ByteArrayInputStream.
@@ -82,7 +82,7 @@
                             "parentid" (str (rand-int 1000))})}))
     (println "Done"))
 
-  (def tx! (get-in @app_ [::h/db-txs! "checkboxes.andersmurphy.com"]))
+  (def tx! (get-in @app_ [::h/apps 0 :tx!]))
 
   ;; simulate slow TX
   (do (dotimes [_ 300]

@@ -123,22 +123,6 @@
         (repl-caught t)
         {:status 500}))))
 
-(defn new-app! [{:keys! [batch-fn domain db routes]}]
-  (let [q          (LinkedBlockingQueue/new)
-        write-conn (sqlite/new-write-conn! db)]
-    {:routes         routes
-     :domain         domain
-     :new-read-conn! (fn [in-component?] (sqlite/new-read-conn! db
-                                           in-component?))
-     :checkpoint!    (fn checkpoint! []
-                       (sqlite/q write-conn
-                         {:raw "PRAGMA wal_checkpoint(TRUNCATE)"}))
-     :batch!         (fn batch! []
-                       (let [batch (ArrayList/new)]
-                         (.drainTo q batch)
-                         (batch-fn {:db write-conn} (seq batch))))
-     :tx!            (fn tx! [thunk] (LinkedBlockingQueue/.offer q thunk))}))
-
 (defn- init-render-lanes
   [{:keys! [render-pool-size apps render-buffer-size
             start-b done-b render-batch render-cursor fragment-cache]}]
@@ -183,8 +167,7 @@
               lane-ctx)))))
 
 (defn start-loop!
-  [{:keys! [tick-ms render-pool-size conns
-            fragment-cache-size apps]
+  [{:keys! [tick-ms render-pool-size fragment-cache-size apps]
     :as    m}]
   (let [overruns      (atom [])
         start-b       (CyclicBarrier/new (inc render-pool-size))
@@ -231,7 +214,7 @@
                   (run! (fn [app] ((app :checkpoint!))) apps)
                   ;; render queue
                   (vreset! render-batch
-                    (.toArray ^Collection conns))
+                    (.toArray ^Collection (into [] (mapcat :conns) apps)))
                   (AtomicInteger/.set render-cursor 0)
                   ;; Start pipeline (renders + writer)
                   (.await ^CyclicBarrier start-b)
@@ -252,7 +235,7 @@
                         (swap! overruns conj tick-ms))
                       (Thread/sleep ^long sleep-time-ms))))))))
         _             (Thread/.start t)]
-    (into {} (map (fn [app] [(app :domain) (app :tx!)])) apps)))
+    nil))
 
 (def stub-stream
   (reify IEventSink
@@ -261,6 +244,23 @@
     (isClosed [_] false)
     (markClosed [_] nil)
     (onClosed   [_ _] nil)))
+
+(defn new-app! [{:keys! [batch-fn domain db routes]}]
+  (let [q          (LinkedBlockingQueue/new)
+        write-conn (sqlite/new-write-conn! db)]
+    {:routes         routes
+     :conns          (ConcurrentHashMap/newKeySet)
+     :domain         domain
+     :new-read-conn! (fn [in-component?] (sqlite/new-read-conn! db
+                                           in-component?))
+     :checkpoint!    (fn checkpoint! []
+                       (sqlite/q write-conn
+                         {:raw "PRAGMA wal_checkpoint(TRUNCATE)"}))
+     :batch!         (fn batch! []
+                       (let [batch (ArrayList/new)]
+                         (.drainTo q batch)
+                         (batch-fn {:db write-conn} (seq batch))))
+     :tx!            (fn tx! [thunk] (LinkedBlockingQueue/.offer q thunk))}))
 
 (defn start-server!
   [{:keys [port tick-ms
@@ -273,27 +273,21 @@
            render-buffer-size  (* 32 16384)
            fragment-cache-size (* 512 1024 1024)}}]
   (assert (#{:test :dev :prod} mode))
-  (let [apps      (mapv new-app! apps)
-        port      (if (= mode :prod) 443 port)
-        conns     (ConcurrentHashMap/newKeySet)
+  (let [port      (if (= mode :prod) 443 port)
         stream-fn (if (= mode :test)
                     (fn strem-fn-stub [] stub-stream)
                     (fn stream-fn [] (s/stream 0 nil)))
         _         (throw-if-port-in-use! port)
-        db-txs!   (start-loop!
+        apps      (mapv new-app! apps)
+        _         (start-loop!
                     {:render-pool-size    render-pool-size
                      :render-buffer-size  render-buffer-size
                      :fragment-cache-size fragment-cache-size
                      :apps                apps
-                     :tick-ms             tick-ms
-                     :conns               conns})
+                     :tick-ms             tick-ms})
         wrap-ctx  (fn [handler]
                     (fn [req]
-                      (handler
-                        (assoc req
-                          ::h/db-txs! db-txs!
-                          ::h/conns conns
-                          ::h/stream-fn stream-fn))))
+                      (handler (assoc req ::h/stream-fn stream-fn))))
         ;; Middleware make for messy error stacks.
         router    (-> (router/router apps mode)
                     wrap-ctx
@@ -327,7 +321,7 @@
                     :email email}]}}))
       :dev  (http/start-server router config))
     {::h/wrapped-router router
-     ::h/db-txs!        db-txs!
-     ::h/conns          conns}))
+     ::h/apps           apps}))
+
 
 

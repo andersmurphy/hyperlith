@@ -87,13 +87,7 @@
 (defn action-handler [thunk {:keys! [path]}]
   {:path   path
    :routes {[:post path]
-            (fn handler [req]
-              (let [tx! ((req ::h/db-txs!) (req ::h/domain))]
-                (-> (assoc req ::h/tx! tx!)
-                  ;; Remove stuff that we don't want to pass on to the handler
-                  (dissoc ::h/db-txs! ::h/conns ::h/domain ::h/stream-fn)
-                  thunk))
-              {:status 204})}})
+            (fn handler [req] (thunk req) {:status 204})}})
 
 (def event-prefix
   (String/.getBytes "event: datastar-patch-elements\ndata: elements "))
@@ -125,11 +119,6 @@
           last-slim-view (atom nil)
           conns          (req ::h/conns)
           domain         (req ::h/domain)
-          ;; Remove stuff that we don't want to pass on to the handler
-          tx!            ((req ::h/db-txs!) (req ::h/domain))
-          req            (-> (assoc req ::h/tx! tx!)
-                           (dissoc ::h/db-txs! ::h/conns ::h/domain
-                             ::h/stream-fn))
           render
           (fn render [^LaneCtx lane-ctx]
             (try
