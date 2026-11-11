@@ -1,5 +1,6 @@
 (ns hyperlith.impl.headers
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [hyperlith.impl.util :as u]))
 
 (def self "'self'")
 (def none "'none'")
@@ -21,7 +22,6 @@
    :connect-src     [self]
    :style-src       [self unsafe-inline]
    :style-src-elem  [self unsafe-inline]
-   ;; https://andersmurphy.com (e.g: for embedding in iframe blog)
    :frame-ancestors [none]})
 
 (defn csp-data->str [csp-data]
@@ -36,10 +36,24 @@
   "max-age=63072000;includeSubDomains;preload")
 
 (def default-headers
-  {"Content-Type"              "text/html; charset=utf-8"
-   "Strict-Transport-Security" strict-transport
-   "Content-Security-Policy"   (csp-data->str csp-data)
-   "Referrer-Policy"           "no-referrer"
-   "X-Content-Type-Options"    "nosniff"
-   "X-Frame-Options"           "deny"
-   "Cache-Control"             "no-cache, must-revalidate"})
+  {"Content-Type"            "text/html; charset=utf-8"
+   "Content-Security-Policy" (csp-data->str csp-data)
+   "Referrer-Policy"         "no-referrer"
+   "X-Content-Type-Options"  "nosniff"
+   "X-Frame-Options"         "deny"
+   "Cache-Control"           "no-cache, must-revalidate"})
+
+(defn wrap-response-headers [handler csp-overrides]
+  (let [default-headers
+        (assoc default-headers
+          "Content-Security-Policy"
+          (csp-data->str (u/fast-merge csp-data csp-overrides)))
+        merge-defaults     (fn [x] (u/fast-merge default-headers x))
+        empty-body-headers {"Strict-Transport-Security" strict-transport
+                            "Cache-Control"             "no-store"}]
+    (fn [req]
+      (let [resp (handler req)]
+        (if (:body resp)
+          (update resp :header merge-defaults)
+          ;; If we don't have a body we still want to be strict and no-store
+          (assoc resp :headers empty-body-headers))))))

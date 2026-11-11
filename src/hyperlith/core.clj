@@ -6,6 +6,7 @@
    [hyperlith.core :as-alias h]
    [hyperlith.impl.assets]
    [hyperlith.impl.blocker :refer [wrap-blocker]]
+   [hyperlith.impl.headers :refer [wrap-response-headers]]
    [hyperlith.impl.cache :as cache]
    [hyperlith.impl.codec :as codec]
    [hyperlith.impl.crypto :as crypto]
@@ -264,7 +265,7 @@
 (defn start-server!
   [{:keys [port tick-ms
            email mode render-pool-size render-buffer-size
-           fragment-cache-size apps]
+           fragment-cache-size apps csp-overrides]
     :or   {port                8080
            tick-ms             50
            render-pool-size    (Runtime/.availableProcessors
@@ -304,7 +305,8 @@
                     wrap-query-params
                     wrap-session
                     wrap-parse-json-body
-                    wrap-blocker)
+                    wrap-blocker
+                    (wrap-response-headers csp-overrides))
         config    {:executor              (Executors/newVirtualThreadPerTaskExecutor)
                    :port                  port
                    ;; Actions payloads are small

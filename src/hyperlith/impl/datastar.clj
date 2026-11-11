@@ -5,8 +5,7 @@
    [hyperlith.impl.assets :refer [static-asset]]
    [hyperlith.impl.crypto :as crypto]
    [hyperlith.core :as-alias h]
-   [hyperlith.impl.headers
-    :refer [default-headers strict-transport]]
+   [hyperlith.impl.headers :refer [strict-transport]]
    [hyperlith.impl.html :as html]
    [hyperlith.impl.json :as json]
    [hyperlith.impl.util :as u]
@@ -71,11 +70,11 @@
                     [:noscript "Your browser does not support JavaScript!"]
                     [:main {:id "morph"}]]]]
                html/html->bytes-oneshot)]
-    (-> {:status  200
-         :headers (assoc default-headers "Content-Encoding" "zstd")
-         :body    (-> body (zstd/compress 19))}
-      ;; Etags ensure the shim is only sent again if it's contents have changed
-      (assoc-in [:headers "ETag"] (crypto/digest-base64 body)))))
+    {:status  200
+     ;; Etags ensure the shim is only sent again if it's contents have changed
+     :headers {"Content-Encoding" "zstd"
+               "ETag"             (crypto/digest-base64 body)}
+     :body    (-> body (zstd/compress 19))}))
 
 (defn- shim-handler [{:keys! [shim-headers]}]
   (let [resp (build-shim-page-resp shim-headers)
@@ -94,9 +93,7 @@
                   ;; Remove stuff that we don't want to pass on to the handler
                   (dissoc ::h/db-txs! ::h/conns ::h/domain ::h/stream-fn)
                   thunk))
-              {:headers {"Strict-Transport-Security" strict-transport
-                         "Cache-Control"             "no-store"}
-               :status  204})}})
+              {:status 204})}})
 
 (def event-prefix
   (String/.getBytes "event: datastar-patch-elements\ndata: elements "))
@@ -163,10 +160,9 @@
       (ConcurrentHashMap$KeySetView/.add conns render)
       (when on-open (on-open req))
       {:status  200
-       :headers (assoc default-headers
-                  "Content-Type"  "text/event-stream"
-                  "Cache-Control" "no-store"
-                  "Content-Encoding" "zstd")
+       :headers {"Content-Type"     "text/event-stream"
+                 "Cache-Control"    "no-store"
+                 "Content-Encoding" "zstd"}
        :body    stream})))
 
 (defn view-handler [render-fn {:keys! [path] :as opts}]

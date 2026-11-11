@@ -16,7 +16,9 @@
        :tick-ms            100
        :render-buffer-size (* 64 16384)
        :email              (h/env :email)
-       :mode               mode})))
+       :mode               mode
+       :csp-overrides
+       {:frame-ancestors ["'none'" "https://andersmurphy.com"]}})))
 
 (defn -main [& args]
   (start-app! :mode (or (keyword (first args)) :prod)))
