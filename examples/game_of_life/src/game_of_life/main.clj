@@ -157,21 +157,22 @@
         values      [{id 1 v 1 data ?board}]}
       {:board (game/empty-board board-size board-size)})))
 
-(defn batch-fn [{:keys [db]} thunks]
+(defn batch-fn [{:keys [db conns]} thunks]
   (let [[board] (d/q db '{select [data]
                           from   chunk
                           where  [= id 1]
                           limit  1}
                   (fn [stmt] (d/blob stmt 0)))]
     (run! (fn [thunk] (thunk db board)) thunks)
-    (d/q db '{update chunk
-              set    {id   1
-                      v    [+ v 1]
-                      data ?new-chunk}}
-      {:new-chunk (game/next-gen-board
-                    {:board    board
-                     :max-rows board-size
-                     :max-cols board-size})})))
+    (when (> (count conns) 0)
+      (d/q db '{update chunk
+                set    {id   1
+                        v    [+ v 1]
+                        data ?new-chunk}}
+        {:new-chunk (game/next-gen-board
+                      {:board    board
+                       :max-rows board-size
+                       :max-cols board-size})}))))
 
 (def routes
   (->> (mapv :routes

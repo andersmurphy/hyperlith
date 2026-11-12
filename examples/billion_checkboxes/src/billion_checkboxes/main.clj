@@ -2,7 +2,6 @@
   (:require
    [billion-checkboxes.qrcode :as qrcode]
    [clojure.math :as math]
-   [clojure.pprint :as pprint]
    [hyperlith.core :as h :refer [defaction defview defc]]
    [hyperlith.extras.ui.virtual-scroll :as vs]
    [hyperlith.impl.sqlite :as d]))
@@ -584,88 +583,3 @@
                :mmap_size  100000000000}}
    :routes   #'routes
    :batch-fn #'batch-fn})
-
-(comment ;; Example projection generation
-  (def tx! (-> @app_ ::h/tx!))
-
-  (tx!
-    (fn [db _]
-      (d/q db '{raw "pragma journal_mode"}
-        (fn [stmt]
-          (pprint/pprint (d/text stmt 0))))))
-
-  (tx!
-    (fn [db _]
-      (d/q db '{raw "pragma page_size"}
-        (fn [stmt]
-          (pprint/pprint (d/text stmt 0))))))
-
-  (tx!
-    (fn [db _]
-      (d/q db '{select [id data] from chunk where [= id 0]}
-        (fn [stmt]
-          (pprint/pprint (d/int stmt 0))
-          (pprint/pprint (d/blob stmt 1)))))))
-
-(comment ;; Example migration of for changing column type
-  (def tx! (-> @app_ ::h/tx!))
-
-  (tx!
-    (fn [db _]
-      (d/q db '{raw "DROP TABLE IF EXISTS newchunk"})
-      (d/q db
-        '{raw "CREATE TABLE IF NOT EXISTS newchunk(id INTEGER PRIMARY KEY, v INTEGER, data BLOB)"})
-      (d/q db '{raw "INSERT INTO newchunk SELECT id, 1, data FROM chunk"})
-      (d/q db '{raw "DROP TABLE chunk"})
-      (d/q db '{raw "ALTER TABLE newchunk RENAME TO chunk"})))
-
-  (tx!
-    (fn [db _]
-      (d/q db '{raw "SELECT id, v FROM chunk"}
-        (fn [stmt] (println (d/int stmt 0) (d/int stmt 1))))))
-
-  )
-
-(comment ;; Generate load test data
-  (def tx! (-> @app_ ::h/tx!))
-
-  (def data (atom nil))
-
-  (tx! (fn [db _]
-         (binding [*print-length* nil]
-           (->> (d/q db '{select id from chunk}
-                  (fn [stmt]
-                    (let [id (d/int stmt 0)]
-                      [(* (quot id board-size)
-                         chunk-size cell-size-px)
-                       (* (rem id board-size)
-                         chunk-size cell-size-px)])))
-             (spit "load-test-data.edn"))))))
-
-(comment ;; Fill empty chunks
-  (def tx! (-> @app_ ::h/tx!))
-
-  (run!
-    (fn [id]
-      (tx!
-        (fn [db _]
-          (d/q db
-            '{insert-into chunk
-              values      [{id   ?id
-                            data ?blank-chunk}]
-              on-conflict []
-              do-nothing  true}
-            {:blank-chunk blank-chunk :id id}))))
-    (range 0 (* board-size board-size)))
-  ,)
-
-(comment ;; Clear empty chunks
-  (def tx! (-> @app_ ::h/tx!))
-
-  (tx!
-    (fn [db _]
-      (d/q db
-        '{delete-from chunk
-          where       [= data ?blank-chunk]}
-        {:blank-chunk blank-chunk})))
-  ,)

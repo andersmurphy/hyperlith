@@ -247,9 +247,10 @@
 
 (defn new-app! [{:keys! [batch-fn domain db routes]}]
   (let [q          (LinkedBlockingQueue/new)
-        write-conn (sqlite/new-write-conn! db)]
+        write-conn (sqlite/new-write-conn! db)
+        conns      (ConcurrentHashMap/newKeySet)]
     {:routes         routes
-     :conns          (ConcurrentHashMap/newKeySet)
+     :conns          conns
      :domain         domain
      :new-read-conn! (fn [in-component?] (sqlite/new-read-conn! db
                                            in-component?))
@@ -259,7 +260,7 @@
      :batch!         (fn batch! []
                        (let [batch (ArrayList/new)]
                          (.drainTo q batch)
-                         (batch-fn {:db write-conn} (seq batch))))
+                         (batch-fn {:db write-conn :conns conns} (seq batch))))
      :tx!            (fn tx! [thunk] (LinkedBlockingQueue/.offer q thunk))}))
 
 (defn start-server!
@@ -322,6 +323,3 @@
       :dev  (http/start-server router config))
     {::h/wrapped-router router
      ::h/apps           apps}))
-
-
-
