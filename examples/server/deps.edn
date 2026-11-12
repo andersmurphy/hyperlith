@@ -1,7 +1,6 @@
 {:paths   ["src" "resources"]
  :deps    {org.clojure/clojure
-           {:mvn/version "1.13.0-alpha10"}           
-           com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.9.0"}
+           {:mvn/version "1.13.0-alpha10"}
            game_of_life/game_of_life   {:local/root "../game_of_life"}
            billion_cells/billion_cells {:local/root "../billion_cells"}
            billion_checkboxes/billion_checkboxes
@@ -14,5 +13,7 @@
                     "-Djdk.attach.allowAttachSelf"
                     "-XX:+EnableDynamicAgentLoading"]}
            :build {:deps       {io.github.clojure/tools.build
-                                {:git/tag "v0.10.5" :git/sha "2a21b7a"}}
+                                {:git/tag "v0.10.5" :git/sha "2a21b7a"}
+                                com.clojure-goes-fast/clj-async-profiler
+                                {:mvn/version "1.9.0"}}
                    :ns-default build}}}

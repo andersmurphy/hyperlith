@@ -5,8 +5,7 @@
    [hyperlith.impl.sqlite :as d]
    [billion-cells.main :as cells]
    [billion-checkboxes.main :as boxes]
-   [game-of-life.main :as gol]
-   [clj-async-profiler.core :as prof]))
+   [game-of-life.main :as gol]))
 
 (defonce app_ (atom nil))
 
@@ -36,6 +35,7 @@
   ,)
 
 (comment ;; Profiling
+  (require '[clj-async-profiler.core :as prof])
 
   (prof/start {:event :alloc})
   (prof/start)
